@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.4.7";
+  const K5WEB_VERSION = "1.4.8";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
@@ -1476,7 +1476,7 @@
     }
   });
 
-  // ---------- 开机图片转换（任意图片 → ST7565 128x64 1bpp 列优先位图） ----------
+  // ---------- 开机图片转换（任意图片 → ST7565 128x64 1bpp 页优先位图） ----------
   function imageToLogoBitmap(img, threshold) {
     if (threshold == null) threshold = parseInt($("logoThreshold").value) || 128;
     // 1. 创建 128x64 Canvas，白色背景
@@ -1507,11 +1507,11 @@
       bw[i] = gray < threshold ? 1 : 0;
     }
 
-    // 4. 转换为 ST7565 原生列优先格式（128 列 × 8 页，每页 8 行）
-    //    列优先 LSB 在上：每列 8 字节，字节 0 的 bit0 是第 0 行
+    // 4. 转换为 ST7565 页优先格式（8 页 × 128 列，每页 8 行）
+    //    页优先 LSB 在上：字节 [page * 128 + col]，bit0 是行 page*8
     const bitmap = new Uint8Array(1024);
-    for (let col = 0; col < 128; col++) {
-      for (let page = 0; page < 8; page++) {
+    for (let page = 0; page < 8; page++) {
+      for (let col = 0; col < 128; col++) {
         let byte = 0;
         for (let bit = 0; bit < 8; bit++) {
           const row = page * 8 + bit;
@@ -1519,14 +1519,14 @@
             byte |= (1 << bit);
           }
         }
-        bitmap[col * 8 + page] = byte;
+        bitmap[page * 128 + col] = byte;
       }
     }
 
     return bitmap;
   }
 
-  // 预览图片转换结果
+  // 预览图片转换结果（bitmap 为页优先格式）
   function renderLogoPreview(bitmap, canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
@@ -1535,9 +1535,9 @@
     const ctx = canvas.getContext('2d');
     const imageData = ctx.createImageData(128, 64);
 
-    for (let col = 0; col < 128; col++) {
-      for (let page = 0; page < 8; page++) {
-        const byte = bitmap[col * 8 + page];
+    for (let page = 0; page < 8; page++) {
+      for (let col = 0; col < 128; col++) {
+        const byte = bitmap[page * 128 + col];
         for (let bit = 0; bit < 8; bit++) {
           const row = page * 8 + bit;
           if (row >= 64) continue;
@@ -1552,6 +1552,15 @@
     }
 
     ctx.putImageData(imageData, 0, 0);
+  }
+
+  // 根据反色复选框返回用于显示的位图副本（不修改 logoData）
+  function getLogoDataForDisplay() {
+    if (!logoData) return null;
+    if (!$("logoInvert").checked) return logoData;
+    const inverted = new Uint8Array(logoData);
+    for (let i = 0; i < inverted.length; i++) inverted[i] = ~inverted[i] & 0xFF;
+    return inverted;
   }
 
   // ---------- 开机图片（EEPROM 0xC000，1032 字节） ----------
@@ -1577,7 +1586,7 @@
       logoImg = img;
       const threshold = parseInt($("logoThreshold").value) || 128;
       logoData = imageToLogoBitmap(img, threshold);
-      renderLogoPreview(logoData, "logoPreview");
+      renderLogoPreview(getLogoDataForDisplay(), "logoPreview");
       $("btnLogoWrite").disabled = false;
       log(`图片已加载：${f.name}（${img.width}×${img.height} → 128×64 单色）`);
     } catch (err) {
@@ -1607,12 +1616,7 @@
   // 反色切换时重新渲染预览
   $("logoInvert").addEventListener("change", () => {
     if (!logoImg) return;
-    const threshold = parseInt($("logoThreshold").value) || 128;
-    logoData = imageToLogoBitmap(logoImg, threshold);
-    if ($("logoInvert").checked) {
-      for (let i = 0; i < logoData.length; i++) logoData[i] = ~logoData[i] & 0xFF;
-    }
-    renderLogoPreview(logoData, "logoPreview");
+    renderLogoPreview(getLogoDataForDisplay(), "logoPreview");
   });
 
   // 色彩阈值滑块
@@ -1621,10 +1625,7 @@
     if (!logoImg) return;
     const threshold = parseInt($("logoThreshold").value) || 128;
     logoData = imageToLogoBitmap(logoImg, threshold);
-    if ($("logoInvert").checked) {
-      for (let i = 0; i < logoData.length; i++) logoData[i] = ~logoData[i] & 0xFF;
-    }
-    renderLogoPreview(logoData, "logoPreview");
+    renderLogoPreview(getLogoDataForDisplay(), "logoPreview");
   });
 
   $("btnLogoWrite").addEventListener("click", async () => {
@@ -1730,7 +1731,10 @@
 
       // 提取位图并预览
       const bitmap = out.slice(L.MAGIC_SIZE, L.MAGIC_SIZE + L.BITMAP_SIZE);
-      renderLogoPreview(bitmap, "logoPreview");
+      logoData = new Uint8Array(bitmap);
+      logoImg = null; // 读取的是设备数据，无原图
+      renderLogoPreview(getLogoDataForDisplay(), "logoPreview");
+      $("btnLogoWrite").disabled = false;
       setStatus("✅ 已读取当前开机图片", "ok");
       log("开机图片读取完成");
     } catch (err) {
