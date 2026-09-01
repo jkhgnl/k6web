@@ -31,13 +31,7 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://jkhgnl.github.io/k6web/#tabCalExp</loc>
-    <lastmod>2026-09-01</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://jkhgnl.github.io/k6web/#tabCalImp</loc>
+    <loc>https://jkhgnl.github.io/k6web/#tabCal</loc>
     <lastmod>2026-09-01</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>

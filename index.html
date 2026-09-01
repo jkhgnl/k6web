@@ -264,8 +264,7 @@
       <div class="nav-title" data-group="gTool">工具 <span class="arrow">▼</span></div>
       <div class="nav-items" id="gTool">
         <div class="nav-item" data-tab="tabFw" type="button">固件刷写</div>
-        <div class="nav-item" data-tab="tabCalExp" type="button">导出校准</div>
-        <div class="nav-item" data-tab="tabCalImp" type="button">导入校准</div>
+        <div class="nav-item" data-tab="tabCal" type="button">校准数据</div>
         <div class="nav-item" data-tab="tabFont" type="button">中文字库</div>
       </div>
     </div>
@@ -323,15 +322,10 @@
       <div class="tool-label">收藏卫星</div>
       <div class="tool-desc">常用卫星收藏与快速定位</div>
     </div>
-    <div class="tool-card" data-goto="tabCalExp">
+    <div class="tool-card" data-goto="tabCal">
       <div class="tool-icon">📤</div>
-      <div class="tool-label">导出校准</div>
-      <div class="tool-desc">读出机器校准数据并保存</div>
-    </div>
-    <div class="tool-card" data-goto="tabCalImp">
-      <div class="tool-icon">📥</div>
-      <div class="tool-label">导入校准</div>
-      <div class="tool-desc">写入校准数据到机器</div>
+      <div class="tool-label">校准数据</div>
+      <div class="tool-desc">导出备份 / 导入恢复校准数据</div>
     </div>
     <div class="tool-card" data-goto="tabFont">
       <div class="tool-icon">🔤</div>
@@ -380,9 +374,9 @@
 
 </div>
 
-<!-- ========== 选项卡：导出校准数据 ========== -->
-<div id="tabCalExp" class="tabpanel">
-  <h2 class="page-title">导出校准数据</h2>
+<!-- ========== 选项卡：校准数据 ========== -->
+<div id="tabCal" class="tabpanel">
+  <h2 class="page-title">校准数据</h2>
 
   <div class="card">
     <h2>导出校准数据（512 字节）</h2>
@@ -391,12 +385,6 @@
       <button id="btnCalExp">📤 导出校准数据</button>
     </div>
   </div>
-
-</div>
-
-<!-- ========== 选项卡：导入校准数据 ========== -->
-<div id="tabCalImp" class="tabpanel">
-  <h2 class="page-title">导入校准数据</h2>
 
   <div class="card">
     <h2>导入校准数据（512 字节）</h2>
