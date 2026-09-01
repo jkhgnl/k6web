@@ -115,6 +115,16 @@
   .fav-table .fav-goto { cursor: pointer; color: #2f6fdc; font-size: 13px; background: none; border: none; padding: 4px 8px; }
   .fav-table .fav-goto:hover { text-decoration: underline; }
 
+  .tool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .tool-card {
+    background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 18px 16px;
+    cursor: pointer; transition: box-shadow .15s, border-color .15s;
+  }
+  .tool-card:hover { border-color: #2f6fdc; box-shadow: 0 2px 8px rgba(47,111,220,.15); }
+  .tool-icon { font-size: 28px; margin-bottom: 8px; }
+  .tool-label { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 4px; }
+  .tool-desc { font-size: 12px; color: #888; line-height: 1.4; }
+
   .tabpanel { display: none; }
   .tabpanel.active { display: block; }
 
@@ -236,8 +246,49 @@
 <!-- ========== 首页 ========== -->
 <div id="tabHome" class="tabpanel active">
   <h1 class="page-title">多普勒固件手台工具</h1>
-  <div class="card">
-    <p class="hint">适用于 UV-K1 / UV-K5 V3 / UV-K6 V3（PY32F071）F4HWN 固件。选择左侧功能菜单开始使用。</p>
+  <p class="hint" style="margin-bottom:18px">适用于 UV-K1 / UV-K5 V3 / UV-K6 V3（PY32F071）F4HWN 固件。选择下方功能开始使用。</p>
+
+  <div class="tool-grid">
+    <div class="tool-card" data-goto="tabFw">
+      <div class="tool-icon">📡</div>
+      <div class="tool-label">固件刷写</div>
+      <div class="tool-desc">远程固件仓库、本地刷写</div>
+    </div>
+    <div class="tool-card" data-goto="tabChProg">
+      <div class="tool-icon">📻</div>
+      <div class="tool-label">信道管理</div>
+      <div class="tool-desc">批量写入 / 读取校验 / 导出 CSV</div>
+    </div>
+    <div class="tool-card" data-goto="tabEphem">
+      <div class="tool-icon">🛰️</div>
+      <div class="tool-label">星历写入</div>
+      <div class="tool-desc">TLE 下载、多普勒预报、星历写入</div>
+    </div>
+    <div class="tool-card" data-goto="tabFav">
+      <div class="tool-icon">⭐</div>
+      <div class="tool-label">收藏卫星</div>
+      <div class="tool-desc">常用卫星收藏与快速定位</div>
+    </div>
+    <div class="tool-card" data-goto="tabCalExp">
+      <div class="tool-icon">📤</div>
+      <div class="tool-label">导出校准</div>
+      <div class="tool-desc">读出机器校准数据并保存</div>
+    </div>
+    <div class="tool-card" data-goto="tabCalImp">
+      <div class="tool-icon">📥</div>
+      <div class="tool-label">导入校准</div>
+      <div class="tool-desc">写入校准数据到机器</div>
+    </div>
+    <div class="tool-card" data-goto="tabFont">
+      <div class="tool-icon">🔤</div>
+      <div class="tool-label">中文字库</div>
+      <div class="tool-desc">刷写中文显示字库</div>
+    </div>
+    <div class="tool-card" data-goto="tabAbout">
+      <div class="tool-icon">ℹ️</div>
+      <div class="tool-label">关于</div>
+      <div class="tool-desc">版本信息、反馈</div>
+    </div>
   </div>
 </div>
 
@@ -700,6 +751,9 @@
   }
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', () => window.switchTab(item.dataset.tab));
+  });
+  document.querySelectorAll('.tool-card[data-goto]').forEach(card => {
+    card.addEventListener('click', () => window.switchTab(card.dataset.goto));
   });
   // 汉堡菜单
   document.getElementById('menuToggle').addEventListener('click', () => {
