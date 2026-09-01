@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.4.0";
+  const K5WEB_VERSION = "1.4.1";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
@@ -2773,6 +2773,8 @@
   // ---------- 收藏列表渲染 ----------
   function renderFavTab() {
     const box = $("favList");
+    // 每次渲染时从 localStorage 读取，确保数据最新
+    loadFavorites();
     if (!favorites.length) {
       box.innerHTML = '<div class="sat-empty" style="padding:24px">还没有收藏卫星。在星历写入的下拉列表中点击 ⭐ 即可收藏。</div>';
       return;
@@ -2811,20 +2813,69 @@
     });
   }
 
-  // 切换到收藏 tab 时自动渲染
-  const origSwitchTab = window.switchTab;
-  window.switchTab = function (tabId) {
-    if (typeof origSwitchTab === "function") origSwitchTab(tabId);
-    else {
-      // fallback: 内联脚本尚未执行，手动切换
-      document.querySelectorAll('.tabpanel').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      const t = document.getElementById(tabId);
-      if (t) t.classList.add('active');
-      document.querySelectorAll('.nav-item').forEach(n => { if (n.dataset.tab === tabId) n.classList.add('active'); });
+  // ---------- 收藏页搜索框 ----------
+  {
+    const input = $("favSearch");
+    const dd = $("favDropdown");
+    if (input && dd) {
+      let activeIdx = -1;
+      function renderFavDropdown() {
+        const q = input.value.trim().toLowerCase();
+        if (!q || !satList.length) { dd.hidden = true; return; }
+        const matched = satList.filter((s) => {
+          const name = s.name.trim().toLowerCase();
+          const norad = satNorad(s);
+          return name.includes(q) || norad.includes(q);
+        }).slice(0, 60);
+        if (!matched.length) { dd.hidden = true; return; }
+        activeIdx = -1;
+        let html = "";
+        matched.forEach((s, i) => {
+          const norad = satNorad(s);
+          const fav = isFav(norad);
+          const name = s.name.trim();
+          html += `<div class="sat-item" data-i="${i}" data-norad="${norad}" data-name="${name}">
+            <span>${name}</span><span class="norad">#${norad}</span>
+            <span class="sat-fav${fav ? " active" : ""}" data-norad="${norad}">${fav ? "★" : "☆"}</span>
+          </div>`;
+        });
+        dd.innerHTML = html;
+        dd.hidden = false;
+        dd.querySelectorAll(".sat-fav").forEach((el) => {
+          el.addEventListener("mousedown", (e) => {
+            e.stopPropagation();
+            toggleFav(el.dataset.norad);
+            renderFavDropdown();
+            renderFavTab();
+          });
+        });
+        dd.querySelectorAll(".sat-item").forEach((el) => {
+          el.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            input.value = el.dataset.name;
+            dd.hidden = true;
+          });
+        });
+      }
+      input.addEventListener("input", renderFavDropdown);
+      input.addEventListener("focus", renderFavDropdown);
+      document.addEventListener("mousedown", (e) => {
+        if (!dd.contains(e.target) && e.target !== input) dd.hidden = true;
+      });
     }
-    if (tabId === "tabFav") renderFavTab();
-  };
+  }
+
+  // 收藏 tab 激活时自动渲染（MutationObserver 兜底，不依赖 switchTab 时序）
+  {
+    const favPanel = document.getElementById("tabFav");
+    if (favPanel) {
+      new MutationObserver(() => {
+        if (favPanel.classList.contains("active")) renderFavTab();
+      }).observe(favPanel, { attributes: true, attributeFilter: ["class"] });
+      // 如果页面加载时 tabFav 已激活，直接渲染
+      if (favPanel.classList.contains("active")) renderFavTab();
+    }
+  }
 
   // 页面加载后恢复频率库（localStorage 缓存优先，其次内置 freqdb.js 静态数据）；
   // 频率基本不变、缓存不过期，仅在完全无数据时后台静默拉取

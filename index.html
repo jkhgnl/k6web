@@ -782,7 +782,11 @@ s.parentNode.insertBefore(el, s);
 <div id="tabFav" class="tabpanel">
   <h2 class="page-title">收藏卫星</h2>
   <div class="card">
-    <p class="hint">收藏的卫星会显示在星历写入的下拉列表顶部，方便快速选择。在下拉列表中点击 ⭐ 即可收藏/取消收藏。</p>
+    <p class="hint">收藏的卫星会显示在星历写入的下拉列表顶部，方便快速选择。点击 ⭐ 收藏/取消收藏。</p>
+    <div class="sat-combo" style="margin-bottom:12px">
+      <input id="favSearch" type="text" placeholder="搜索卫星名称或 NORAD 编号..." autocomplete="off" spellcheck="false">
+      <div id="favDropdown" class="sat-dropdown" hidden></div>
+    </div>
     <div id="favList"></div>
   </div>
 </div>
