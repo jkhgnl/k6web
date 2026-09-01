@@ -2623,4 +2623,11 @@
     }
     requestAnimationFrame(tick);
   }).catch(() => {});
+
+  // 动态获取 APP 最新版本下载链接
+  fetch("https://gitee.com/api/v5/repos/jkhgnl/uvk6-tools-android/releases/latest").then(r => r.json()).then(d => {
+    const apk = (d.assets || []).find(a => a.name && a.name.endsWith(".apk"));
+    const btn = $("appDownloadBtn");
+    if (apk && btn) btn.href = apk.browser_download_url;
+  }).catch(() => {});
 })();
