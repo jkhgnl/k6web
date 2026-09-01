@@ -64,7 +64,10 @@
   /* 内容区 */
   .content {
     flex: 1; overflow-y: auto; padding: 20px 24px;
-    max-width: 900px; margin: 0 auto; width: 100%;
+    width: 100%;
+  }
+  .content-inner {
+    max-width: 900px; margin: 0 auto;
   }
   .page-title { font-size: 20px; margin: 0 0 16px; }
   .welcome { font-size: 16px; color: #333; margin-bottom: 24px; }
@@ -228,6 +231,7 @@
 
   <!-- 右侧内容 -->
   <main class="content">
+  <div class="content-inner">
 
 <!-- ========== 首页 ========== -->
 <div id="tabHome" class="tabpanel active">
@@ -639,6 +643,7 @@
   </div>
 </div>
 
+  </div>
   </main>
 </div>
 
