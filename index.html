@@ -141,8 +141,9 @@ s.parentNode.insertBefore(el, s);
   /* 卫星模糊搜索下拉 */
   .sat-combo { position: relative; }
   .sat-dropdown { position: absolute; top: 100%; left: 0; right: 0; z-index: 1000; background: #fff; border: 1px solid #bbb; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.15); max-height: 260px; overflow-y: auto; margin-top: 2px; }
-  .sat-item { padding: 6px 8px; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .sat-item .norad { color: #999; font-size: 12px; font-family: Consolas, monospace; flex-shrink: 0; }
+  .sat-item { padding: 6px 8px; font-size: 13px; cursor: pointer; display: flex; align-items: baseline; gap: 8px; }
+  .sat-item span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sat-item .norad { color: #999; font-size: 12px; font-family: Consolas, monospace; flex-shrink: 0; white-space: nowrap; }
   .sat-item.active { background: #2f6fdc; color: #fff; }
   .sat-item.active .norad { color: #cfe0ff; }
   .sat-item mark { background: #ffe58f; padding: 0; }
