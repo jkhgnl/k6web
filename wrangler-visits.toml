@@ -1,0 +1,13 @@
+name = "k6web-visits"
+main = "visits-worker.js"
+compatibility_date = "2024-01-01"
+account_id = "14a86e1ce4d1aa9b673f18b184c24ff1"
+
+routes = [
+  { pattern = "visits.jkhgnl.dpdns.org", custom_domain = true }
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "gps"
+database_id = "af8934f2-9993-4aa8-afee-8783e559a84b"

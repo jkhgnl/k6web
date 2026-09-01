@@ -2606,4 +2606,10 @@
       ensureFreqDB().catch(() => {});
     }
   }
+
+  // 首页访问人次统计
+  fetch("https://visits.jkhgnl.dpdns.org/").then(r => r.json()).then(d => {
+    const el = $("homeVisitCount");
+    if (el) el.textContent = `今日访问：${d.count} 次`;
+  }).catch(() => {});
 })();
