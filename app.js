@@ -1860,6 +1860,176 @@
   }
 
   let chCsvData = null;
+  let chTablePage = 1;
+  const CH_PAGE_SIZE = 10;
+
+  const BANDWIDTH_OPTIONS = [{ label: "宽带", value: 0 }, { label: "窄带", value: 1 }];
+  const POWER_OPTIONS = ["USER","LOW1","LOW2","LOW3","LOW4","LOW5","MID","HIGH"].map((l, i) => ({ label: l, value: i }));
+  const MOD_OPTIONS = ["FM","AM","USB"].map((l, i) => ({ label: l, value: i }));
+  const DIR_OPTIONS = ["关闭","+","−"].map((l, i) => ({ label: l, value: i }));
+  const TONE_OPTIONS = (function() {
+    const opts = [{ label: "OFF", codeType: 0, code: 0 }];
+    for (let i = 0; i < proto.CTCSS_OPTIONS.length; i++) {
+      opts.push({ label: (proto.CTCSS_OPTIONS[i] / 10).toFixed(1) + "Hz", codeType: 1, code: i });
+    }
+    for (let i = 0; i < proto.DCS_OPTIONS.length; i++) {
+      const dcs = proto.DCS_OPTIONS[i];
+      opts.push({ label: "D" + dcs.toString(8).padStart(3, "0"), codeType: 2, code: i });
+      opts.push({ label: "I" + dcs.toString(8).padStart(3, "0"), codeType: 3, code: i });
+    }
+    return opts;
+  })();
+
+  function fmtMhz(freq10Hz) {
+    return (freq10Hz / 100000).toFixed(5);
+  }
+
+  function renderChannelTable(parsedRows) {
+    const tb = $("chPreviewTbody");
+    const totalPages = Math.max(1, Math.ceil((parsedRows.length || 0) / CH_PAGE_SIZE));
+    if (chTablePage > totalPages) chTablePage = totalPages;
+    const start = (chTablePage - 1) * CH_PAGE_SIZE;
+    const pageRows = parsedRows.slice(start, start + CH_PAGE_SIZE);
+    const rowCount = Math.max(pageRows.length, CH_PAGE_SIZE);
+    tb.innerHTML = "";
+    for (let ri = 0; ri < rowCount; ri++) {
+      const tr = document.createElement("tr");
+      const hasData = ri < pageRows.length;
+      const r = hasData ? pageRows[ri] : null;
+      const globalIdx = start + ri;
+      for (let ci = 0; ci < 11; ci++) {
+        const td = document.createElement("td");
+        td.style.border = "1px solid #ccc";
+        td.style.padding = "4px";
+        td.style.minWidth = "70px";
+        if (ci === 0) {
+          td.textContent = hasData ? (r.ch + 1).toString() : (globalIdx + 1).toString();
+        } else if ([1, 2, 3, 10].includes(ci)) {
+          td.setAttribute("contenteditable", "true");
+          if (hasData) {
+            if (ci === 1) td.textContent = r.name || "";
+            else if (ci === 2) td.textContent = fmtMhz(r.rx10);
+            else if (ci === 3) td.textContent = fmtMhz(r.rx10 + r.diff10);
+            else if (ci === 10) td.textContent = Math.abs(r.diff10 / 100000).toFixed(4);
+          }
+          td.addEventListener("blur", syncTableData);
+        } else {
+          const select = document.createElement("select");
+          let options;
+          if (ci === 4 || ci === 5) options = TONE_OPTIONS;
+          else if (ci === 6) options = BANDWIDTH_OPTIONS;
+          else if (ci === 7) options = POWER_OPTIONS;
+          else if (ci === 8) options = MOD_OPTIONS;
+          else if (ci === 9) options = DIR_OPTIONS;
+          if (options) {
+            options.forEach(opt => {
+              const op = document.createElement("option");
+              op.textContent = opt.label;
+              if (ci !== 4 && ci !== 5) op.value = opt.value;
+              select.appendChild(op);
+            });
+            if (hasData) {
+              let selIdx = 0;
+              if (ci === 4) selIdx = options.findIndex(o => o.codeType === r.rxCodeType && o.code === r.rxCode);
+              else if (ci === 5) selIdx = options.findIndex(o => o.codeType === r.txCodeType && o.code === r.txCode);
+              else if (ci === 6) selIdx = options.findIndex(o => o.value === r.bandwidth);
+              else if (ci === 7) selIdx = options.findIndex(o => o.value === r.power);
+              else if (ci === 8) selIdx = options.findIndex(o => o.value === r.modulation);
+              else if (ci === 9) {
+                const dirVal = r.diff10 > 0 ? 1 : (r.diff10 < 0 ? 2 : 0);
+                selIdx = options.findIndex(o => o.value === dirVal);
+              }
+              if (selIdx >= 0) select.selectedIndex = selIdx;
+            }
+            select.dataset.row = globalIdx;
+            const fieldMap = { 4: "rxTone", 5: "txTone", 6: "bandwidth", 7: "power", 8: "modulation", 9: "dir" };
+            select.dataset.field = fieldMap[ci];
+            select.dataset.options = JSON.stringify(options);
+            select.addEventListener("change", function() {
+              const idx = parseInt(this.dataset.row);
+              if (isNaN(idx) || !chCsvData || idx >= chCsvData.length) return;
+              const field = this.dataset.field;
+              const selectedOpt = JSON.parse(this.dataset.options)[this.selectedIndex];
+              const row = chCsvData[idx];
+              if (field === "rxTone") { row.rxCodeType = selectedOpt.codeType; row.rxCode = selectedOpt.code; }
+              else if (field === "txTone") { row.txCodeType = selectedOpt.codeType; row.txCode = selectedOpt.code; }
+              else if (field === "bandwidth") row.bandwidth = selectedOpt.value;
+              else if (field === "power") row.power = selectedOpt.value;
+              else if (field === "modulation") row.modulation = selectedOpt.value;
+              else if (field === "dir") {
+                const absDiff = Math.abs(row.diff10);
+                if (selectedOpt.value === 0) row.diff10 = 0;
+                else if (selectedOpt.value === 1) row.diff10 = absDiff;
+                else row.diff10 = -absDiff;
+              }
+              renderChannelTable(chCsvData);
+            });
+          }
+          td.appendChild(select);
+        }
+        tr.appendChild(td);
+      }
+      tb.appendChild(tr);
+    }
+    renderPagination(totalPages, parsedRows.length);
+  }
+
+  function renderPagination(totalPages, totalItems) {
+    const el = $("chPagination");
+    if (!el) return;
+    if (totalPages <= 1) { el.innerHTML = totalItems > 0 ? `共 ${totalItems} 条信道` : ""; return; }
+    let html = `<button onclick="chGoPage(${chTablePage - 1})" ${chTablePage <= 1 ? "disabled" : ""} style="margin:0 4px">◀</button>`;
+    html += `<span>第 ${chTablePage}/${totalPages} 页（共 ${totalItems} 条）</span>`;
+    html += `<button onclick="chGoPage(${chTablePage + 1})" ${chTablePage >= totalPages ? "disabled" : ""} style="margin:0 4px">▶</button>`;
+    el.innerHTML = html;
+  }
+  window.chGoPage = function(p) {
+    if (!chCsvData) return;
+    const totalPages = Math.ceil(chCsvData.length / CH_PAGE_SIZE);
+    if (p < 1 || p > totalPages) return;
+    chTablePage = p;
+    renderChannelTable(chCsvData);
+  };
+
+  function syncTableData() {
+    try {
+      const tb = $("chPreviewTbody");
+      if (!tb) return;
+      const trs = Array.from(tb.querySelectorAll("tr"));
+      const outRows = [];
+      for (const tr of trs) {
+        const cells = Array.from(tr.querySelectorAll("td"));
+        const rowData = cells.map((td, colIdx) => {
+          const select = td.querySelector("select");
+          if (select) {
+            if (colIdx === 4 || colIdx === 5) return select.options[select.selectedIndex]?.textContent || "";
+            return select.value;
+          }
+          return td.textContent.trim();
+        });
+        if (rowData.every(s => s === "")) continue;
+        outRows.push(rowData);
+      }
+      if (outRows.length === 0) { chCsvData = null; $("btnChProgCsv").disabled = true; return; }
+      const { rows: parsed, warnings } = proto.parseChannelRows(outRows);
+      for (const w of warnings) log(w, "warn");
+      chCsvData = parsed;
+      $("btnChProgCsv").disabled = false;
+    } catch (err) {
+      log(`[表格同步失败] ${err.message}`, "err");
+    }
+  }
+
+  setTimeout(() => { if ($("chPreviewTbody")) renderChannelTable([]); }, 100);
+
+  $("btnClearTable")?.addEventListener("click", () => {
+    chCsvData = null;
+    chTablePage = 1;
+    renderChannelTable([]);
+    $("btnChProgCsv").disabled = true;
+    log("预览表格已清空");
+  });
+
   $("chCsvFile").addEventListener("change", async (e) => {
     const f = e.target.files[0];
     chCsvData = null;
@@ -1871,6 +2041,8 @@
       for (const w of warnings) log(w, "warn");
       if (parsed.length === 0) { setStatus("文件中没有可识别的信道行", "err"); return; }
       chCsvData = parsed;
+      chTablePage = 1;
+      renderChannelTable(parsed);
       $("btnChProgCsv").disabled = false;
       const fmt = f.name.toLowerCase().endsWith(".xlsx") ? "xlsx" : "CSV";
       log(`${fmt} 已加载：${f.name}，${parsed.length} 条信道（识别为${format}格式）`);
@@ -1882,6 +2054,7 @@
 
   $("btnChProgCsv").addEventListener("click", async () => {
     if (!port) { setStatus("请先连接串口", "err"); return; }
+    syncTableData();
     if (!chCsvData || !chCsvData.length) { setStatus("请先选择信道文件", "err"); return; }
     $("btnChProgCsv").disabled = true;
     $("chCsvProgress").style.display = "block";

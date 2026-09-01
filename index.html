@@ -562,12 +562,33 @@
   </div>
 
   <div class="card">
-    <h2>批量导入（CSV）</h2>
+    <h2>批量信道写入</h2>
     <p class="hint">每行：信道号,名称,接收频率,发射频率,接收亚音,发射亚音,带宽,功率,调制,差频方向,差频。标题行可选。信道号与手台显示一致，为 1–1024。名称留空则清空。</p>
-    <label>CSV 文件</label>
     <input id="chCsvFile" type="file" accept=".xlsx,.csv,.txt">
+    <div style="overflow:auto;margin-top:8px">
+      <table id="chPreviewTable" style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:#f3f4f6;">
+            <th style="border:1px solid #ccc;padding:4px;">信道号</th>
+            <th style="border:1px solid #ccc;padding:4px;">名称</th>
+            <th style="border:1px solid #ccc;padding:4px;">接收频率</th>
+            <th style="border:1px solid #ccc;padding:4px;">发射频率</th>
+            <th style="border:1px solid #ccc;padding:4px;">接收亚音</th>
+            <th style="border:1px solid #ccc;padding:4px;">发射亚音</th>
+            <th style="border:1px solid #ccc;padding:4px;">带宽</th>
+            <th style="border:1px solid #ccc;padding:4px;">功率</th>
+            <th style="border:1px solid #ccc;padding:4px;">调制</th>
+            <th style="border:1px solid #ccc;padding:4px;">差频方向</th>
+            <th style="border:1px solid #ccc;padding:4px;">差频</th>
+          </tr>
+        </thead>
+        <tbody id="chPreviewTbody"></tbody>
+      </table>
+    </div>
+    <div id="chPagination" style="margin-top:8px;text-align:center;font-size:13px;"></div>
     <div class="row" style="margin-top:8px">
       <button id="btnChProgCsv" disabled>📁 导入 CSV 并写入</button>
+      <button id="btnClearTable" class="secondary">🗑 清空表格</button>
     </div>
     <div id="chCsvProgress" class="progress"><div id="chCsvProgressBar"></div></div>
   </div>
