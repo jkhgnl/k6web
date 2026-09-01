@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.4.4";
+  const K5WEB_VERSION = "1.4.5";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
@@ -1581,6 +1581,24 @@
       log("图片加载异常：" + err.message, "err");
     }
   });
+
+  // ---------- 拖拽上传 ----------
+  {
+    const zone = $("logoDropZone");
+    const fileInput = $("logoFile");
+    if (zone && fileInput) {
+      zone.addEventListener("click", () => fileInput.click());
+      zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.style.borderColor = "#2f6fdc"; zone.style.background = "#f0f6ff"; });
+      zone.addEventListener("dragleave", () => { zone.style.borderColor = "#ccc"; zone.style.background = ""; });
+      zone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        zone.style.borderColor = "#ccc";
+        zone.style.background = "";
+        const f = e.dataTransfer.files[0];
+        if (f) { fileInput.files = e.dataTransfer.files; fileInput.dispatchEvent(new Event("change")); }
+      });
+    }
+  }
 
   // 反色切换时重新渲染预览
   $("logoInvert").addEventListener("change", () => {
