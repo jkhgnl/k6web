@@ -34,9 +34,10 @@
   let passData = null; // findPass 结果
 
   const log = (msg, cls) => {
+    const line = (cls ? `[${cls}] ` : "") + msg;
+    console.log(line);
     const el = $("log");
-    el.textContent += (cls ? `[${cls}] ` : "") + msg + "\n";
-    el.scrollTop = el.scrollHeight;
+    if (el) { el.textContent += line + "\n"; el.scrollTop = el.scrollHeight; }
   };
   const setStatus = (msg, cls) => {
     const el = $("status");

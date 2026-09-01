@@ -108,11 +108,13 @@ export default {
         try {
           const body = await request.json();
           const { lat, lon, alt } = body;
+          console.log("[setgps] POST token=" + token, lat, lon, alt);
           if (typeof lat === "number" && typeof lon === "number") {
             await env.GPS_KV.put("gps:" + token, JSON.stringify({ lat, lon, alt: alt || 0 }), { expirationTtl: 300 });
+            console.log("[setgps] KV stored gps:" + token);
             return new Response(JSON.stringify({ ok: true }), { status: 200, headers: jsonHeaders });
           }
-        } catch (e) {}
+        } catch (e) { console.log("[setgps] error:", e); }
         return new Response(JSON.stringify({ ok: false, error: "invalid data" }), { status: 400, headers: jsonHeaders });
       }
 
@@ -126,7 +128,9 @@ export default {
 
     // ---------- /getgps ----------
     if (path === "/getgps" && token) {
+      console.log("[getgps] GET token=" + token);
       const data = await env.GPS_KV.get("gps:" + token, "json");
+      console.log("[getgps] KV result:", data);
       if (data) {
         return new Response(JSON.stringify({ ok: true, lat: data.lat, lon: data.lon, alt: data.alt || 0 }), { status: 200, headers: jsonHeaders });
       }
