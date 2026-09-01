@@ -9,3 +9,8 @@ routes = [
 [[kv_namespaces]]
 binding = "GPS_KV"
 id = "d9e7abbcf6e44496833cea5d7e6702b8"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "gps"
+database_id = "af8934f2-9993-4aa8-afee-8783e559a84b"

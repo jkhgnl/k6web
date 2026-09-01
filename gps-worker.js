@@ -4,21 +4,66 @@
  * 流程：
  * 1. 网页生成二维码 → https://<worker>/setgps?t=<token>
  * 2. 手机扫码 → 打开 Worker URL → 浏览器弹出定位授权
- * 3. 手机授权后 → GPS 数据上报到 Worker（存入 KV）
+ * 3. 手机授权后 → GPS 数据上报到 Worker（存入 KV / D1）
  * 4. 网页轮询 → https://<worker>/getgps?t=<token> → 拿到 GPS 数据
  *
- * 部署：
- * 1. wrangler kv namespace create GPS_KV
- * 2. 把 id 填入 wrangler.toml 的 kv_namespace
- * 3. wrangler deploy
+ * 存储策略：KV 优先，D1 兜底（KV 写入配额耗尽时自动切换）
  */
 
-function corsHeaders(origin) {
+function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
+}
+
+const TTL_SECONDS = 300;
+
+// 写入：KV 优先，失败则 D1
+async function storeGps(env, token, lat, lon, alt) {
+  const json = JSON.stringify({ lat, lon, alt });
+  const expiresAt = Math.floor(Date.now() / 1000) + TTL_SECONDS;
+  try {
+    await env.GPS_KV.put("gps:" + token, json, { expirationTtl: TTL_SECONDS });
+    console.log("[store] KV ok token=" + token);
+    return "kv";
+  } catch (e) {
+    console.log("[store] KV failed, fallback to D1:", e.message);
+  }
+  try {
+    await env.DB.prepare(
+      "INSERT OR REPLACE INTO gps_data (token, data, expires_at) VALUES (?, ?, ?)"
+    ).bind(token, json, expiresAt).run();
+    console.log("[store] D1 ok token=" + token);
+    return "d1";
+  } catch (e) {
+    console.log("[store] D1 error:", e.message);
+    return null;
+  }
+}
+
+// 读取：KV 优先，没有则查 D1
+async function loadGps(env, token) {
+  // 先查 KV
+  try {
+    const kvData = await env.GPS_KV.get("gps:" + token, "json");
+    if (kvData) return kvData;
+  } catch (_) {}
+  // 再查 D1
+  try {
+    const row = await env.DB.prepare(
+      "SELECT data, expires_at FROM gps_data WHERE token = ?"
+    ).bind(token).first();
+    if (row && row.expires_at > Math.floor(Date.now() / 1000)) {
+      return JSON.parse(row.data);
+    }
+    // 过期则清理
+    if (row) {
+      await env.DB.prepare("DELETE FROM gps_data WHERE token = ?").bind(token).run();
+    }
+  } catch (_) {}
+  return null;
 }
 
 // 手机端页面：获取 GPS 后自动上报
@@ -127,9 +172,10 @@ export default {
           const { lat, lon, alt } = body;
           console.log("[setgps] POST token=" + token, lat, lon, alt);
           if (typeof lat === "number" && typeof lon === "number") {
-            await env.GPS_KV.put("gps:" + token, JSON.stringify({ lat, lon, alt: alt || 0 }), { expirationTtl: 300 });
-            console.log("[setgps] KV stored gps:" + token);
-            return new Response(JSON.stringify({ ok: true }), { status: 200, headers: jsonHeaders });
+            const via = await storeGps(env, token, lat, lon, alt || 0);
+            if (via) {
+              return new Response(JSON.stringify({ ok: true, via }), { status: 200, headers: jsonHeaders });
+            }
           }
         } catch (e) { console.log("[setgps] error:", e); }
         return new Response(JSON.stringify({ ok: false, error: "invalid data" }), { status: 400, headers: jsonHeaders });
@@ -144,9 +190,10 @@ export default {
         const alt = parseFloat(url.searchParams.get("alt") || "0") || 0;
         console.log("[setgps] GET token=" + token, lat, lon, alt);
         if (!isNaN(lat) && !isNaN(lon)) {
-          await env.GPS_KV.put("gps:" + token, JSON.stringify({ lat, lon, alt }), { expirationTtl: 300 });
-          console.log("[setgps] KV stored gps:" + token + " (from GET)");
-          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: jsonHeaders });
+          const via = await storeGps(env, token, lat, lon, alt);
+          if (via) {
+            return new Response(JSON.stringify({ ok: true, via }), { status: 200, headers: jsonHeaders });
+          }
         }
         return new Response(JSON.stringify({ ok: false, error: "invalid lat/lon" }), { status: 400, headers: jsonHeaders });
       }
@@ -162,8 +209,7 @@ export default {
     // ---------- /getgps ----------
     if (path === "/getgps" && token) {
       console.log("[getgps] GET token=" + token);
-      const data = await env.GPS_KV.get("gps:" + token, "json");
-      console.log("[getgps] KV result:", data);
+      const data = await loadGps(env, token);
       if (data) {
         return new Response(JSON.stringify({ ok: true, lat: data.lat, lon: data.lon, alt: data.alt || 0 }), { status: 200, headers: jsonHeaders });
       }
