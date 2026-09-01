@@ -147,6 +147,7 @@
   // （新发射的星/数据修正自动进来），获取失败沿用旧缓存（反正频率不变）。
   // 缓存结构 { savedAt, map: { noradId: { up, down, mode, type, desc } } }
   const FREQ_CACHE_KEY = "k5web_freq_cache_v1";
+  const FREQ_CACHE_MAX_AGE_MS = 7 * 24 * 3600 * 1000; // 7 天
   let freqMap = {}; // NORAD -> { up, down, mode, type, desc }（Hz）
 
   function loadFreqCache() {
@@ -155,6 +156,7 @@
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (!parsed.map || typeof parsed.map !== "object") return null;
+      if (parsed.savedAt && Date.now() - parsed.savedAt > FREQ_CACHE_MAX_AGE_MS) return null;
       return parsed;
     } catch (e) {
       log("频率库缓存读取失败：" + e.message, "err");
