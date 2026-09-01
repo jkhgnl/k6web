@@ -12,7 +12,7 @@
  *   3. wrangler deploy
  */
 
-const TLE_TTL = 21600; // 6 小时（秒）
+const TLE_TTL = 43200; // 12 小时（秒）
 const FREQ_TTL = 604800; // 7 天（秒）
 
 // Upstash REST API 辅助
