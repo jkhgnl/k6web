@@ -1,0 +1,7 @@
+name = "k6web-gps-relay"
+main = "gps-worker.js"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "GPS_KV"
+id = "d9e7abbcf6e44496833cea5d7e6702b8"

@@ -19,6 +19,9 @@
   // 部署 cloudflare-worker.js 后，把你的 Worker URL 填到这里
   const WORKER_PROXY_URL = "https://k6web-cors-proxy.lateral-faucet.workers.dev";
 
+  // GPS 扫码中转 Worker：手机扫码后通过此 Worker 上报 GPS 到网页
+  const GPS_WORKER_URL = "https://k6web-gps-relay.jialiang-ju.workers.dev";
+
   const proto = window.K5WEB.protocol;
   const calc = window.K5WEB.calc;
   const gb = window.K5WEB && window.K5WEB.gb2312;
@@ -704,20 +707,14 @@
   }
 
   // 每秒轮询 /getgps，收到后自动填入经纬度/海拔
-  // GitHub Pages 模式下无法使用（需要本地服务器中转），给出提示
   function startGpsPoll() {
-    if (IS_GITHUB_PAGES) {
-      const s = $("gpsQrStatus");
-      if (s) {
-        s.textContent = "⚠️ GitHub Pages 版本不支持扫码传定位，请使用「我的位置」或「地图选点」代替";
-        s.className = "gps-qr-status err";
-      }
-      return;
-    }
     stopGpsPoll();
+    const pollUrl = IS_GITHUB_PAGES
+      ? GPS_WORKER_URL + "/getgps?t=" + encodeURIComponent(gpsQrToken)
+      : "/getgps?t=" + encodeURIComponent(gpsQrToken);
     gpsPollTimer = setInterval(async () => {
       try {
-        const resp = await fetch("/getgps?t=" + encodeURIComponent(gpsQrToken));
+        const resp = await fetch(pollUrl);
         if (!resp.ok) return;
         const data = await resp.json();
         if (!data || !data.ok) return;
@@ -739,16 +736,24 @@
   }
 
   function buildGpsQr() {
-    const ip = ($("gpsQrIp").value || "").trim();
-    if (!ip) {
-      const s = $("gpsQrStatus");
-      s.textContent = "⚠️ 请填写电脑局域网 IP（可在服务器窗口或 ipconfig 中查看）";
-      s.className = "gps-qr-status err";
-      return;
-    }
     gpsQrToken = genToken();
-    const port = window.location.port || "8080";
-    const url = "http://" + ip + ":" + port + "/setgps?t=" + gpsQrToken;
+    let url;
+
+    if (IS_GITHUB_PAGES) {
+      // GitHub Pages 模式：使用 GPS Worker 中转
+      url = GPS_WORKER_URL + "/setgps?t=" + gpsQrToken;
+    } else {
+      const ip = ($("gpsQrIp").value || "").trim();
+      if (!ip) {
+        const s = $("gpsQrStatus");
+        s.textContent = "⚠️ 请填写电脑局域网 IP（可在服务器窗口或 ipconfig 中查看）";
+        s.className = "gps-qr-status err";
+        return;
+      }
+      const port = window.location.port || "8080";
+      url = "http://" + ip + ":" + port + "/setgps?t=" + gpsQrToken;
+    }
+
     $("gpsQrUrl").textContent = url;
     $("gpsQr").innerHTML = "";
     try {
@@ -769,12 +774,16 @@
     $("gpsQrModal").classList.add("show");
     const s = $("gpsQrStatus");
 
-    // GitHub Pages 模式：无法使用扫码传定位（需要本地服务器中转）
+    // GitHub Pages 模式：直接使用 GPS Worker，无需局域网 IP
     if (IS_GITHUB_PAGES) {
-      s.textContent = "⚠️ GitHub Pages 版本不支持扫码传定位（需要本地服务器中转）。请使用「我的位置」或「地图选点」代替。";
-      s.className = "gps-qr-status err";
+      const ipRow = $("gpsQrIp").closest(".form-row") || $("gpsQrIp").parentElement;
+      if (ipRow) ipRow.style.display = "none";
+      buildGpsQr();
       return;
     }
+    // 本地服务器模式：显示 IP 输入框
+    const ipRow = $("gpsQrIp").closest(".form-row") || $("gpsQrIp").parentElement;
+    if (ipRow) ipRow.style.display = "";
 
     s.textContent = "正在获取本机局域网 IP…";
     s.className = "gps-qr-status";
