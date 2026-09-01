@@ -26,7 +26,7 @@
   }
   .topbar .brand { font-size: 18px; font-weight: 600; color: #111; }
   .topbar .top-actions { display: flex; align-items: center; gap: 12px; }
-  .topbar .link { font-size: 14px; color: #444; cursor: pointer; }
+  .topbar .link { font-size: 14px; color: #444; cursor: pointer; text-decoration: none; }
   .topbar .link:hover { color: #2f6fdc; }
   .btn-connect { padding: 7px 18px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; background: #2f6fdc; color: #fff; }
   .btn-connect.secondary { background: #6c757d; }
@@ -178,7 +178,7 @@
     <span class="brand">多普勒固件手台工具</span>
   </div>
   <div class="top-actions">
-    <span class="link">问题反馈</span>
+    <a class="link" href="https://github.com/jkhgnl/k6web/issues" target="_blank">问题反馈</a>
     <button id="btnConnect" class="btn-connect">连接</button>
     <span id="status" class="top-status"></span>
   </div>
