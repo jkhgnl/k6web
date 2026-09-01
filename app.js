@@ -15,7 +15,9 @@
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
   const IS_GITHUB_PAGES = !window.location.port || window.location.port === "443" || window.location.port === ""
     || window.location.hostname.endsWith(".github.io");
-  // 如果 URL 中不包含本地端口（8080），大概率是 GitHub Pages 或其他静态托管
+  // Cloudflare Worker 代理地址：用于绕过 Gitee raw 文件的 CORS 限制，实现固件一键下载
+  // 部署 cloudflare-worker.js 后，把你的 Worker URL 填到这里
+  const WORKER_PROXY_URL = ""; // 例如 "https://k6web-proxy.xxx.workers.dev"
 
   const proto = window.K5WEB.protocol;
   const calc = window.K5WEB.calc;
@@ -2256,13 +2258,17 @@
 
     if (!url) { status.textContent = "无效的下载地址"; status.className = "hint err"; return; }
 
-    // GitHub Pages 模式：Gitee raw URL 不支持 CORS，直接在新窗口打开供用户手动下载
+    // GitHub Pages 模式：Gitee raw URL 不支持 CORS，需通过 Cloudflare Worker 代理下载
+    let downloadUrl = url;
     if (IS_GITHUB_PAGES) {
-      status.textContent = `📥 正在打开下载链接，请在弹出窗口中下载 ${name}，然后用下方「选择固件文件」导入`;
-      status.className = "hint ok";
-      log(`固件下载：打开 ${url}`);
-      window.open(url, "_blank");
-      return;
+      if (!WORKER_PROXY_URL) {
+        status.textContent = `📥 正在打开下载链接，请在弹出窗口中下载 ${name}，然后用下方「选择固件文件」导入`;
+        status.className = "hint ok";
+        log(`固件下载：打开 ${url}`);
+        window.open(url, "_blank");
+        return;
+      }
+      downloadUrl = `${WORKER_PROXY_URL}?url=${encodeURIComponent(url)}`;
     }
 
     btn.disabled = true;
@@ -2271,7 +2277,7 @@
     status.className = "hint";
 
     try {
-      const resp = await fetchWithTimeout(`/fw/download?url=${encodeURIComponent(url)}`, {}, 60000);
+      const resp = await fetchWithTimeout(downloadUrl, {}, 60000);
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       const buf = new Uint8Array(await resp.arrayBuffer());
 
