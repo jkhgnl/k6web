@@ -82,7 +82,8 @@ const CN_FONT = {
   // 每帧数据量上限由固件 256B 接收环形缓冲决定：整帧 = 数据 + 偏移4 + 命令头4 + CRC2 + 帧头尾4 = CHUNK + 16，
   // 必须 ≤ 255。若整帧恰好 256B 填满环形缓冲，写指针回卷后与读指针重合，
   // 固件 (uart.c UART_IsCommandAvailable) 会误判"缓冲空"而丢弃整帧 → 主机回复超时。
-  CHUNK: 232,
+  // C 口（Type-C）时序裕量较小，适当降低 CHUNK 留出缓冲余量。
+  CHUNK: 200,
 };
 
 // MR 信道存储参数（EEPROM 仿真地址，经 eeprom_compat.c 1:1 映射到 SPI Flash）

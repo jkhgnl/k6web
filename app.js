@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.5.2";
+  const K5WEB_VERSION = "1.5.3";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
@@ -1389,9 +1389,10 @@
         if (s % 10 === 9 || s === sectors - 1) log(`擦除 ${s + 1}/${sectors}`);
       }
 
-      // 2. 分块写入（240 字节/帧，进度 30~100%）
+      // 2. 分块写入（200 字节/帧，进度 30~100%）
       const total = fontData.length, chunk = proto.CN_FONT.CHUNK;
       log("写入字库数据...");
+      await new Promise((r) => setTimeout(r, 100)); // 擦除后短暂延时，等待固件就绪
       for (let off = 0; off < total; off += chunk) {
         const n = Math.min(chunk, total - off);
         const payload = new Uint8Array(4 + n);
@@ -1634,9 +1635,9 @@
         <div style="font-size:12px;color:#999;margin-top:4px">支持 PNG / JPG / BMP / GIF / WebP</div>
         <input id="logoFile" type="file" accept="image/*" style="display:none">`;
     } else {
-      zone.innerHTML = `<div style="font-size:28px;margin-bottom:8px">🖼️</div>
+      zone.innerHTML = `<div style="font-size:36px;margin-bottom:8px">🖼️</div>
         <div style="font-size:14px;font-weight:500;color:#222;word-break:break-all;padding:0 8px">${filename}</div>
-        <div style="font-size:12px;color:#999;margin-top:4px">已加载，可继续拖拽替换</div>
+        <div style="font-size:14px;color:#999;margin-top:4px">已加载，可继续拖拽替换</div>
         <input id="logoFile" type="file" accept="image/*" style="display:none">`;
     }
     const fileInput = zone.querySelector("#logoFile");
