@@ -645,16 +645,14 @@ s.parentNode.insertBefore(el, s);
     
     <div style="margin-top:12px">
       <label>预览（128×64 像素）</label>
-      <div style="background:#fff;border:1px solid #ddd;border-radius:4px;padding:8px;display:inline-block">
-        <canvas id="logoPreview" style="width:256px;height:128px;image-rendering:pixelated;border:1px solid #ccc"></canvas>
+      <div class="logo-preview-wrap">
+        <canvas id="logoPreview"></canvas>
       </div>
     </div>
     
-    <div class="row" style="margin-top:12px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <input id="logoInvert" type="checkbox">
-        <label for="logoInvert" style="margin:0">反色（黑底白字）</label>
-      </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+      <input id="logoInvert" type="checkbox">
+      <label for="logoInvert" style="margin:0">反色（黑底白字）</label>
     </div>
     
     <div class="row" style="margin-top:8px">
