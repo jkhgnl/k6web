@@ -731,7 +731,7 @@
         setStatus("✅ 已扫码获取位置：" + lat + ", " + lon, "ok");
         log("扫码上报位置：" + lat + ", " + lon + ", 海拔 " + alt + " m");
         if (map) { try { map.setView([Number(data.lat), Number(data.lon)], 12); } catch (e) {} }
-      } catch (e) { /* 服务器暂不可达时静默重试 */ }
+      } catch (e) { console.log("[GPS poll]", e); }
     }, 1000);
   }
 

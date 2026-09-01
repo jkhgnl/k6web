@@ -63,6 +63,16 @@ function gpsPage(token, workerUrl) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lat: lat, lon: lon, alt: alt })
+      }).then(function(r) {
+        if (!r.ok) {
+          document.getElementById("status").innerHTML =
+            '<div class="err">❌ 上报失败 (HTTP ' + r.status + ')</div>' +
+            '<div class="coord">纬度: ' + lat.toFixed(6) + '<br>经度: ' + lon.toFixed(6) + '</div>';
+        }
+      }).catch(function(e) {
+        document.getElementById("status").innerHTML =
+          '<div class="err">❌ 上报失败: ' + e.message + '</div>' +
+          '<div class="coord">纬度: ' + lat.toFixed(6) + '<br>经度: ' + lon.toFixed(6) + '</div>';
       });
     },
     function(err) {
