@@ -2607,9 +2607,20 @@
     }
   }
 
-  // 首页访问人次统计
+  // 首页访问人次统计（数字滚动动画）
   fetch("https://visits.jkhgnl.dpdns.org/").then(r => r.json()).then(d => {
     const el = $("homeVisitCount");
-    if (el) el.textContent = `今日访问：${d.count} 次`;
+    if (!el) return;
+    const target = d.count;
+    if (target <= 0) { el.textContent = "0"; return; }
+    const duration = Math.min(1200, target * 30);
+    const start = performance.now();
+    function tick(now) {
+      const p = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(ease * target);
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
   }).catch(() => {});
 })();
