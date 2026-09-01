@@ -712,12 +712,13 @@
     const pollUrl = IS_GITHUB_PAGES
       ? GPS_WORKER_URL + "/getgps?t=" + encodeURIComponent(gpsQrToken)
       : "/getgps?t=" + encodeURIComponent(gpsQrToken);
+    log("开始GPS轮询：" + pollUrl, "GPS");
     gpsPollTimer = setInterval(async () => {
       try {
         const resp = await fetch(pollUrl);
-        if (!resp.ok) return;
+        if (!resp.ok) { log("GPS轮询HTTP错误：" + resp.status, "GPS"); return; }
         const data = await resp.json();
-        if (!data || !data.ok) return;
+        if (!data || !data.ok) return; // 正常轮询中，还没有数据
         stopGpsPoll();
         const lat = Number(data.lat).toFixed(5);
         const lon = Number(data.lon).toFixed(5);
@@ -731,7 +732,10 @@
         setStatus("✅ 已扫码获取位置：" + lat + ", " + lon, "ok");
         log("扫码上报位置：" + lat + ", " + lon + ", 海拔 " + alt + " m");
         if (map) { try { map.setView([Number(data.lat), Number(data.lon)], 12); } catch (e) {} }
-      } catch (e) { console.log("[GPS poll]", e); }
+      } catch (e) {
+        console.log("[GPS poll]", e);
+        log("GPS轮询失败：" + e.message, "GPS");
+      }
     }, 1000);
   }
 
@@ -767,6 +771,7 @@
     const s = $("gpsQrStatus");
     s.textContent = "等待手机扫码上报…";
     s.className = "gps-qr-status";
+    log("生成GPS二维码：" + url, "GPS");
     startGpsPoll();
   }
 
