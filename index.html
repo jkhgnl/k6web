@@ -211,12 +211,6 @@
       </div>
     </div>
     <div class="nav-group">
-      <div class="nav-title" data-group="gUpdate">更新 <span class="arrow">▼</span></div>
-      <div class="nav-items" id="gUpdate">
-        <div class="nav-item" data-tab="tabUpdate" type="button">检查更新</div>
-      </div>
-    </div>
-    <div class="nav-group">
       <div class="nav-title" data-group="gLog">日志 <span class="arrow">▼</span></div>
       <div class="nav-items" id="gLog">
         <div class="nav-item" data-tab="tabLog" type="button">运行日志</div>
@@ -597,22 +591,6 @@
 </div>
 
 <!-- ========== 在线更新 ========== -->
-<div id="tabUpdate" class="tabpanel">
-  <h1 class="page-title">在线更新</h1>
-  <div class="card">
-    <h2>版本信息</h2>
-    <p class="result">当前版本：<span id="updCurrent">-</span></p>
-    <p class="result">远程版本：<span id="updLatest">-</span> <span id="updPublished"></span></p>
-    <div id="updBodyBox" style="display:none; margin:10px 0; padding:10px; background:#f7f8fa; border-radius:4px; font-size:13px; white-space:pre-wrap;"></div>
-    <p id="updStatus" class="hint">点击「检查更新」从 Gitee Release 获取最新版本。GitHub Pages 版本请前往 Gitee 下载更新包后手动替换。</p>
-    <div id="updProgress" class="progress"><div id="updProgressBar"></div></div>
-    <div style="margin-top:12px; display:flex; gap:10px;">
-      <button id="btnCheckUpdate" type="button">检查更新</button>
-      <button id="btnApplyUpdate" type="button" disabled>前往 Gitee 下载</button>
-    </div>
-  </div>
-</div>
-
 <!-- ========== 公共：运行日志 ========== -->
 <div id="tabLog" class="tabpanel">
   <h1 class="page-title">运行日志</h1>
