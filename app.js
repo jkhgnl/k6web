@@ -1899,9 +1899,7 @@
       const globalIdx = start + ri;
       for (let ci = 0; ci < 11; ci++) {
         const td = document.createElement("td");
-        td.style.border = "1px solid #ccc";
-        td.style.padding = "4px";
-        td.style.minWidth = "70px";
+        td.style.cssText = "border:1px solid #ddd;padding:5px 6px";
         if (ci === 0) {
           td.textContent = hasData ? (r.ch + 1).toString() : (globalIdx + 1).toString();
         } else if ([1, 2, 3, 10].includes(ci)) {
@@ -1915,6 +1913,7 @@
           td.addEventListener("blur", syncTableData);
         } else {
           const select = document.createElement("select");
+          select.style.cssText = "width:100%;padding:2px;font-size:12px;border:1px solid #ccc;border-radius:3px";
           let options;
           if (ci === 4 || ci === 5) options = TONE_OPTIONS;
           else if (ci === 6) options = BANDWIDTH_OPTIONS;
@@ -1977,19 +1976,26 @@
   function renderPagination(totalPages, totalItems) {
     const el = $("chPagination");
     if (!el) return;
-    if (totalPages <= 1) { el.innerHTML = totalItems > 0 ? `共 ${totalItems} 条信道` : ""; return; }
-    let html = `<button onclick="chGoPage(${chTablePage - 1})" ${chTablePage <= 1 ? "disabled" : ""} style="margin:0 4px">◀</button>`;
-    html += `<span>第 ${chTablePage}/${totalPages} 页（共 ${totalItems} 条）</span>`;
-    html += `<button onclick="chGoPage(${chTablePage + 1})" ${chTablePage >= totalPages ? "disabled" : ""} style="margin:0 4px">▶</button>`;
-    el.innerHTML = html;
+    el.innerHTML = "";
+    if (totalPages <= 1) {
+      if (totalItems > 0) el.textContent = `共 ${totalItems} 条信道`;
+      return;
+    }
+    const btnPrev = document.createElement("button");
+    btnPrev.textContent = "◀ 上一页";
+    btnPrev.disabled = chTablePage <= 1;
+    btnPrev.addEventListener("click", () => { chTablePage--; renderChannelTable(chCsvData); });
+    const info = document.createElement("span");
+    info.textContent = ` 第 ${chTablePage} / ${totalPages} 页（共 ${totalItems} 条） `;
+    info.style.cssText = "margin:0 12px;font-size:13px";
+    const btnNext = document.createElement("button");
+    btnNext.textContent = "下一页 ▶";
+    btnNext.disabled = chTablePage >= totalPages;
+    btnNext.addEventListener("click", () => { chTablePage++; renderChannelTable(chCsvData); });
+    el.appendChild(btnPrev);
+    el.appendChild(info);
+    el.appendChild(btnNext);
   }
-  window.chGoPage = function(p) {
-    if (!chCsvData) return;
-    const totalPages = Math.ceil(chCsvData.length / CH_PAGE_SIZE);
-    if (p < 1 || p > totalPages) return;
-    chTablePage = p;
-    renderChannelTable(chCsvData);
-  };
 
   function syncTableData() {
     try {
