@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.4.6";
+  const K5WEB_VERSION = "1.4.7";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
@@ -1575,7 +1575,8 @@
       URL.revokeObjectURL(url);
 
       logoImg = img;
-      logoData = imageToLogoBitmap(img);
+      const threshold = parseInt($("logoThreshold").value) || 128;
+      logoData = imageToLogoBitmap(img, threshold);
       renderLogoPreview(logoData, "logoPreview");
       $("btnLogoWrite").disabled = false;
       log(`图片已加载：${f.name}（${img.width}×${img.height} → 128×64 单色）`);
@@ -1605,27 +1606,25 @@
 
   // 反色切换时重新渲染预览
   $("logoInvert").addEventListener("change", () => {
-    if (!logoData) return;
-    // 反色处理：翻转每个字节的每一位
-    const inverted = new Uint8Array(logoData.length);
-    for (let i = 0; i < logoData.length; i++) {
-      inverted[i] = ~logoData[i] & 0xFF;
+    if (!logoImg) return;
+    const threshold = parseInt($("logoThreshold").value) || 128;
+    logoData = imageToLogoBitmap(logoImg, threshold);
+    if ($("logoInvert").checked) {
+      for (let i = 0; i < logoData.length; i++) logoData[i] = ~logoData[i] & 0xFF;
     }
-    renderLogoPreview(inverted, "logoPreview");
+    renderLogoPreview(logoData, "logoPreview");
   });
 
   // 色彩阈值滑块
   $("logoThreshold").addEventListener("input", () => {
     $("logoThresholdVal").textContent = $("logoThreshold").value;
     if (!logoImg) return;
-    logoData = imageToLogoBitmap(logoImg);
+    const threshold = parseInt($("logoThreshold").value) || 128;
+    logoData = imageToLogoBitmap(logoImg, threshold);
     if ($("logoInvert").checked) {
-      const inverted = new Uint8Array(logoData.length);
-      for (let i = 0; i < logoData.length; i++) inverted[i] = ~logoData[i] & 0xFF;
-      renderLogoPreview(inverted, "logoPreview");
-    } else {
-      renderLogoPreview(logoData, "logoPreview");
+      for (let i = 0; i < logoData.length; i++) logoData[i] = ~logoData[i] & 0xFF;
     }
+    renderLogoPreview(logoData, "logoPreview");
   });
 
   $("btnLogoWrite").addEventListener("click", async () => {
