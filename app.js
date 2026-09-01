@@ -538,8 +538,6 @@
       );
       log(`TLE 完成：共 ${list.length} 颗${updated > 0 ? `，更新 ${updated} 颗` : "（无变化）"}`);
       input.focus();
-      // 顺便后台同步一次网络时间，写入 RTC 时即可零延迟使用
-      syncTimeInBackground();
     } catch (e) {
       if (satList.length) {
         // 网络失败：过期缓存必须明确警告结果可能不准
@@ -1273,119 +1271,16 @@
     }
   });
 
-  // ---------- 写入精确时间（联网获取北京时间写入 RTC） ----------
-  // 优先访问本机 NTP 代理（time_proxy.py），获取真正的 NTP 时间；
-  // 代理未启动或失败时，回退到 HTTP Date 头 / worldtimeapi / 本机时间。
-  const TIME_PROXY_URL = "http://127.0.0.1:8765/time";
-
-  async function fetchProxyTime() {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10000);
-    try {
-      const resp = await fetch(TIME_PROXY_URL, { signal: ctrl.signal });
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
-      const data = await resp.json();
-      if (typeof data.unixtime_utc !== "number" || data.unixtime_utc <= 0)
-        throw new Error("代理返回无效时间");
-      return { date: new Date(data.unixtime_utc * 1000), source: data.source || "本地 NTP 代理" };
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  async function fetchNetworkTime() {
-    // 1) 先尝试本地 NTP 代理（真正的 NTP，最快最准）
-    try {
-      return await fetchProxyTime();
-    } catch (e) {
-      log("本地 NTP 代理不可用：" + e.message + "，尝试网络时间源...", "info");
-    }
-
-    // 2) 本地代理未启动时，用 HTTP Date 头兜底（无 CORS 支持时浏览器会报错）
-    const corsSources = [
-      { url: "https://httpbin.org/get", name: "httpbin" },
-    ];
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 5000);
-    let lastErr = null;
-
-    try {
-      for (const src of corsSources) {
-        try {
-          const resp = await fetch(src.url, { method: "GET", cache: "no-store", signal: ctrl.signal });
-          const dateHdr = resp.headers.get("Date");
-          if (dateHdr) {
-            const d = new Date(dateHdr);
-            if (!isNaN(d.getTime())) {
-              // Date 头是 GMT/UTC，直接作为 Date 使用；显示和转换时统一按北京时间处理
-              return { date: d, source: src.name };
-            }
-          }
-          throw new Error("响应中无 Date 头");
-        } catch (e) {
-          lastErr = e;
-          log("时间源失败：" + src.name + " -> " + e.message);
-        }
-      }
-
-      // 3) 最后兜底 worldtimeapi（Asia/Shanghai 直接给 unixtime）
-      try {
-        const resp = await fetch("https://worldtimeapi.org/api/timezone/Asia/Shanghai.json", { signal: ctrl.signal });
-        if (!resp.ok) throw new Error("HTTP " + resp.status);
-        const data = await resp.json();
-        if (typeof data.unixtime === "number" && data.unixtime > 0) {
-          return { date: new Date(data.unixtime * 1000), source: "worldtimeapi" };
-        }
-        throw new Error("响应中无 unixtime");
-      } catch (e) {
-        lastErr = e;
-        log("时间源失败：worldtimeapi -> " + e.message);
-      }
-    } finally {
-      clearTimeout(timer);
-    }
-    throw lastErr || new Error("所有网络时间源均不可用");
-  }
+  // ---------- 获取当前时间（直接使用本机时钟） ----------
+  // 本地电脑 OS 已通过 NTP 自动同步，误差 <1 秒，卫星追踪精度足够。
 
   function formatBeijingDateTime(d) {
     return d.toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" });
   }
 
-  // ---------- 时钟同步：记录网络时间与本机时钟的偏差，写入时零延迟 ----------
-  let timeSync = { offsetMs: null, source: null, syncedAt: 0 };
-
-  // 取一次网络时间并记录 offset（网络时间 - 本机时钟）
-  async function syncTimeInBackground() {
-    try {
-      const net = await fetchNetworkTime();
-      timeSync.offsetMs = net.date.getTime() - Date.now();
-      timeSync.source = net.source;
-      timeSync.syncedAt = Date.now();
-      log(`时间已同步（${net.source}）：${formatBeijingDateTime(net.date)}` +
-          `，与本机偏差 ${(timeSync.offsetMs / 1000).toFixed(1)} 秒`);
-      return net;
-    } catch (e) {
-      log("后台时间同步失败：" + e.message, "info");
-      return null;
-    }
-  }
-
-  // 优先用已同步时钟（本机时间 + offset，零网络请求）；未同步过返回 null
-  function getSyncedTime() {
-    if (timeSync.offsetMs === null) return null;
-    return {
-      date: new Date(Date.now() + timeSync.offsetMs),
-      source: `已同步时钟（来自 ${timeSync.source}）`,
-    };
-  }
-
-  // 获取"当前时间"用于写入：有同步结果直接用，否则现场同步
+  // 获取"当前时间"用于写入 RTC
   async function getWriteTime() {
-    const synced = getSyncedTime();
-    if (synced) return synced;
-    const net = await syncTimeInBackground();
-    if (net) return net;
-    return { date: new Date(), source: "本机时钟（同步失败）" };
+    return { date: new Date(), source: "本机时钟" };
   }
 
   // ---------- 中文字库刷入 ----------
@@ -2392,9 +2287,6 @@
       clearTimeout(t);
     }
   }
-
-  // 页面加载后静默同步一次网络时间，后续写 RTC 零延迟
-  syncTimeInBackground();
 
   // 加载收藏列表
   loadFavorites();
