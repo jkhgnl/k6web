@@ -22,6 +22,9 @@
   // GPS 扫码中转 Worker：手机扫码后通过此 Worker 上报 GPS 到网页
   const GPS_WORKER_URL = "https://gps.jkhgnl.dpdns.org";
 
+  // TLE + 频率 Redis 缓存 Worker：共享缓存，减少重复抓取
+  const TLE_WORKER_URL = "https://tle.jkhgnl.dpdns.org";
+
   const proto = window.K5WEB.protocol;
   const calc = window.K5WEB.calc;
   const gb = window.K5WEB && window.K5WEB.gb2312;
@@ -195,6 +198,21 @@
     const data = loadFreqData();
     if (data) freqMap = data.map;
     if (!refresh && data) return; // 有数据且不要求刷新：直接用
+    // 优先从 Redis Worker 获取频率（全站共享）
+    if (IS_GITHUB_PAGES) {
+      try {
+        const resp = await fetch(TLE_WORKER_URL + "/freq");
+        if (resp.ok) {
+          const d = await resp.json();
+          if (d.ok && d.map && Object.keys(d.map).length > 0) {
+            freqMap = d.map;
+            saveFreqCache(d.map);
+            log(`频率库从 Redis 获取：覆盖 ${Object.keys(d.map).length} 颗卫星`);
+            return;
+          }
+        }
+      } catch (_) {}
+    }
     try {
       await fetchFreqDB();
     } catch (e) {
@@ -482,6 +500,22 @@
   ];
 
   async function fetchTLE() {
+    // 优先走 Redis 缓存 Worker（全站共享，减少重复抓取）
+    if (IS_GITHUB_PAGES) {
+      try {
+        const resp = await fetch(TLE_WORKER_URL + "/tle");
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.ok && data.sats && data.sats.length > 0) {
+            log(`TLE 从 Redis 缓存获取：${data.sats.length} 颗（来源：${data.source}）`);
+            return data.sats.map((s) => ({ name: s.name, tle1: s.tle1, tle2: s.tle2 }));
+          }
+        }
+      } catch (e) {
+        log("TLE Redis 缓存不可用：" + e.message + "，回退直连源", "info");
+      }
+    }
+    // 回退：直连各 TLE 源
     const results = await Promise.all(TLE_SOURCES.map(async (src) => {
       try {
         const resp = await fetch(src.url, { headers: src.headers || {} });

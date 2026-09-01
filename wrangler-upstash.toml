@@ -1,0 +1,11 @@
+name = "k6web-tle-cache"
+main = "upstash-worker.js"
+compatibility_date = "2024-01-01"
+
+routes = [
+  { pattern = "tle.jkhgnl.dpdns.org", custom_domain = true }
+]
+
+[vars]
+UPSTASH_REDIS_REST_URL = "https://proud-mammal-120181.upstash.io"
+UPSTASH_REDIS_REST_TOKEN = "gQAAAAAAAdV1AAIgcDEyZDI2Mzk5NDk0ZmE0Y2ZlOTEwMDliNjlkNzRiMDhlYw"
