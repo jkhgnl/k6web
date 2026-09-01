@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.0.0";
+  const K5WEB_VERSION = "1.1.0";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
@@ -1881,7 +1881,7 @@
   })();
 
   function fmtMhz(freq10Hz) {
-    return (freq10Hz / 100000).toFixed(5);
+    return (freq10Hz / 100000).toFixed(5) + " MHz";
   }
 
   function renderChannelTable(parsedRows) {
@@ -2011,7 +2011,9 @@
             if (colIdx === 4 || colIdx === 5) return select.options[select.selectedIndex]?.textContent || "";
             return select.value;
           }
-          return td.textContent.trim();
+          let v = td.textContent.trim();
+          if ([2, 3].includes(colIdx)) v = v.replace(/\s*mhz$/i, "").trim();
+          return v;
         });
         if (rowData.every(s => s === "")) continue;
         outRows.push(rowData);
