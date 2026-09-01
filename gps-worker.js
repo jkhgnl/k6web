@@ -120,7 +120,7 @@ export default {
 
     // ---------- /setgps ----------
     if (path === "/setgps" && token) {
-      // POST：手机上报 GPS 数据
+      // POST：浏览器手机端上报 GPS 数据（JSON body）
       if (request.method === "POST") {
         try {
           const body = await request.json();
@@ -135,7 +135,23 @@ export default {
         return new Response(JSON.stringify({ ok: false, error: "invalid data" }), { status: 400, headers: jsonHeaders });
       }
 
-      // GET：返回手机端定位页面
+      // GET：APP 通过 query 参数上报（lat/lon/alt 在 URL 里）
+      const latParam = url.searchParams.get("lat");
+      const lonParam = url.searchParams.get("lon");
+      if (latParam && lonParam) {
+        const lat = parseFloat(latParam);
+        const lon = parseFloat(lonParam);
+        const alt = parseFloat(url.searchParams.get("alt") || "0") || 0;
+        console.log("[setgps] GET token=" + token, lat, lon, alt);
+        if (!isNaN(lat) && !isNaN(lon)) {
+          await env.GPS_KV.put("gps:" + token, JSON.stringify({ lat, lon, alt }), { expirationTtl: 300 });
+          console.log("[setgps] KV stored gps:" + token + " (from GET)");
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: jsonHeaders });
+        }
+        return new Response(JSON.stringify({ ok: false, error: "invalid lat/lon" }), { status: 400, headers: jsonHeaders });
+      }
+
+      // GET 无 lat/lon 参数：返回手机端定位页面（浏览器扫码用）
       const workerUrl = url.origin;
       return new Response(gpsPage(token, workerUrl), {
         status: 200,
