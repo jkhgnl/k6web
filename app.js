@@ -17,10 +17,10 @@
     || window.location.hostname.endsWith(".github.io");
   // Cloudflare Worker 代理地址：用于绕过 Gitee raw 文件的 CORS 限制，实现固件一键下载
   // 部署 cloudflare-worker.js 后，把你的 Worker URL 填到这里
-  const WORKER_PROXY_URL = "https://k6web-cors-proxy.lateral-faucet.workers.dev";
+  const WORKER_PROXY_URL = "https://cors.jkhgnl.dpdns.org";
 
   // GPS 扫码中转 Worker：手机扫码后通过此 Worker 上报 GPS 到网页
-  const GPS_WORKER_URL = "https://k6web-gps-relay.jialiang-ju.workers.dev";
+  const GPS_WORKER_URL = "https://gps.jkhgnl.dpdns.org";
 
   const proto = window.K5WEB.protocol;
   const calc = window.K5WEB.calc;
