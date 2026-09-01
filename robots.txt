@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /vendor/
+Disallow: /img/
+
+Sitemap: https://jkhgnl.github.io/k6web/sitemap.xml
