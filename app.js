@@ -17,7 +17,7 @@
     || window.location.hostname.endsWith(".github.io");
   // Cloudflare Worker 代理地址：用于绕过 Gitee raw 文件的 CORS 限制，实现固件一键下载
   // 部署 cloudflare-worker.js 后，把你的 Worker URL 填到这里
-  const WORKER_PROXY_URL = ""; // 例如 "https://k6web-proxy.xxx.workers.dev"
+  const WORKER_PROXY_URL = "https://k6web-cors-proxy.lateral-faucet.workers.dev";
 
   const proto = window.K5WEB.protocol;
   const calc = window.K5WEB.calc;
@@ -2203,10 +2203,13 @@
     listBox.innerHTML = "";
 
     try {
-      // GitHub Pages 模式：直接从 Gitee raw URL 获取固件列表（跳过本地服务器代理）
-      const fwListUrl = IS_GITHUB_PAGES
+      // GitHub Pages 模式：通过 Cloudflare Worker 代理获取固件列表（Gitee raw URL 缺少 CORS 头）
+      let fwListUrl = IS_GITHUB_PAGES
         ? "https://raw.giteeusercontent.com/jkhgnl/uv-k1-k5v3-firmware-doppler/raw/main/update.json"
         : "/fw/list";
+      if (IS_GITHUB_PAGES && WORKER_PROXY_URL) {
+        fwListUrl = `${WORKER_PROXY_URL}?url=${encodeURIComponent(fwListUrl)}`;
+      }
       const resp = await fetchWithTimeout(fwListUrl, {}, 15000);
       const text = await resp.text();
       let data;
