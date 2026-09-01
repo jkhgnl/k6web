@@ -245,7 +245,26 @@ s.parentNode.insertBefore(el, s);
   .fw-asset-name { font-size: 13px; font-family: Consolas, monospace; }
   .fw-asset-size { font-size: 12px; color: #888; margin-left: 8px; }
   .fw-asset-btn { padding: 4px 10px; font-size: 12px; }
-  /* 开机图片预览 */
+  /* 信道批量写入表格固定列宽 */
+  #chPreviewTable { table-layout: fixed; width: 100%; }
+  #chPreviewTable th, #chPreviewTable td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0;
+  }
+  #chPreviewTable th:nth-child(1), #chPreviewTable td:nth-child(1) { width: 48px; }
+  #chPreviewTable th:nth-child(2), #chPreviewTable td:nth-child(2) { width: 110px; }
+  #chPreviewTable th:nth-child(3), #chPreviewTable td:nth-child(3),
+  #chPreviewTable th:nth-child(4), #chPreviewTable td:nth-child(4) { width: 96px; }
+  #chPreviewTable th:nth-child(5), #chPreviewTable td:nth-child(5),
+  #chPreviewTable th:nth-child(6), #chPreviewTable td:nth-child(6) { width: 84px; }
+  #chPreviewTable th:nth-child(7), #chPreviewTable td:nth-child(7),
+  #chPreviewTable th:nth-child(8), #chPreviewTable td:nth-child(8),
+  #chPreviewTable th:nth-child(9), #chPreviewTable td:nth-child(9) { width: 64px; }
+  #chPreviewTable th:nth-child(10), #chPreviewTable td:nth-child(10),
+  #chPreviewTable th:nth-child(11), #chPreviewTable td:nth-child(11) { width: 78px; }
+  #chPreviewTable select { width: 100%; max-width: 100%; }
   .logo-preview-wrap {
     background: #fff;
     border: 1px solid #ddd;
