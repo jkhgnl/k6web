@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.4.9";
+  const K5WEB_VERSION = "1.5.0";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
@@ -2202,6 +2202,7 @@
           td.textContent = hasData ? (r.ch + 1).toString() : (globalIdx + 1).toString();
         } else if ([1, 2, 3, 10].includes(ci)) {
           td.setAttribute("contenteditable", "true");
+          td.dataset.col = ci;
           if (hasData) {
             if (ci === 1) td.textContent = r.name || "";
             else if (ci === 2) td.textContent = fmtMhz(r.rx10);
@@ -2209,6 +2210,22 @@
             else if (ci === 10) td.textContent = Math.abs(r.diff10 / 100000).toFixed(4);
           }
           td.addEventListener("blur", syncTableData);
+          td.addEventListener("keydown", restrictChannelInput);
+          td.addEventListener("paste", (e) => {
+            e.preventDefault();
+            let text = (e.clipboardData || window.clipboardData).getData("text").replace(/\s/g, "");
+            const col = parseInt(td.dataset.col);
+            if (col !== 1) {
+              text = text.replace(/[^0-9\.\-]/g, "");
+              const parts = text.split(".");
+              if (parts.length > 2) text = parts[0] + "." + parts.slice(1).join("");
+              if (text.indexOf("-") > 0) text = text.replace("-", "");
+              if (col === 10) text = text.replace("-", "");
+            } else {
+              text = text.slice(0, 10);
+            }
+            document.execCommand("insertText", false, text);
+          });
         } else {
           const select = document.createElement("select");
           select.style.cssText = "width:100%;padding:2px;font-size:12px;border:1px solid #ccc;border-radius:3px";
@@ -2295,6 +2312,61 @@
     el.appendChild(btnNext);
   }
 
+  function restrictChannelInput(e) {
+    const col = parseInt(e.target.dataset.col);
+    const key = e.key;
+    // 允许控制键
+    if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Tab", "Enter", "Escape", "Home", "End"].includes(key)) return;
+
+    // 名称列：限制 10 个字符（近似 10 字节限制）
+    if (col === 1) {
+      const text = e.target.textContent;
+      const sel = window.getSelection();
+      const start = sel && sel.rangeCount ? sel.getRangeAt(0).startOffset : text.length;
+      const end = sel && sel.rangeCount ? sel.getRangeAt(0).endOffset : text.length;
+      if (start !== end) return; // 选中了文本，允许替换
+      if (text.length >= 10) { e.preventDefault(); return; }
+      return;
+    }
+
+    // 频率列允许减号；差频列（10）只表示绝对值，不允许负号
+    if (col === 10) {
+      if (!/[0-9\.]/.test(key)) { e.preventDefault(); return; }
+    } else if (!/[0-9\.\-]/.test(key)) {
+      e.preventDefault();
+      return;
+    }
+    const text = e.target.textContent;
+    const sel = window.getSelection();
+    const start = sel && sel.rangeCount ? sel.getRangeAt(0).startOffset : text.length;
+    const end = sel && sel.rangeCount ? sel.getRangeAt(0).endOffset : text.length;
+    const hasSelection = start !== end;
+
+    // 小数点只能有一个
+    if (key === ".") {
+      if (text.includes(".") && !hasSelection) { e.preventDefault(); return; }
+      // 小数点后最多 5 位
+      if (!hasSelection) {
+        const dotIdx = text.indexOf(".");
+        if (dotIdx >= 0 && start > dotIdx && text.length - dotIdx > 5) { e.preventDefault(); return; }
+      }
+    }
+    // 减号只允许在最前面
+    if (key === "-") {
+      if (!hasSelection && (text.includes("-") || start !== 0)) { e.preventDefault(); return; }
+    }
+    // 整数部分最多 3 位（MHz 通常 3 位整数）
+    if (/[0-9]/.test(key)) {
+      if (!hasSelection) {
+        const dotIdx = text.indexOf(".");
+        const intLen = dotIdx >= 0 ? dotIdx : text.length;
+        if (start <= intLen && intLen >= 3) { e.preventDefault(); return; }
+        // 小数点后最多 5 位
+        if (dotIdx >= 0 && start > dotIdx && text.length - dotIdx - 1 >= 5) { e.preventDefault(); return; }
+      }
+    }
+  }
+
   function syncTableData() {
     try {
       const tb = $("chPreviewTbody");
@@ -2321,6 +2393,7 @@
       for (const w of warnings) log(w, "warn");
       chCsvData = parsed;
       $("btnChProgCsv").disabled = false;
+      renderChannelTable(chCsvData);
     } catch (err) {
       log(`[表格同步失败] ${err.message}`, "err");
     }
