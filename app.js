@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.4.1";
+  const K5WEB_VERSION = "1.4.2";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
@@ -2821,22 +2821,22 @@
       let activeIdx = -1;
       function renderFavDropdown() {
         const q = input.value.trim().toLowerCase();
-        if (!q || !satList.length) { dd.hidden = true; return; }
-        const matched = satList.filter((s) => {
+        if (!q || !favorites.length) { dd.hidden = true; return; }
+        const matched = favorites.filter((norad) => {
+          const s = satList.find((x) => satNorad(x) === norad);
+          if (!s) return false;
           const name = s.name.trim().toLowerCase();
-          const norad = satNorad(s);
           return name.includes(q) || norad.includes(q);
         }).slice(0, 60);
         if (!matched.length) { dd.hidden = true; return; }
         activeIdx = -1;
         let html = "";
-        matched.forEach((s, i) => {
-          const norad = satNorad(s);
-          const fav = isFav(norad);
-          const name = s.name.trim();
+        matched.forEach((norad, i) => {
+          const s = satList.find((x) => satNorad(x) === norad);
+          const name = s ? s.name.trim() : "(未知)";
           html += `<div class="sat-item" data-i="${i}" data-norad="${norad}" data-name="${name}">
             <span>${name}</span><span class="norad">#${norad}</span>
-            <span class="sat-fav${fav ? " active" : ""}" data-norad="${norad}">${fav ? "★" : "☆"}</span>
+            <span class="sat-fav active" data-norad="${norad}">★</span>
           </div>`;
         });
         dd.innerHTML = html;
