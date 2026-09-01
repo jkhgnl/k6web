@@ -232,8 +232,9 @@
   // 联网全量刷新：并发拉取全部渠道（含 Celestrak active 全量），补充星（缓存新鲜则跳过），
   // 按 NORAD 合并只更新变化的。成功返回 { list, updated }，网络失败抛异常。
   async function refreshTleFromNetwork(cache) {
-    const fresh = await fetchTLE();
-    const extra = await fetchExtraSats(cache);
+    const { sats: fresh, fromRedis } = await fetchTLE();
+    // Redis 缓存已是全量数据，无需补星；直连源才需要逐个补
+    const extra = fromRedis ? [] : await fetchExtraSats(cache);
     for (const s of fresh) s.fetchedAt = Date.now();
     const { list, updated } = calc.mergeTleList(cache, fresh.concat(extra));
     satList = list;
@@ -510,7 +511,7 @@
           const data = await resp.json();
           if (data.ok && data.sats && data.sats.length > 0) {
             log(`TLE 从 Redis 缓存获取：${data.sats.length} 颗（来源：${data.source}）`);
-            return data.sats.map((s) => ({ name: s.name, tle1: s.tle1, tle2: s.tle2 }));
+            return { sats: data.sats.map((s) => ({ name: s.name, tle1: s.tle1, tle2: s.tle2 })), fromRedis: true };
           }
         }
       } catch (e) {
@@ -532,10 +533,9 @@
     }));
     const ok = results.filter(Boolean);
     if (ok.length === 0) throw new Error("所有 TLE 源均不可用");
-    // 按源优先级合并（前面的源优先，按 NORAD 编号去重）
     const list = calc.mergeSatelliteSources(ok);
     log(`TLE 多源获取成功：${ok.length}/${TLE_SOURCES.length} 个源，共 ${list.length} 颗（${ok.map((r) => r.name + ":" + r.sats.length).join("，")}）`);
-    return list;
+    return { sats: list, fromRedis: false };
   }
 
   $("btnFetch").addEventListener("click", async () => {
