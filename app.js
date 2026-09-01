@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.5.1";
+  const K5WEB_VERSION = "1.5.2";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
@@ -1596,9 +1596,9 @@
   let logoData = null; // 转换后的位图数据
   let logoImg = null;  // 原始图片对象（用于阈值调节）
 
-  $("logoFile").addEventListener("change", async (e) => {
-    const f = e.target.files[0];
+  async function handleLogoFile(f) {
     logoData = null;
+    logoImg = null;
     $("btnLogoWrite").disabled = true;
     if (!f) return;
 
@@ -1617,27 +1617,57 @@
       logoData = imageToLogoBitmap(img, threshold);
       renderLogoPreview(getLogoDataForDisplay(), "logoPreview");
       $("btnLogoWrite").disabled = false;
+      updateLogoDropZone(f.name);
       log(`图片已加载：${f.name}（${img.width}×${img.height} → 128×64 单色）`);
     } catch (err) {
       setStatus("图片加载失败：" + err.message, "err");
       log("图片加载异常：" + err.message, "err");
     }
+  }
+
+  function updateLogoDropZone(filename) {
+    const zone = $("logoDropZone");
+    if (!zone) return;
+    if (!filename) {
+      zone.innerHTML = `<div style="font-size:36px;margin-bottom:8px">🖼️</div>
+        <div style="font-size:14px;font-weight:500;color:#555">点击选择或拖拽图片到这里</div>
+        <div style="font-size:12px;color:#999;margin-top:4px">支持 PNG / JPG / BMP / GIF / WebP</div>
+        <input id="logoFile" type="file" accept="image/*" style="display:none">`;
+    } else {
+      zone.innerHTML = `<div style="font-size:28px;margin-bottom:8px">🖼️</div>
+        <div style="font-size:14px;font-weight:500;color:#222;word-break:break-all;padding:0 8px">${filename}</div>
+        <div style="font-size:12px;color:#999;margin-top:4px">已加载，可继续拖拽替换</div>
+        <input id="logoFile" type="file" accept="image/*" style="display:none">`;
+    }
+    const fileInput = zone.querySelector("#logoFile");
+    if (fileInput) {
+      fileInput.addEventListener("change", async (e) => {
+        const f2 = e.target.files[0];
+        if (f2) await handleLogoFile(f2);
+      });
+    }
+  }
+
+  $("logoFile").addEventListener("change", async (e) => {
+    await handleLogoFile(e.target.files[0]);
   });
 
   // ---------- 拖拽上传 ----------
   {
     const zone = $("logoDropZone");
-    const fileInput = $("logoFile");
+    let fileInput = $("logoFile");
     if (zone && fileInput) {
       zone.addEventListener("click", () => fileInput.click());
       zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.style.borderColor = "#2f6fdc"; zone.style.background = "#f0f6ff"; });
       zone.addEventListener("dragleave", () => { zone.style.borderColor = "#ccc"; zone.style.background = ""; });
-      zone.addEventListener("drop", (e) => {
+      zone.addEventListener("drop", async (e) => {
         e.preventDefault();
         zone.style.borderColor = "#ccc";
         zone.style.background = "";
         const f = e.dataTransfer.files[0];
-        if (f) { fileInput.files = e.dataTransfer.files; fileInput.dispatchEvent(new Event("change")); }
+        fileInput = $("logoFile");
+        if (f && fileInput) fileInput.files = e.dataTransfer.files;
+        await handleLogoFile(f);
       });
     }
   }
