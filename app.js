@@ -2203,13 +2203,10 @@
     listBox.innerHTML = "";
 
     try {
-      // GitHub Pages 模式：通过 Cloudflare Worker 代理获取固件列表（Gitee raw URL 缺少 CORS 头）
-      let fwListUrl = IS_GITHUB_PAGES
-        ? "https://raw.giteeusercontent.com/jkhgnl/uv-k1-k5v3-firmware-doppler/raw/main/update.json"
+      // GitHub Pages 模式：从 GitHub 仓库读取固件列表（raw.githubusercontent.com 支持 CORS）
+      const fwListUrl = IS_GITHUB_PAGES
+        ? "https://raw.githubusercontent.com/jkhgnl/k6web/gh-pages/update.json"
         : "/fw/list";
-      if (IS_GITHUB_PAGES && WORKER_PROXY_URL) {
-        fwListUrl = `${WORKER_PROXY_URL}?url=${encodeURIComponent(fwListUrl)}`;
-      }
       const resp = await fetchWithTimeout(fwListUrl, {}, 15000);
       const text = await resp.text();
       let data;
@@ -2261,18 +2258,16 @@
 
     if (!url) { status.textContent = "无效的下载地址"; status.className = "hint err"; return; }
 
-    // GitHub Pages 模式：Gitee raw URL 不支持 CORS，需通过 Cloudflare Worker 代理下载
-    let downloadUrl = url;
+    // GitHub Pages 模式：Gitee 下载链接不支持 CORS，直接在新窗口打开供用户下载
     if (IS_GITHUB_PAGES) {
-      if (!WORKER_PROXY_URL) {
-        status.textContent = `📥 正在打开下载链接，请在弹出窗口中下载 ${name}，然后用下方「选择固件文件」导入`;
-        status.className = "hint ok";
-        log(`固件下载：打开 ${url}`);
-        window.open(url, "_blank");
-        return;
-      }
-      downloadUrl = `${WORKER_PROXY_URL}?url=${encodeURIComponent(url)}`;
+      status.textContent = `📥 正在打开下载链接，请在弹出窗口中下载 ${name}，然后用下方「选择固件文件」导入`;
+      status.className = "hint ok";
+      log(`固件下载：打开 ${url}`);
+      window.open(url, "_blank");
+      return;
     }
+
+    let downloadUrl = url;
 
     btn.disabled = true;
     btn.textContent = "下载中...";
