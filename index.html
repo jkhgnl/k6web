@@ -125,6 +125,17 @@
   .tool-label { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 4px; }
   .tool-desc { font-size: 12px; color: #888; line-height: 1.4; }
 
+  .visit-bar {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-top: 24px; padding: 14px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px; color: #fff;
+  }
+  .visit-icon { font-size: 22px; }
+  .visit-text { font-size: 14px; opacity: .9; }
+  .visit-num { font-size: 28px; font-weight: 700; letter-spacing: 1px; }
+  .visit-unit { font-size: 13px; opacity: .8; }
+
   .tabpanel { display: none; }
   .tabpanel.active { display: block; }
 
@@ -291,8 +302,11 @@
     </div>
   </div>
 
-  <div style="text-align:center;margin-top:24px;padding:12px 0;border-top:1px solid #eee">
-    <span id="homeVisitCount" style="font-size:13px;color:#999">今日访问：加载中…</span>
+  <div class="visit-bar">
+    <span class="visit-icon">👁️</span>
+    <span class="visit-text">今日访问</span>
+    <span class="visit-num" id="homeVisitCount">-</span>
+    <span class="visit-unit">人次</span>
   </div>
 </div>
 
