@@ -612,7 +612,13 @@ s.parentNode.insertBefore(el, s);
     <h2>中文字库刷入（GB2312 16×16）</h2>
     <p class="hint">字库写入外置 FLASH <code>0xA0000</code>，与白头佬多系统共享字库位置兼容，单系统同样可用。只需刷一次，之后升级固件不受影响。</p>
 
-    <input id="fontFile" type="file" accept=".bin">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button id="btnFontRemote" style="flex:1">⬇️ 获取远程字库</button>
+      <button id="btnFontFile" class="secondary" style="flex:1">📁 本地字库文件</button>
+    </div>
+    <input id="fontFile" type="file" accept=".bin" style="display:none">
+    <p id="fontStatus" class="hint" style="min-height:18px">点击「获取远程字库」自动下载 <code>gb2312_16x16.bin</code></p>
+
     <div class="row" style="margin-top:8px">
       <button id="btnFont" disabled>🀄 刷入字库</button>
     </div>

@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.4.8";
+  const K5WEB_VERSION = "1.4.9";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
@@ -1321,6 +1321,22 @@
 
   // ---------- 中文字库刷入 ----------
   let fontData = null;
+  const FONT_REMOTE_URL = "gb2312_16x16.bin";
+
+  async function loadFontBuffer(buf, sourceName) {
+    if (buf.length > proto.CN_FONT.FLASH_SIZE) {
+      setStatus(`字库文件过大：${buf.length} 字节，应为 ${proto.CN_FONT.FLASH_SIZE}`, "err");
+      log(`字库文件过大：${buf.length} 字节`);
+      return false;
+    }
+    fontData = buf;
+    $("btnFont").disabled = false;
+    $("fontStatus").textContent = `已加载：${sourceName}（${buf.length} 字节）`;
+    log(`字库已加载：${sourceName}（${buf.length} 字节）`);
+    if (buf.length !== proto.CN_FONT.FLASH_SIZE)
+      log("提示：文件小于标准尺寸，未覆盖区域将保持空白", "info");
+    return true;
+  }
 
   $("fontFile").addEventListener("change", async (e) => {
     const f = e.target.files[0];
@@ -1328,15 +1344,28 @@
     $("btnFont").disabled = true;
     if (!f) return;
     const buf = new Uint8Array(await f.arrayBuffer());
-    if (buf.length > proto.CN_FONT.FLASH_SIZE) {
-      setStatus(`字库文件过大：${buf.length} 字节，应为 ${proto.CN_FONT.FLASH_SIZE}`, "err");
-      return;
+    await loadFontBuffer(buf, f.name);
+  });
+
+  $("btnFontFile").addEventListener("click", () => {
+    $("fontFile").click();
+  });
+
+  $("btnFontRemote").addEventListener("click", async () => {
+    $("btnFontRemote").disabled = true;
+    $("fontStatus").textContent = "正在下载远程字库...";
+    try {
+      const resp = await fetch(FONT_REMOTE_URL);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const buf = new Uint8Array(await resp.arrayBuffer());
+      await loadFontBuffer(buf, FONT_REMOTE_URL);
+    } catch (err) {
+      setStatus("远程字库下载失败：" + err.message, "err");
+      log("远程字库下载失败：" + err.message, "err");
+      $("fontStatus").textContent = `下载失败：${err.message}`;
+    } finally {
+      $("btnFontRemote").disabled = false;
     }
-    fontData = buf;
-    $("btnFont").disabled = false;
-    log(`字库文件已加载：${f.name}（${buf.length} 字节）`);
-    if (buf.length !== proto.CN_FONT.FLASH_SIZE)
-      log("提示：文件小于标准尺寸，未覆盖区域将保持空白", "info");
   });
 
   $("btnFont").addEventListener("click", async () => {
