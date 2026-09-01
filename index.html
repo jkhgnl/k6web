@@ -656,6 +656,14 @@ s.parentNode.insertBefore(el, s);
           <label for="logoInvert" style="margin:0;font-size:13px;color:#555">反色（黑底白字）</label>
         </div>
 
+        <div style="margin-top:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <label style="margin:0;font-size:13px;color:#555">色彩阈值</label>
+            <span id="logoThresholdVal" style="font-size:13px;color:#2f6fdc;font-weight:600">128</span>
+          </div>
+          <input id="logoThreshold" type="range" min="0" max="255" value="128" style="width:100%;margin-top:4px;accent-color:#2f6fdc">
+        </div>
+
         <div style="display:flex;gap:8px;margin-top:14px">
           <button id="btnLogoWrite" disabled style="flex:1">💾 写入开机图片</button>
           <button id="btnLogoRead" class="secondary" style="flex:1">🔍 读取当前图片</button>

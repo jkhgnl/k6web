@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.4.5";
+  const K5WEB_VERSION = "1.4.6";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
@@ -1477,7 +1477,8 @@
   });
 
   // ---------- 开机图片转换（任意图片 → ST7565 128x64 1bpp 列优先位图） ----------
-  function imageToLogoBitmap(img) {
+  function imageToLogoBitmap(img, threshold) {
+    if (threshold == null) threshold = parseInt($("logoThreshold").value) || 128;
     // 1. 创建 128x64 Canvas，白色背景
     const canvas = document.createElement('canvas');
     canvas.width = 128;
@@ -1503,7 +1504,7 @@
       const g = pixels[i * 4 + 1];
       const b = pixels[i * 4 + 2];
       const gray = (r * 77 + g * 150 + b * 29) >> 8; // 灰度公式
-      bw[i] = gray < 128 ? 1 : 0; // 阈值 128
+      bw[i] = gray < threshold ? 1 : 0;
     }
 
     // 4. 转换为 ST7565 原生列优先格式（128 列 × 8 页，每页 8 行）
@@ -1555,6 +1556,7 @@
 
   // ---------- 开机图片（EEPROM 0xC000，1032 字节） ----------
   let logoData = null; // 转换后的位图数据
+  let logoImg = null;  // 原始图片对象（用于阈值调节）
 
   $("logoFile").addEventListener("change", async (e) => {
     const f = e.target.files[0];
@@ -1572,6 +1574,7 @@
       });
       URL.revokeObjectURL(url);
 
+      logoImg = img;
       logoData = imageToLogoBitmap(img);
       renderLogoPreview(logoData, "logoPreview");
       $("btnLogoWrite").disabled = false;
@@ -1609,6 +1612,20 @@
       inverted[i] = ~logoData[i] & 0xFF;
     }
     renderLogoPreview(inverted, "logoPreview");
+  });
+
+  // 色彩阈值滑块
+  $("logoThreshold").addEventListener("input", () => {
+    $("logoThresholdVal").textContent = $("logoThreshold").value;
+    if (!logoImg) return;
+    logoData = imageToLogoBitmap(logoImg);
+    if ($("logoInvert").checked) {
+      const inverted = new Uint8Array(logoData.length);
+      for (let i = 0; i < logoData.length; i++) inverted[i] = ~logoData[i] & 0xFF;
+      renderLogoPreview(inverted, "logoPreview");
+    } else {
+      renderLogoPreview(logoData, "logoPreview");
+    }
   });
 
   $("btnLogoWrite").addEventListener("click", async () => {
