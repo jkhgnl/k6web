@@ -35,41 +35,57 @@ function gpsPage(token, workerUrl) {
   .ok { color: #16a34a; font-size: 20px; font-weight: bold; }
   .err { color: #dc2626; }
   .coord { font-size: 14px; color: #666; margin: 10px 0; }
+  .log { font-size: 12px; color: #999; margin-top: 20px; text-align: left; max-width: 360px; margin-left: auto; margin-right: auto; word-break: break-all; }
 </style>
 </head>
 <body>
 <div id="status" class="msg">正在获取位置…</div>
+<div id="log" class="log"></div>
 <script>
 (function() {
   var token = "${token}";
   var workerUrl = "${workerUrl}";
+  var logEl = document.getElementById("log");
+  function log(m) { logEl.innerHTML += m + "<br>"; }
 
   if (!navigator.geolocation) {
     document.getElementById("status").innerHTML = '<div class="err">❌ 手机浏览器不支持定位</div>';
     return;
   }
+  log("开始定位…");
 
   navigator.geolocation.getCurrentPosition(
     function(pos) {
       var lat = pos.coords.latitude;
       var lon = pos.coords.longitude;
       var alt = pos.coords.altitude || 0;
+      log("定位成功: " + lat.toFixed(6) + ", " + lon.toFixed(6));
       document.getElementById("status").innerHTML =
-        '<div class="ok">✅ 位置已上报</div>' +
+        '<div class="msg">正在上报…</div>' +
         '<div class="coord">纬度: ' + lat.toFixed(6) + '<br>经度: ' + lon.toFixed(6) + '<br>海拔: ' + alt.toFixed(1) + ' m</div>';
 
-      // 上报到 Worker
-      fetch(workerUrl + "/setgps?t=" + token, {
+      var postUrl = workerUrl + "/setgps?t=" + token;
+      log("POST → " + postUrl);
+
+      fetch(postUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lat: lat, lon: lon, alt: alt })
       }).then(function(r) {
-        if (!r.ok) {
+        log("HTTP " + r.status);
+        return r.json();
+      }).then(function(d) {
+        log("响应: " + JSON.stringify(d));
+        if (d && d.ok) {
           document.getElementById("status").innerHTML =
-            '<div class="err">❌ 上报失败 (HTTP ' + r.status + ')</div>' +
-            '<div class="coord">纬度: ' + lat.toFixed(6) + '<br>经度: ' + lon.toFixed(6) + '</div>';
+            '<div class="ok">✅ 位置已上报</div>' +
+            '<div class="coord">纬度: ' + lat.toFixed(6) + '<br>经度: ' + lon.toFixed(6) + '<br>海拔: ' + alt.toFixed(1) + ' m</div>';
+        } else {
+          document.getElementById("status").innerHTML =
+            '<div class="err">❌ 上报被拒: ' + JSON.stringify(d) + '</div>';
         }
       }).catch(function(e) {
+        log("fetch错误: " + e.message);
         document.getElementById("status").innerHTML =
           '<div class="err">❌ 上报失败: ' + e.message + '</div>' +
           '<div class="coord">纬度: ' + lat.toFixed(6) + '<br>经度: ' + lon.toFixed(6) + '</div>';
@@ -77,6 +93,7 @@ function gpsPage(token, workerUrl) {
     },
     function(err) {
       document.getElementById("status").innerHTML = '<div class="err">❌ 定位失败: ' + err.message + '</div>';
+      log("定位错误: " + err.message);
     },
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
   );
