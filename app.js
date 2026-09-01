@@ -714,12 +714,18 @@
       ? GPS_WORKER_URL + "/getgps?t=" + encodeURIComponent(gpsQrToken)
       : "/getgps?t=" + encodeURIComponent(gpsQrToken);
     log("开始GPS轮询：" + pollUrl, "GPS");
+    let pollCount = 0;
     gpsPollTimer = setInterval(async () => {
+      pollCount++;
       try {
         const resp = await fetch(pollUrl);
         if (!resp.ok) { log("GPS轮询HTTP错误：" + resp.status, "GPS"); return; }
-        const data = await resp.json();
-        if (!data || !data.ok) return; // 正常轮询中，还没有数据
+        const raw = await resp.text();
+        const data = JSON.parse(raw);
+        if (pollCount <= 5 || pollCount % 10 === 0) {
+          log("GPS轮询#" + pollCount + "：" + raw, "GPS");
+        }
+        if (!data || !data.ok) return;
         stopGpsPoll();
         const lat = Number(data.lat).toFixed(5);
         const lon = Number(data.lon).toFixed(5);
