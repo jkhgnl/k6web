@@ -243,6 +243,20 @@ s.parentNode.insertBefore(el, s);
   .fw-asset-name { font-size: 13px; font-family: Consolas, monospace; }
   .fw-asset-size { font-size: 12px; color: #888; margin-left: 8px; }
   .fw-asset-btn { padding: 4px 10px; font-size: 12px; }
+  /* 开机图片预览 */
+  .logo-preview-wrap {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px;
+    display: inline-block;
+  }
+  .logo-preview-wrap canvas {
+    width: 256px;
+    height: 128px;
+    image-rendering: pixelated;
+    border: 1px solid #ccc;
+  }
 </style>
 </head>
 <body>
@@ -277,6 +291,7 @@ s.parentNode.insertBefore(el, s);
         <div class="nav-item" data-tab="tabFw" type="button">固件刷写</div>
         <div class="nav-item" data-tab="tabCal" type="button">校准数据</div>
         <div class="nav-item" data-tab="tabFont" type="button">中文字库</div>
+        <div class="nav-item" data-tab="tabLogo" type="button">开机图片</div>
       </div>
     </div>
     <div class="nav-group">
@@ -345,6 +360,11 @@ s.parentNode.insertBefore(el, s);
       <div class="tool-icon">🔤</div>
       <div class="tool-label">中文字库</div>
       <div class="tool-desc">刷写中文显示字库</div>
+    </div>
+    <div class="tool-card" data-goto="tabLogo">
+      <div class="tool-icon">🖼️</div>
+      <div class="tool-label">开机图片</div>
+      <div class="tool-desc">自定义开机画面</div>
     </div>
     <div class="tool-card" data-goto="tabAbout">
       <div class="tool-icon">ℹ️</div>
@@ -440,6 +460,40 @@ s.parentNode.insertBefore(el, s);
     <pre id="fontViewGrid" style="font-family:Consolas,monospace;font-size:11px;line-height:10px;margin-top:8px"></pre>
   </div>
 
+</div>
+
+<!-- ========== 选项卡：开机图片 ========== -->
+<div id="tabLogo" class="tabpanel">
+  <h2 class="page-title">开机图片</h2>
+
+  <div class="card">
+    <h2>上传开机图片（128×64 单色）</h2>
+    <p class="hint">上传任意格式图片（PNG/JPG/BMP/GIF/WebP），自动转换为 128×64 单色位图并写入对讲机 EEPROM。开机画面为 ST7565 屏幕原生分辨率，黑白两色。</p>
+    
+    <label>选择图片文件</label>
+    <input id="logoFile" type="file" accept="image/*">
+    
+    <div style="margin-top:12px">
+      <label>预览（128×64 像素）</label>
+      <div style="background:#fff;border:1px solid #ddd;border-radius:4px;padding:8px;display:inline-block">
+        <canvas id="logoPreview" style="width:256px;height:128px;image-rendering:pixelated;border:1px solid #ccc"></canvas>
+      </div>
+    </div>
+    
+    <div class="row" style="margin-top:12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <input id="logoInvert" type="checkbox">
+        <label for="logoInvert" style="margin:0">反色（黑底白字）</label>
+      </div>
+    </div>
+    
+    <div class="row" style="margin-top:8px">
+      <button id="btnLogoWrite" disabled>💾 写入开机图片</button>
+      <button id="btnLogoRead" class="secondary">🔍 读取当前图片</button>
+    </div>
+    <div id="logoProgress" class="progress"><div id="logoProgressBar"></div></div>
+    <p class="hint">写入后对讲机自动重启生效。格式：8 字节魔数 "F4HWNLGO" + 1024 字节 ST7565 位图。</p>
+  </div>
 </div>
 
 <!-- ========== 选项卡：多普勒星历 ========== -->

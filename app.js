@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.2.1";
+  const K5WEB_VERSION = "1.3.0";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
@@ -1473,6 +1473,237 @@
       log("字库校验异常：" + err.message, "err");
     } finally {
       $("btnFontCheck").disabled = false;
+    }
+  });
+
+  // ---------- 开机图片转换（任意图片 → ST7565 128x64 1bpp 列优先位图） ----------
+  function imageToLogoBitmap(img) {
+    // 1. 创建 128x64 Canvas，白色背景
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, 128, 64);
+
+    // 2. 保持比例绘制图片（居中）
+    const scale = Math.min(128 / img.width, 64 / img.height);
+    const w = Math.round(img.width * scale);
+    const h = Math.round(img.height * scale);
+    const x = Math.round((128 - w) / 2);
+    const y = Math.round((64 - h) / 2);
+    ctx.drawImage(img, x, y, w, h);
+
+    // 3. 获取像素数据并二值化
+    const imageData = ctx.getImageData(0, 0, 128, 64);
+    const pixels = imageData.data; // RGBA
+    const bw = new Uint8Array(128 * 64); // 1=黑, 0=白
+    for (let i = 0; i < 128 * 64; i++) {
+      const r = pixels[i * 4];
+      const g = pixels[i * 4 + 1];
+      const b = pixels[i * 4 + 2];
+      const gray = (r * 77 + g * 150 + b * 29) >> 8; // 灰度公式
+      bw[i] = gray < 128 ? 1 : 0; // 阈值 128
+    }
+
+    // 4. 转换为 ST7565 原生列优先格式（128 列 × 8 页，每页 8 行）
+    //    列优先 LSB 在上：每列 8 字节，字节 0 的 bit0 是第 0 行
+    const bitmap = new Uint8Array(1024);
+    for (let col = 0; col < 128; col++) {
+      for (let page = 0; page < 8; page++) {
+        let byte = 0;
+        for (let bit = 0; bit < 8; bit++) {
+          const row = page * 8 + bit;
+          if (row < 64 && bw[row * 128 + col]) {
+            byte |= (1 << bit);
+          }
+        }
+        bitmap[col * 8 + page] = byte;
+      }
+    }
+
+    return bitmap;
+  }
+
+  // 预览图片转换结果
+  function renderLogoPreview(bitmap, canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    canvas.width = 128;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(128, 64);
+
+    for (let col = 0; col < 128; col++) {
+      for (let page = 0; page < 8; page++) {
+        const byte = bitmap[col * 8 + page];
+        for (let bit = 0; bit < 8; bit++) {
+          const row = page * 8 + bit;
+          if (row >= 64) continue;
+          const idx = (row * 128 + col) * 4;
+          const black = (byte & (1 << bit)) !== 0;
+          imageData.data[idx] = black ? 0 : 255;
+          imageData.data[idx + 1] = black ? 0 : 255;
+          imageData.data[idx + 2] = black ? 0 : 255;
+          imageData.data[idx + 3] = 255;
+        }
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  // ---------- 开机图片（EEPROM 0xC000，1032 字节） ----------
+  let logoData = null; // 转换后的位图数据
+
+  $("logoFile").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    logoData = null;
+    $("btnLogoWrite").disabled = true;
+    if (!f) return;
+
+    try {
+      const url = URL.createObjectURL(f);
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = () => reject(new Error("无法加载图片"));
+        img.src = url;
+      });
+      URL.revokeObjectURL(url);
+
+      logoData = imageToLogoBitmap(img);
+      renderLogoPreview(logoData, "logoPreview");
+      $("btnLogoWrite").disabled = false;
+      log(`图片已加载：${f.name}（${img.width}×${img.height} → 128×64 单色）`);
+    } catch (err) {
+      setStatus("图片加载失败：" + err.message, "err");
+      log("图片加载异常：" + err.message, "err");
+    }
+  });
+
+  // 反色切换时重新渲染预览
+  $("logoInvert").addEventListener("change", () => {
+    if (!logoData) return;
+    // 反色处理：翻转每个字节的每一位
+    const inverted = new Uint8Array(logoData.length);
+    for (let i = 0; i < logoData.length; i++) {
+      inverted[i] = ~logoData[i] & 0xFF;
+    }
+    renderLogoPreview(inverted, "logoPreview");
+  });
+
+  $("btnLogoWrite").addEventListener("click", async () => {
+    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!logoData) { setStatus("请先选择图片文件", "err"); return; }
+
+    $("btnLogoWrite").disabled = true;
+    $("logoProgress").style.display = "block";
+    const bar = $("logoProgressBar");
+    bar.style.width = "0%";
+    try {
+      const ver = await ensureSession();
+      log(`固件版本：${ver}`);
+
+      const L = proto.LOGO;
+      let dataToWrite = logoData;
+
+      // 处理反色
+      if ($("logoInvert").checked) {
+        dataToWrite = new Uint8Array(logoData.length);
+        for (let i = 0; i < logoData.length; i++) {
+          dataToWrite[i] = ~logoData[i] & 0xFF;
+        }
+      }
+
+      // 构建完整数据：魔数 + 位图 + 填充
+      const fullData = new Uint8Array(L.PADDED_SIZE);
+      fullData.set(L.MAGIC, 0);
+      fullData.set(dataToWrite, L.MAGIC_SIZE);
+      // 填充区保持 0xFF（擦除态）
+
+      // 分块写入（16 字节/块）
+      for (let off = 0; off < L.TOTAL_SIZE; off += L.WRITE_CHUNK) {
+        const payload = new Uint8Array(8 + L.WRITE_CHUNK);
+        const dv = new DataView(payload.buffer);
+        dv.setUint16(0, L.OFFSET + off, true);
+        dv.setUint8(2, L.WRITE_CHUNK);
+        dv.setUint8(3, 1); // bAllowPassword 标志位
+        dv.setUint32(4, L.TS, true);
+        payload.set(fullData.subarray(off, off + L.WRITE_CHUNK), 8);
+        await writer.write(proto.buildFrame(proto.CMD.WRITE_EEPROM, payload));
+        const resp = await waitForMsg(proto.CMD.WRITE_EEPROM_RESP, 1500);
+        if (!resp) throw new Error(`写入 0x${(L.OFFSET + off).toString(16)} 超时`);
+        if (resp.length < 6) throw new Error("写入回复过短");
+        const wdv = new DataView(resp.buffer, resp.byteOffset, resp.byteLength);
+        if (wdv.getUint16(4, true) !== L.OFFSET + off) throw new Error("写入偏移回显不一致");
+        bar.style.width = ((off + L.WRITE_CHUNK) / L.TOTAL_SIZE * 100).toFixed(1) + "%";
+        if (off % 128 === 112) log(`写入 ${off + L.WRITE_CHUNK}/${L.TOTAL_SIZE}`);
+      }
+
+      bar.style.width = "100%";
+      log("开机图片写入完成，发送重启命令...");
+      await writer.write(proto.buildFrame(proto.CMD.REBOOT, new Uint8Array(0)));
+      setStatus("✅ 开机图片已写入，对讲机正在重启生效", "ok");
+      log("已重启");
+    } catch (err) {
+      setStatus("写入失败：" + err.message, "err");
+      log("写入异常：" + err.message, "err");
+    } finally {
+      $("btnLogoWrite").disabled = false;
+    }
+  });
+
+  $("btnLogoRead").addEventListener("click", async () => {
+    if (!port) { setStatus("请先连接串口", "err"); return; }
+    $("btnLogoRead").disabled = true;
+    try {
+      const ver = await ensureSession();
+      log(`固件版本：${ver}`);
+
+      const L = proto.LOGO;
+      const out = new Uint8Array(L.TOTAL_SIZE);
+
+      // 分块读取（128 字节/块，与 CALIB.READ_CHUNK 一致）
+      const READ_CHUNK = 128;
+      for (let off = 0; off < L.TOTAL_SIZE; off += READ_CHUNK) {
+        const n = Math.min(READ_CHUNK, L.TOTAL_SIZE - off);
+        const payload = new Uint8Array(8);
+        const dv = new DataView(payload.buffer);
+        dv.setUint16(0, L.OFFSET + off, true);
+        dv.setUint8(2, n);
+        dv.setUint32(4, L.TS, true);
+        await writer.write(proto.buildFrame(proto.CMD.READ_EEPROM, payload));
+        const resp = await waitForMsg(proto.CMD.READ_EEPROM_RESP, 1500);
+        if (!resp) throw new Error(`读取 0x${(L.OFFSET + off).toString(16)} 超时`);
+        const rdv = new DataView(resp.buffer, resp.byteOffset, resp.byteLength);
+        if (rdv.getUint16(4, true) !== L.OFFSET + off) throw new Error("读取偏移回显不一致");
+        out.set(resp.subarray(8, 8 + n), off);
+        log(`读取 0x${(L.OFFSET + off).toString(16)} ~ 0x${(L.OFFSET + off + n).toString(16)}`);
+      }
+
+      // 验证魔数
+      let magicValid = true;
+      for (let i = 0; i < L.MAGIC_SIZE; i++) {
+        if (out[i] !== L.MAGIC[i]) { magicValid = false; break; }
+      }
+
+      if (!magicValid) {
+        setStatus("开机图片区无有效数据（魔数不匹配）", "warn");
+        log("开机图片读取：魔数不匹配，可能为空");
+        return;
+      }
+
+      // 提取位图并预览
+      const bitmap = out.slice(L.MAGIC_SIZE, L.MAGIC_SIZE + L.BITMAP_SIZE);
+      renderLogoPreview(bitmap, "logoPreview");
+      setStatus("✅ 已读取当前开机图片", "ok");
+      log("开机图片读取完成");
+    } catch (err) {
+      setStatus("读取失败：" + err.message, "err");
+      log("读取异常：" + err.message, "err");
+    } finally {
+      $("btnLogoRead").disabled = false;
     }
   });
 

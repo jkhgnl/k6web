@@ -61,6 +61,18 @@ const CALIB = {
   TS: 0x11223344,    // 会话时间戳（与 tools/k5web/probe_radio.py 一致）
 };
 
+// 开机图片区参数（EEPROM 0xC000，见 App/app/eeprom.h LOGO_EEPROM_OFFSET）
+const LOGO = {
+  OFFSET: 0xc000,       // 开机图片 EEPROM 偏移
+  MAGIC: new Uint8Array([0x46, 0x34, 0x48, 0x57, 0x4E, 0x4C, 0x47, 0x4F]), // "F4HWNLGO"
+  MAGIC_SIZE: 8,
+  BITMAP_SIZE: 1024,    // 128x64 像素，1bpp = 1024 字节
+  TOTAL_SIZE: 1032,     // 魔数 + 位图 = 1032 字节
+  PADDED_SIZE: 1040,    // 16 字节对齐填充
+  WRITE_CHUNK: 16,      // 与校准区写入块大小一致
+  TS: 0x11223344,       // 会话时间戳（与 CALIB.TS 一致）
+};
+
 // 字库区参数（必须与 App/app/cnfont.h 一致）
 const CN_FONT = {
   GLYPH_SIZE: 32,          // 16×16 源字形，与白头佬共享字库一致
@@ -657,7 +669,7 @@ function concat(a, b) {
   }
 })(typeof self !== "undefined" ? self : this, function () {
   return {
-    OBFUSCATION, CMD, CN_FONT, FLASH_MSG, CALIB, CHAN, CTCSS_OPTIONS, DCS_OPTIONS,
+    OBFUSCATION, CMD, CN_FONT, FLASH_MSG, CALIB, LOGO, CHAN, CTCSS_OPTIONS, DCS_OPTIONS,
     CODE_TYPE, MODULATION, TX_DIR, BANDWIDTH, POWER, STEP,
     DD_HEADERS, POWER_NAMES, MODULATION_NAMES, DD_DIR_NAMES,
     crc16, crc8,
