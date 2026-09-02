@@ -5,7 +5,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, getUser, handleOptions } from "../_shared/cors.ts";
 
 const MAX_FILE_SIZE = 1.5 * 1024 * 1024; // 1.5MB
-const ALLOWED_EXT = new Set([".bin", ".csv", ".txt", ".json", ".py", ".js", ".html", ".zip", ".dat"]);
+const ALLOWED_EXT = [".bin", ".csv", ".txt", ".json", ".py", ".js", ".html", ".zip", ".dat"];
 const ALLOWED_CATEGORIES = new Set(["theme", "channel", "extension", "other"]);
 
 Deno.serve(async (req) => {

@@ -156,6 +156,10 @@
     body.innerHTML = `<div class="ws-loading">加载中…</div>`;
     dlBtn.disabled = true;
 
+    // 隐藏评论区
+    const commentsSection = $("wsComments");
+    if (commentsSection) commentsSection.style.display = "none";
+
     fetch(`${FUNC_BASE}/get-workshop-item?id=${encodeURIComponent(id)}`, { headers: anonHeaders() })
       .then((r) => r.json())
       .then((data) => {
@@ -171,6 +175,12 @@
         dlBtn.disabled = false;
         dlBtn.dataset.id = it.id;
         dlBtn.dataset.path = data.download_url || "";
+
+        // 加载评论
+        if (commentsSection && window.K5COMMENTS) {
+          commentsSection.style.display = "block";
+          window.K5COMMENTS.load(it.id, "workshop", "wsCommentList");
+        }
       })
       .catch((e) => {
         body.innerHTML = `<div class="ws-empty">加载失败：${escapeHtml(e.message)}</div>`;
@@ -388,6 +398,17 @@
     if (modal) modal.addEventListener("click", (e) => {
       if (e.target === modal) closeDetail();
     });
+
+    // 初始化工坊评论区
+    if (window.K5COMMENTS) {
+      window.K5COMMENTS.init({
+        inputId: "wsCommentText",
+        submitBtnId: "wsCommentSubmit",
+        listContainerId: "wsCommentList",
+        itemId: null, // 动态设置
+        itemType: "workshop",
+      });
+    }
 
     // 进入工坊 tab 时刷新（首次 init 已加载；重复进入只刷新一次避免刷屏）
     let loadedOnce = false;

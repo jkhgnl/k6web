@@ -3648,6 +3648,13 @@
   fetch("https://gitee.com/api/v5/repos/jkhgnl/uvk6-tools-android/releases/latest").then(r => r.json()).then(d => {
     const apk = (d.assets || []).find(a => a.name && a.name.endsWith(".apk"));
     const btn = $("appDownloadBtn");
-    if (apk && btn) btn.href = apk.browser_download_url;
-  }).catch(() => {});
+    if (apk && btn) {
+      btn.href = apk.browser_download_url;
+    } else if (d.tag_name && btn) {
+      // fallback: 即使 assets 为空，也能根据 tag_name 构造出下载链接
+      btn.href = `https://gitee.com/jkhgnl/uvk6-tools-android/releases/download/${d.tag_name}/uvk6tools-${d.tag_name}.apk`;
+    }
+  }).catch(() => {
+    // 网络请求失败时保留 HTML 中硬编码的直接下载链接（手机浏览器兼容）
+  });
 })();
