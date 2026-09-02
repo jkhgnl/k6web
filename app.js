@@ -17,13 +17,13 @@
     || window.location.hostname.endsWith(".github.io");
   // Cloudflare Worker 代理地址：用于绕过 Gitee raw 文件的 CORS 限制，实现固件一键下载
   // 部署 cloudflare-worker.js 后，把你的 Worker URL 填到这里
-  const WORKER_PROXY_URL = "https://cors.jkhgnl.dpdns.org";
+  const WORKER_PROXY_URL = "https://cors.jkhgnl.top";
 
   // GPS 扫码中转 Worker：手机扫码后通过此 Worker 上报 GPS 到网页
-  const GPS_WORKER_URL = "https://gps.jkhgnl.dpdns.org";
+  const GPS_WORKER_URL = "https://gps.jkhgnl.top";
 
   // TLE + 频率 Redis 缓存 Worker：共享缓存，减少重复抓取
-  const TLE_WORKER_URL = "https://tle.jkhgnl.dpdns.org";
+  const TLE_WORKER_URL = "https://tle.jkhgnl.top";
 
   const proto = window.K5WEB.protocol;
   const calc = window.K5WEB.calc;
@@ -3061,7 +3061,7 @@
   }
 
   // 首页访问人次统计（数字滚动动画）
-  fetch("https://visits.jkhgnl.dpdns.org/").then(r => r.json()).then(d => {
+  fetch("https://visits.jkhgnl.top/").then(r => r.json()).then(d => {
     const el = $("homeVisitCount");
     if (!el) return;
     const target = d.count;

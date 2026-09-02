@@ -4,7 +4,7 @@ compatibility_date = "2024-01-01"
 account_id = "14a86e1ce4d1aa9b673f18b184c24ff1"
 
 routes = [
-  { pattern = "visits.jkhgnl.dpdns.org", custom_domain = true }
+  { pattern = "visits.jkhgnl.top", custom_domain = true }
 ]
 
 [[d1_databases]]

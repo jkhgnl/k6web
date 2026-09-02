@@ -3,7 +3,7 @@ main = "gps-worker.js"
 compatibility_date = "2024-01-01"
 
 routes = [
-  { pattern = "gps.jkhgnl.dpdns.org", custom_domain = true }
+  { pattern = "gps.jkhgnl.top", custom_domain = true }
 ]
 
 [[kv_namespaces]]

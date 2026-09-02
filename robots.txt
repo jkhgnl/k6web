@@ -3,4 +3,4 @@ Allow: /
 Disallow: /vendor/
 Disallow: /img/
 
-Sitemap: https://jkhgnl.github.io/k6web/sitemap.xml
+Sitemap: https://jkhgnl.top/sitemap.xml

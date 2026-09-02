@@ -17,7 +17,7 @@ const ALLOWED_HOSTS = [
 ];
 
 // 允许的请求来源（根据你的 GitHub Pages 域名调整）
-// 生产环境建议改成你的 GitHub Pages 域名，如 "https://jkhgnl.github.io"
+// 生产环境建议改成你的域名，如 "https://jkhgnl.top"
 const ALLOWED_ORIGINS = ["*"];
 
 function isAllowedUrl(urlString) {
