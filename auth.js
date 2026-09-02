@@ -223,6 +223,8 @@
       confirmRow.classList.remove("match", "mismatch");
     }
     if (emailRow) emailRow.classList.remove("valid", "invalid");
+    const forgotRow = document.getElementById("authForgotRow");
+    if (forgotRow) forgotRow.style.display = isLogin ? "" : "none";
     const title = document.getElementById("authTitle");
     const sub = document.getElementById("authSub");
     if (title) title.textContent = isLogin ? "欢迎回来" : "创建你的账号";
@@ -398,6 +400,88 @@
     }
   }
 
+  // ---------- 找回密码 ----------
+  function openForgotModal() {
+    const modal = document.getElementById("forgotModal");
+    if (!modal) return;
+    // 默认显示第一步（输入邮箱）
+    const step1 = document.getElementById("forgotStep1");
+    const step2 = document.getElementById("forgotStep2");
+    if (step1) step1.style.display = "";
+    if (step2) step2.style.display = "none";
+    const err1 = document.getElementById("forgotError");
+    const err2 = document.getElementById("forgotError2");
+    if (err1) err1.textContent = "";
+    if (err2) err2.textContent = "";
+    modal.classList.add("show");
+    const email = document.getElementById("forgotEmail");
+    if (email) email.value = "";
+  }
+
+  function closeForgotModal() {
+    const modal = document.getElementById("forgotModal");
+    if (modal) modal.classList.remove("show");
+  }
+
+  // 显示设置新密码步骤（recovery 回调时调用）
+  function showForgotStep2() {
+    const modal = document.getElementById("forgotModal");
+    if (!modal) return;
+    const step1 = document.getElementById("forgotStep1");
+    const step2 = document.getElementById("forgotStep2");
+    if (step1) step1.style.display = "none";
+    if (step2) step2.style.display = "";
+    const title = document.getElementById("forgotTitle");
+    const sub = document.getElementById("forgotSub");
+    if (title) title.textContent = "设置新密码";
+    if (sub) sub.textContent = "验证通过，请设置一个新密码";
+    modal.classList.add("show");
+  }
+
+  async function sendResetEmail() {
+    const email = (document.getElementById("forgotEmail")?.value || "").trim();
+    const err = document.getElementById("forgotError");
+    if (!email) { if (err) { err.textContent = "请输入邮箱"; err.classList.add("err"); } return; }
+    const btn = document.getElementById("btnForgotSend");
+    if (btn) { btn.disabled = true; btn.classList.add("loading"); }
+    try {
+      // redirectTo 指向当前站点，恢复链接会带回 recovery token
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + "/",
+      });
+      if (error) throw error;
+      if (err) { err.textContent = "✅ 重置邮件已发送，请查收邮箱"; err.classList.remove("err"); }
+    } catch (e) {
+      if (err) { err.textContent = "发送失败：" + (e.message || "请重试"); err.classList.add("err"); }
+    } finally {
+      if (btn) { btn.disabled = false; btn.classList.remove("loading"); }
+    }
+  }
+
+  async function submitNewPassword() {
+    const p1 = (document.getElementById("forgotNewPassword")?.value || "");
+    const p2 = (document.getElementById("forgotConfirmPassword2")?.value || "");
+    const err = document.getElementById("forgotError2");
+    if (p1.length < 6) { if (err) { err.textContent = "密码至少 6 位"; err.classList.add("err"); } return; }
+    if (p1 !== p2) { if (err) { err.textContent = "两次输入的密码不一致"; err.classList.add("err"); } return; }
+    const btn = document.getElementById("btnForgotSubmit");
+    if (btn) { btn.disabled = true; btn.classList.add("loading"); }
+    try {
+      const { error } = await supabase.auth.updateUser({ password: p1 });
+      if (error) throw error;
+      if (err) { err.textContent = "✅ 密码已重置，请用新密码登录"; err.classList.remove("err"); }
+      setTimeout(() => {
+        closeForgotModal();
+        closeModal();
+        openModal();
+      }, 1500);
+    } catch (e) {
+      if (err) { err.textContent = "重置失败：" + (e.message || "请重试"); err.classList.add("err"); }
+    } finally {
+      if (btn) { btn.disabled = false; btn.classList.remove("loading"); }
+    }
+  }
+
   function getToken() {
     return supabase?.auth.getSession().then(({ data }) => data.session?.access_token || null);
   }
@@ -421,11 +505,15 @@
     });
 
     // 监听状态变化（登录/登出/token 刷新）
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange((event, session) => {
       user = session?.user || null;
       emit();
       renderAuthUI();
       maybePromptCompleteProfile();
+      // 密码重置回调：邮件链接带回 recovery token，自动进入设置新密码
+      if (event === "PASSWORD_RECOVERY") {
+        showForgotStep2();
+      }
     });
 
     // 顶部栏按钮
@@ -542,6 +630,30 @@
     ["cpUsername", "cpEmail"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener("input", refreshCpSubmit);
+    });
+
+    // 找回密码
+    const forgotOpen = document.getElementById("btnForgotOpen");
+    if (forgotOpen) forgotOpen.addEventListener("click", openForgotModal);
+    const forgotClose = document.getElementById("btnForgotClose");
+    if (forgotClose) forgotClose.addEventListener("click", closeForgotModal);
+    const forgotSend = document.getElementById("btnForgotSend");
+    if (forgotSend) forgotSend.addEventListener("click", sendResetEmail);
+    const forgotBack = document.getElementById("btnForgotBack");
+    if (forgotBack) forgotBack.addEventListener("click", () => { closeForgotModal(); openModal(); });
+    const forgotSubmit = document.getElementById("btnForgotSubmit");
+    if (forgotSubmit) forgotSubmit.addEventListener("click", submitNewPassword);
+    const forgotModal = document.getElementById("forgotModal");
+    if (forgotModal) forgotModal.addEventListener("click", (e) => {
+      if (e.target === forgotModal) closeForgotModal();
+    });
+    // 密码可见性（找回密码弹窗）
+    const forgotPwEye = document.getElementById("btnForgotPwEye");
+    if (forgotPwEye) forgotPwEye.addEventListener("click", () => {
+      const p = document.getElementById("forgotNewPassword");
+      if (!p) return;
+      p.type = p.type === "password" ? "text" : "password";
+      forgotPwEye.textContent = p.type === "password" ? "👁️" : "🙈";
     });
   }
 
