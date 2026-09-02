@@ -20,9 +20,38 @@ function corsHeaders() {
 
 const TTL_SECONDS = 300;
 
-// 写入：KV 优先，失败则 D1
+// Upstash Redis REST 辅助（强一致，避免 KV 跨节点同步延迟）
+async function redis(env, command) {
+  const resp = await fetch(env.UPSTASH_REDIS_REST_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.UPSTASH_REDIS_REST_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(command),
+  });
+  if (!resp.ok) throw new Error(`Redis HTTP ${resp.status}`);
+  const data = await resp.json();
+  if (data.error) throw new Error(`Redis: ${data.error}`);
+  return data.result;
+}
+
+function redisAvailable(env) {
+  return !!(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN);
+}
+
+// 写入：Redis 优先（强一致），未配置则回退 KV / D1
 async function storeGps(env, token, lat, lon, alt) {
   const json = JSON.stringify({ lat, lon, alt });
+  if (redisAvailable(env)) {
+    try {
+      await redis(env, ["SET", "gps:" + token, json, "EX", TTL_SECONDS]);
+      console.log("[store] Redis ok token=" + token);
+      return "redis";
+    } catch (e) {
+      console.log("[store] Redis failed, fallback:", e.message);
+    }
+  }
   const expiresAt = Math.floor(Date.now() / 1000) + TTL_SECONDS;
   try {
     await env.GPS_KV.put("gps:" + token, json, { expirationTtl: TTL_SECONDS });
@@ -43,9 +72,15 @@ async function storeGps(env, token, lat, lon, alt) {
   }
 }
 
-// 读取：KV 优先，没有则查 D1
+// 读取：Redis 优先，没有则查 KV / D1
 async function loadGps(env, token) {
-  // 先查 KV
+  if (redisAvailable(env)) {
+    try {
+      const data = await redis(env, ["GET", "gps:" + token]);
+      if (data) return JSON.parse(data);
+    } catch (_) {}
+  }
+  // 再查 KV
   try {
     const kvData = await env.GPS_KV.get("gps:" + token, "json");
     if (kvData) return kvData;

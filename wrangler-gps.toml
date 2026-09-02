@@ -14,3 +14,7 @@ id = "d9e7abbcf6e44496833cea5d7e6702b8"
 binding = "DB"
 database_name = "gps"
 database_id = "af8934f2-9993-4aa8-afee-8783e559a84b"
+
+[vars]
+UPSTASH_REDIS_REST_URL = "https://proud-mammal-120181.upstash.io"
+UPSTASH_REDIS_REST_TOKEN = "gQAAAAAAAdV1AAIgcDEyZDI2Mzk5NDk0ZmE0Y2ZlOTEwMDliNjlkNzRiMDhlYw"
