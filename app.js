@@ -3245,15 +3245,19 @@
 
   // ---------- 获取远程固件（读取仓库 update.json） ----------
 
+  // 远程固件列表（每个固件自动通过 CORS 代理下载到内存，用户直接点选即可刷写）
+  const remoteFwCache = []; // [{ name, version, note, buf }]
+
   $("btnFwList").addEventListener("click", async () => {
     const btn = $("btnFwList");
     const status = $("fwRemoteStatus");
     const listBox = $("fwReleaseList");
     btn.disabled = true;
     btn.textContent = "获取中...";
-    status.textContent = "正在获取固件信息...";
+    status.textContent = "正在获取固件列表...";
     status.className = "hint";
     listBox.innerHTML = "";
+    remoteFwCache.length = 0;
 
     try {
       // GitHub Pages 模式：从 GitHub 仓库读取固件列表（raw.githubusercontent.com 支持 CORS）
@@ -3269,31 +3273,92 @@
       const list = Array.isArray(data) ? data : (data.firmware_url ? [data] : []);
       if (list.length === 0) throw new Error("固件仓库暂无固件");
 
+      // 先渲染占位卡片（带 loading 状态），同时后台并发下载所有固件
       let html = "";
-      for (const fw of list) {
-        const name = fw.name || "f4hwn.Fusion.bin";
+      for (let i = 0; i < list.length; i++) {
+        const fw = list[i];
+        const name = fw.name || "f4hwn.fusion.bin";
         const version = fw.version || "";
         const note = (fw.note || fw.description || fw.body || "").trim();
-        const url = fw.url || fw.firmware_url || "";
-
-        html += `<div class="fw-release">`;
+        html += `<div class="fw-release" id="fwItem${i}">`;
         html += `<div class="fw-release-header">`;
         html += `<span class="fw-release-tag">${name}${version ? " v" + version : ""}</span>`;
         html += `</div>`;
         if (note) html += `<div class="fw-release-body">${note}</div>`;
         html += `<div class="fw-asset">`;
         html += `<span class="fw-asset-name">${name}</span>`;
-        html += `<button class="fw-asset-btn" data-url="${url}" data-name="${name}">📥 下载</button>`;
+        html += `<span class="fw-asset-size" id="fwSize${i}" style="color:#888">⏳ 下载中...</span>`;
         html += `</div>`;
         html += `</div>`;
       }
-
       listBox.innerHTML = html;
-      status.textContent = "固件信息已获取，请点击下载";
-      status.className = "hint ok";
-      listBox.querySelectorAll(".fw-asset-btn").forEach((dlBtn) => {
-        dlBtn.addEventListener("click", () => downloadRemoteFirmware(dlBtn));
+
+      // 并发下载所有固件到内存
+      const total = list.length;
+      let done = 0;
+      status.textContent = `正在下载 ${total} 个固件...`;
+      status.className = "hint";
+
+      const downloadTasks = list.map(async (fw, i) => {
+        const name = fw.name || "f4hwn.fusion.bin";
+        const version = fw.version || "";
+        const url = fw.url || fw.firmware_url || "";
+        const sizeEl = $(`fwSize${i}`);
+        const itemEl = $(`fwItem${i}`);
+
+        if (!url) {
+          if (sizeEl) { sizeEl.textContent = "⚠️ 无下载地址"; sizeEl.style.color = "#c62828"; }
+          return;
+        }
+
+        try {
+          let buf;
+          if (IS_GITHUB_PAGES) {
+            const proxyUrl = WORKER_PROXY_URL + "?url=" + encodeURIComponent(url);
+            const r = await fetchWithTimeout(proxyUrl, {}, 60000);
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            buf = new Uint8Array(await r.arrayBuffer());
+          } else {
+            const r = await fetchWithTimeout(url, {}, 60000);
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            buf = new Uint8Array(await r.arrayBuffer());
+          }
+
+          if (!buf.length || buf.length > proto.FLASH_MSG.APP_MAX_SIZE) {
+            throw new Error(`大小无效：${buf.length} 字节`);
+          }
+
+          remoteFwCache.push({ name, version, note: (fw.note || fw.description || fw.body || "").trim(), buf });
+
+          // 更新 UI：显示大小，加点击事件
+          if (sizeEl) {
+            const kb = (buf.length / 1024).toFixed(1);
+            sizeEl.textContent = `✅ ${kb} KB · 点击选择`;
+            sizeEl.style.color = "#1a7f37";
+          }
+          if (itemEl) {
+            itemEl.style.cursor = "pointer";
+            itemEl.addEventListener("click", () => selectRemoteFirmware(i));
+          }
+        } catch (err) {
+          if (sizeEl) { sizeEl.textContent = "❌ 下载失败：" + err.message; sizeEl.style.color = "#c62828"; }
+          log(`固件 ${name} 下载失败：${err.message}`, "err");
+        } finally {
+          done++;
+          status.textContent = `正在下载固件... ${done}/${total}`;
+        }
       });
+
+      await Promise.all(downloadTasks);
+
+      if (remoteFwCache.length > 0) {
+        status.textContent = `✅ ${remoteFwCache.length}/${total} 个固件已就绪，请点击选择`;
+        status.className = "hint ok";
+        log(`远程固件全部就绪：${remoteFwCache.length}/${total}`);
+      } else {
+        status.textContent = "❌ 所有固件下载失败";
+        status.className = "hint err";
+      }
     } catch (err) {
       status.textContent = "获取失败：" + err.message;
       status.className = "hint err";
@@ -3304,78 +3369,35 @@
     }
   });
 
-  async function downloadRemoteFirmware(btn) {
-    const url = btn.dataset.url;
-    const name = btn.dataset.name;
+  function selectRemoteFirmware(index) {
+    const fw = remoteFwCache[index];
+    if (!fw) return;
+    fwData = fw.buf;
+    $("btnFlash").disabled = false;
+    // 高亮选中的卡片
+    document.querySelectorAll("#fwReleaseList .fw-release").forEach((el, i) => {
+      el.style.borderColor = i === index ? "#2f6fdc" : "";
+      el.style.background = i === index ? "#f0f6ff" : "";
+    });
+    // 更新按钮文字
+    document.querySelectorAll("#fwReleaseList .fw-asset-size").forEach((el, i) => {
+      if (i === index) {
+        const kb = (fw.buf.length / 1024).toFixed(1);
+        el.textContent = `✅ 已选择 · ${kb} KB`;
+        el.style.color = "#2f6fdc";
+      } else {
+        const cacheItem = remoteFwCache[i];
+        if (cacheItem) {
+          const kb = (cacheItem.buf.length / 1024).toFixed(1);
+          el.textContent = `✅ ${kb} KB · 点击选择`;
+          el.style.color = "#1a7f37";
+        }
+      }
+    });
     const status = $("fwRemoteStatus");
-
-    if (!url) { status.textContent = "无效的下载地址"; status.className = "hint err"; return; }
-
-    // GitHub Pages 模式：通过 CORS 代理下载固件到页面内，用户可直接切换刷写
-    if (IS_GITHUB_PAGES) {
-      const proxyUrl = WORKER_PROXY_URL + "?url=" + encodeURIComponent(url);
-      btn.disabled = true;
-      btn.textContent = "下载中...";
-      status.textContent = `正在通过代理下载 ${name}...`;
-      status.className = "hint";
-
-      try {
-        const resp = await fetchWithTimeout(proxyUrl, {}, 60000);
-        if (!resp.ok) {
-          const errText = await resp.text().catch(() => "");
-          throw new Error("HTTP " + resp.status + (errText ? "：" + errText.slice(0, 100) : ""));
-        }
-        const buf = new Uint8Array(await resp.arrayBuffer());
-
-        if (!buf.length || buf.length > proto.FLASH_MSG.APP_MAX_SIZE) {
-          throw new Error(`固件大小无效：${buf.length} 字节（应 1~${proto.FLASH_MSG.APP_MAX_SIZE}）`);
-        }
-
-        fwData = buf;
-        $("btnFlash").disabled = false;
-        status.textContent = `✅ 已下载：${name}（${buf.length} 字节，${Math.ceil(buf.length / 256)} 页），可直接刷写`;
-        status.className = "hint ok";
-        log(`远程固件已加载：${name}（${buf.length} 字节）`);
-      } catch (err) {
-        status.textContent = "下载失败：" + err.message;
-        status.className = "hint err";
-        log("远程固件下载失败：" + err.message, "err");
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "📥 下载";
-      }
-      return;
-    }
-
-    let downloadUrl = url;
-
-    btn.disabled = true;
-    btn.textContent = "下载中...";
-    status.textContent = `正在下载 ${name}...`;
-    status.className = "hint";
-
-    try {
-      const resp = await fetchWithTimeout(downloadUrl, {}, 60000);
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
-      const buf = new Uint8Array(await resp.arrayBuffer());
-
-      if (!buf.length || buf.length > proto.FLASH_MSG.APP_MAX_SIZE) {
-        throw new Error(`固件大小无效：${buf.length} 字节（应 1~${proto.FLASH_MSG.APP_MAX_SIZE}）`);
-      }
-
-      fwData = buf;
-      $("btnFlash").disabled = false;
-      status.textContent = `✅ 已下载：${name}（${buf.length} 字节，${Math.ceil(buf.length / 256)} 页）`;
-      status.className = "hint ok";
-      log(`远程固件已加载：${name}（${buf.length} 字节）`);
-    } catch (err) {
-      status.textContent = "下载失败：" + err.message;
-      status.className = "hint err";
-      log("远程固件下载失败：" + err.message, "err");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "📥 下载";
-    }
+    status.textContent = `已选择：${fw.name}${fw.version ? " v" + fw.version : ""}（${fw.buf.length} 字节，${Math.ceil(fw.buf.length / 256)} 页），可直接刷写`;
+    status.className = "hint ok";
+    log(`已选择远程固件：${fw.name}${fw.version ? " v" + fw.version : ""}（${fw.buf.length} 字节）`);
   }
 
   $("btnFlash").addEventListener("click", async () => {
