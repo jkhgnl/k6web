@@ -675,6 +675,15 @@
 .pp-bind-badge.bound { background: #e6f6ee; color: #1a7f37; }
 .pp-bind-badge.unbound { background: #fdecea; color: #b43422; }
 .pp-bind-badge.pending { background: #fff4e5; color: #b26a00; }
+.pp-field { margin-top: 12px; }
+.pp-field label { font-size: 13px; color: #555; font-weight: 500; margin-bottom: 4px; display: block; }
+.pp-field input, .pp-field textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px;
+  font-size: 14px; font-family: inherit; transition: border-color .2s;
+}
+.pp-field input:focus, .pp-field textarea:focus { outline: none; border-color: #2f6fdc; }
+.pp-field textarea { resize: vertical; min-height: 60px; }
+.pp-field-hint { font-size: 11px; color: #999; text-align: right; margin-top: 2px; }
 .pp-works { display: flex; flex-direction: column; gap: 8px; }
 .pp-work { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #eef1f5; border-radius: 10px; }
 .pp-work-icon { font-size: 22px; flex-shrink: 0; }
@@ -724,18 +733,41 @@
         </div>
         <button class="pp-btn ghost small" id="ppChangeAvatar">更换头像</button>
       </div>
+      <div class="pp-field" style="margin-top:16px">
+        <label>用户名</label>
+        <input id="ppEditName" type="text" maxlength="20" placeholder="2-20 字符" autocomplete="off">
+      </div>
+      <div class="pp-field">
+        <label>简介</label>
+        <textarea id="ppEditBio" maxlength="200" rows="3" placeholder="写点什么介绍自己..." autocomplete="off"></textarea>
+        <div class="pp-field-hint"><span id="ppBioCount">0</span>/200</div>
+      </div>
+      <div id="ppEditStatus" style="font-size:12px;margin-top:8px"></div>
+      <button class="pp-btn primary" id="ppSaveProfile" style="margin-top:10px">💾 保存资料</button>
     </div>
 
     <div class="pp-card">
-      <h2>🔗 账号绑定</h2>
+      <h2>🔐 账号安全</h2>
+      <div class="pp-bind-item">
+        <span class="pp-bind-icon">🔑</span>
+        <div style="flex:1">
+          <div class="pp-bind-name">修改密码</div>
+          <div class="pp-bind-sub">更新你的登录密码</div>
+        </div>
+        <button class="pp-btn ghost small" id="ppChangePass">修改</button>
+      </div>
       <div class="pp-bind-item">
         <span class="pp-bind-icon">✉️</span>
-        <div>
-          <div class="pp-bind-name">邮箱</div>
-          <div class="pp-bind-sub" id="ppBindEmailSub">邮箱登录账号</div>
+        <div style="flex:1">
+          <div class="pp-bind-name">修改邮箱</div>
+          <div class="pp-bind-sub" id="ppBindEmailSub">当前邮箱：-</div>
         </div>
-        <div class="pp-bind-status"><span class="pp-bind-badge bound">已绑定</span></div>
+        <button class="pp-btn ghost small" id="ppChangeEmail">修改</button>
       </div>
+    </div>
+
+    <div class="pp-card">
+      <h2>🔗 第三方绑定</h2>
       <div class="pp-bind-item">
         <span class="pp-bind-icon">🐙</span>
         <div>
@@ -769,6 +801,50 @@
     <div class="gps-qr-status" id="gpsQrStatus">等待手机扫码上报…</div>
     <div style="margin-top:12px; display:flex; gap:8px; justify-content:center">
       <button id="gpsQrClose" type="button" class="secondary">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 修改密码弹窗 -->
+<div id="passModal" class="modal-overlay" style="display:none">
+  <div class="modal-panel" style="max-width:380px">
+    <h3>🔑 修改密码</h3>
+    <div class="pp-field">
+      <label>当前密码</label>
+      <input id="ppOldPass" type="password" placeholder="输入当前密码" autocomplete="current-password">
+    </div>
+    <div class="pp-field">
+      <label>新密码</label>
+      <input id="ppNewPass" type="password" placeholder="至少 6 位" autocomplete="new-password">
+    </div>
+    <div class="pp-field">
+      <label>确认新密码</label>
+      <input id="ppConfirmPass" type="password" placeholder="再次输入新密码" autocomplete="new-password">
+    </div>
+    <div id="ppPassStatus" style="font-size:12px;margin-top:8px"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="secondary" id="ppPassCancel" style="flex:1">取消</button>
+      <button class="pp-btn primary" id="ppPassSubmit" style="flex:1">确认修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- 修改邮箱弹窗 -->
+<div id="emailModal" class="modal-overlay" style="display:none">
+  <div class="modal-panel" style="max-width:380px">
+    <h3>✉️ 修改邮箱</h3>
+    <div class="pp-field">
+      <label>新邮箱</label>
+      <input id="ppNewEmail" type="email" placeholder="输入新邮箱地址" autocomplete="email">
+    </div>
+    <div class="pp-field">
+      <label>当前密码（验证身份）</label>
+      <input id="ppEmailPass" type="password" placeholder="输入当前密码" autocomplete="current-password">
+    </div>
+    <div id="ppEmailStatus" style="font-size:12px;margin-top:8px"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="secondary" id="ppEmailCancel" style="flex:1">取消</button>
+      <button class="pp-btn primary" id="ppEmailSubmit" style="flex:1">确认修改</button>
     </div>
   </div>
 </div>
@@ -964,6 +1040,11 @@
     $("ppName").textContent = name;
     $("ppEmail").textContent = user.email || "";
     $("ppJoined").textContent = user.created_at ? "加入于 " + fmtDate(user.created_at) : "";
+    // 填充编辑表单
+    $("ppEditName").value = meta.user_name || meta.name || "";
+    $("ppEditBio").value = meta.bio || "";
+    $("ppBioCount").textContent = (meta.bio || "").length;
+    $("ppBindEmailSub").textContent = "当前邮箱：" + (user.email || "-");
 
     // GitHub 绑定状态
     const identities = user.identities || [];
@@ -1042,6 +1123,93 @@
   // 更换头像：复用顶栏隐藏 input
   $("ppChangeAvatar")?.addEventListener("click", () => $("avatarInput")?.click());
   $("ppGoLogin")?.addEventListener("click", () => window.K5AUTH.openModal());
+
+  // 简介字数统计
+  $("ppEditBio")?.addEventListener("input", () => {
+    $("ppBioCount").textContent = $("ppEditBio").value.length;
+  });
+
+  // 保存资料
+  $("ppSaveProfile")?.addEventListener("click", async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const name = $("ppEditName").value.trim();
+    const bio = $("ppEditBio").value.trim();
+    const statusEl = $("ppEditStatus");
+    if (!name) { statusEl.textContent = "用户名不能为空"; statusEl.style.color = "#c62828"; return; }
+    try {
+      // 更新 auth.users 的 user_metadata
+      const { error: authErr } = await supabase.auth.updateUser({ data: { user_name: name, bio } });
+      if (authErr) throw authErr;
+      // 更新 profiles 表
+      const { error: dbErr } = await supabase.from("profiles").upsert({ id: session.user.id, username: name, bio }, { onConflict: "id" });
+      if (dbErr) throw dbErr;
+      statusEl.textContent = "✅ 保存成功"; statusEl.style.color = "#1a7f37";
+      // 刷新显示
+      const { data } = await supabase.auth.getUser();
+      if (data.user) render(data.user);
+    } catch (e) {
+      statusEl.textContent = "保存失败：" + (e.message || "请重试"); statusEl.style.color = "#c62828";
+    }
+  });
+
+  // ---------- 修改密码 ----------
+  $("ppChangePass")?.addEventListener("click", () => { $("passModal").style.display = "flex"; });
+  $("ppPassCancel")?.addEventListener("click", () => {
+    $("passModal").style.display = "none";
+    $("ppOldPass").value = ""; $("ppNewPass").value = ""; $("ppConfirmPass").value = "";
+    $("ppPassStatus").textContent = "";
+  });
+  $("ppPassSubmit")?.addEventListener("click", async () => {
+    const oldPass = $("ppOldPass").value;
+    const newPass = $("ppNewPass").value;
+    const confirmPass = $("ppConfirmPass").value;
+    const statusEl = $("ppPassStatus");
+    if (!oldPass || !newPass) { statusEl.textContent = "请填写所有字段"; statusEl.style.color = "#c62828"; return; }
+    if (newPass.length < 6) { statusEl.textContent = "新密码至少 6 位"; statusEl.style.color = "#c62828"; return; }
+    if (newPass !== confirmPass) { statusEl.textContent = "两次密码不一致"; statusEl.style.color = "#c62828"; return; }
+    try {
+      // 先用旧密码重新验证
+      const { data: { session } } = await supabase.auth.getSession();
+      const { error: authErr } = await supabase.auth.signInWithPassword({ email: session.user.email, password: oldPass });
+      if (authErr) throw new Error("当前密码错误");
+      // 修改密码
+      const { error } = await supabase.auth.updateUser({ password: newPass });
+      if (error) throw error;
+      statusEl.textContent = "✅ 密码已修改"; statusEl.style.color = "#1a7f37";
+      setTimeout(() => { $("passModal").style.display = "none"; }, 1500);
+    } catch (e) {
+      statusEl.textContent = e.message || "修改失败"; statusEl.style.color = "#c62828";
+    }
+  });
+
+  // ---------- 修改邮箱 ----------
+  $("ppChangeEmail")?.addEventListener("click", () => { $("emailModal").style.display = "flex"; });
+  $("ppEmailCancel")?.addEventListener("click", () => {
+    $("emailModal").style.display = "none";
+    $("ppNewEmail").value = ""; $("ppEmailPass").value = "";
+    $("ppEmailStatus").textContent = "";
+  });
+  $("ppEmailSubmit")?.addEventListener("click", async () => {
+    const newEmail = $("ppNewEmail").value.trim();
+    const pass = $("ppEmailPass").value;
+    const statusEl = $("ppEmailStatus");
+    if (!newEmail || !pass) { statusEl.textContent = "请填写所有字段"; statusEl.style.color = "#c62828"; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) { statusEl.textContent = "邮箱格式不正确"; statusEl.style.color = "#c62828"; return; }
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      // 验证密码
+      const { error: authErr } = await supabase.auth.signInWithPassword({ email: session.user.email, password: pass });
+      if (authErr) throw new Error("密码错误");
+      // 修改邮箱
+      const { error } = await supabase.auth.updateUser({ email: newEmail });
+      if (error) throw error;
+      statusEl.textContent = "✅ 验证邮件已发送到新邮箱，请查收确认"; statusEl.style.color = "#1a7f37";
+      setTimeout(() => { $("emailModal").style.display = "none"; }, 2000);
+    } catch (e) {
+      statusEl.textContent = e.message || "修改失败"; statusEl.style.color = "#c62828";
+    }
+  });
 
   // 初始化：恢复会话后渲染
   window.K5AUTH.init();
