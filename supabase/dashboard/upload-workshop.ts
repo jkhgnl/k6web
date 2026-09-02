@@ -1,8 +1,36 @@
+// upload-workshop - Dashboard 内联版（共享代码已内联，无需 _shared 目录）
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-auth",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+};
+function jsonResponse(body, status = 200, extraHeaders = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders, ...extraHeaders },
+  });
+}
+async function getUser(req, supabase) {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return null;
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  if (!token) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) return null;
+  return data.user;
+}
+function handleOptions(req) {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+  return null;
+}
+
 // 创意工坊 - 上传作品（需登录）
 // POST multipart/form-data: title, description, category, file
 // 文件大小限制 1.5MB（Supabase Edge Function body 上限 2MB，留出余量）
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { jsonResponse, getUser, handleOptions } from "../_shared/cors.ts";
 
 const MAX_FILE_SIZE = 1.5 * 1024 * 1024; // 1.5MB
 const ALLOWED_EXT = new Set([".bin", ".csv", ".txt", ".json", ".py", ".js", ".html", ".zip", ".dat"]);

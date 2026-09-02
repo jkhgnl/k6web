@@ -1,7 +1,35 @@
+// upload-avatar - Dashboard 内联版（共享代码已内联，无需 _shared 目录）
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-auth",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+};
+function jsonResponse(body, status = 200, extraHeaders = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders, ...extraHeaders },
+  });
+}
+async function getUser(req, supabase) {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return null;
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  if (!token) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) return null;
+  return data.user;
+}
+function handleOptions(req) {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+  return null;
+}
+
 // 上传头像（需登录）
 // POST multipart/form-data: file（图片 JPG/PNG/GIF/WebP ≤2MB）
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { jsonResponse, getUser, handleOptions } from "../_shared/cors.ts";
 
 const MAX_SIZE = 2 * 1024 * 1024;
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);

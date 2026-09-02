@@ -1,7 +1,35 @@
+// list-workshop - Dashboard 内联版（共享代码已内联，无需 _shared 目录）
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-auth",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+};
+function jsonResponse(body, status = 200, extraHeaders = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders, ...extraHeaders },
+  });
+}
+async function getUser(req, supabase) {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return null;
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  if (!token) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) return null;
+  return data.user;
+}
+function handleOptions(req) {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+  return null;
+}
+
 // 创意工坊 - 作品列表（公开）
 // GET ?page=1&page_size=12&category=theme
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { jsonResponse, handleOptions } from "../_shared/cors.ts";
 
 Deno.serve(async (req) => {
   const pre = handleOptions(req);
