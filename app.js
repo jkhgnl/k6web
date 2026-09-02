@@ -3311,12 +3311,39 @@
 
     if (!url) { status.textContent = "无效的下载地址"; status.className = "hint err"; return; }
 
-    // GitHub Pages 模式：Gitee 下载链接不支持 CORS，直接在新窗口打开供用户下载
+    // GitHub Pages 模式：通过 CORS 代理下载固件到页面内，用户可直接切换刷写
     if (IS_GITHUB_PAGES) {
-      status.textContent = `📥 正在打开下载链接，请在弹出窗口中下载 ${name}，然后用下方「选择固件文件」导入`;
-      status.className = "hint ok";
-      log(`固件下载：打开 ${url}`);
-      window.open(url, "_blank");
+      const proxyUrl = WORKER_PROXY_URL + "?url=" + encodeURIComponent(url);
+      btn.disabled = true;
+      btn.textContent = "下载中...";
+      status.textContent = `正在通过代理下载 ${name}...`;
+      status.className = "hint";
+
+      try {
+        const resp = await fetchWithTimeout(proxyUrl, {}, 60000);
+        if (!resp.ok) {
+          const errText = await resp.text().catch(() => "");
+          throw new Error("HTTP " + resp.status + (errText ? "：" + errText.slice(0, 100) : ""));
+        }
+        const buf = new Uint8Array(await resp.arrayBuffer());
+
+        if (!buf.length || buf.length > proto.FLASH_MSG.APP_MAX_SIZE) {
+          throw new Error(`固件大小无效：${buf.length} 字节（应 1~${proto.FLASH_MSG.APP_MAX_SIZE}）`);
+        }
+
+        fwData = buf;
+        $("btnFlash").disabled = false;
+        status.textContent = `✅ 已下载：${name}（${buf.length} 字节，${Math.ceil(buf.length / 256)} 页），可直接刷写`;
+        status.className = "hint ok";
+        log(`远程固件已加载：${name}（${buf.length} 字节）`);
+      } catch (err) {
+        status.textContent = "下载失败：" + err.message;
+        status.className = "hint err";
+        log("远程固件下载失败：" + err.message, "err");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "📥 下载";
+      }
       return;
     }
 
