@@ -391,6 +391,18 @@ s.parentNode.insertBefore(el, s);
     font-size: 13px; color: #333; cursor: pointer;
   }
   .user-dropdown-item:hover { background: #f3f6fb; color: #2f6fdc; }
+  .user-dropdown-item.danger:hover { background: #fdecec; color: #d93025; }
+
+  .my-works-body { padding: 8px 0; }
+  .my-work-list { display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto; }
+  .my-work-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px; border: 1px solid #eee; border-radius: 8px; text-align: left;
+  }
+  .my-work-icon { font-size: 22px; flex-shrink: 0; }
+  .my-work-main { min-width: 0; flex: 1; }
+  .my-work-title { font-size: 14px; font-weight: 600; color: #222; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .my-work-sub { font-size: 12px; color: #999; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .user-avatar-btn { cursor: pointer; position: relative; transition: opacity .15s; }
   .user-avatar-btn:hover { opacity: .8; }
   #avatarInput { display: none; }
@@ -1390,6 +1402,17 @@ s.parentNode.insertBefore(el, s);
     <div id="profileBody" class="profile-body"></div>
     <div class="ws-detail-actions">
       <button id="btnProfileClose" type="button" class="secondary">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 我的作品弹窗 -->
+<div id="myWorksModal" class="modal-overlay">
+  <div class="modal-panel" style="max-width:420px">
+    <h3>🗂️ 我的作品</h3>
+    <div id="myWorksBody" class="my-works-body"></div>
+    <div class="ws-detail-actions">
+      <button id="btnMyWorksClose" type="button" class="secondary">关闭</button>
     </div>
   </div>
 </div>

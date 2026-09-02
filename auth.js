@@ -48,10 +48,14 @@
                  <div><div class="user-dropdown-name">${escapeHtml(name)}</div><div class="user-dropdown-email">${escapeHtml(user.email || "")}</div></div>
                </div>
                <div class="user-dropdown-item" id="menuProfile">👤 个人中心</div>
+               <div class="user-dropdown-item" id="menuMyWorks">🗂️ 我的作品</div>
+               <div class="user-dropdown-item danger" id="menuLogout">🚪 退出登录</div>
              </div>`;
         badge.style.display = "inline-flex";
         bindAvatarClick();
         document.getElementById("menuProfile")?.addEventListener("click", openProfile);
+        document.getElementById("menuMyWorks")?.addEventListener("click", openMyWorks);
+        document.getElementById("menuLogout")?.addEventListener("click", signOut);
       }
       btn.textContent = "登出";
       btn.classList.add("secondary");
@@ -93,6 +97,61 @@
 
   function closeProfile() {
     const modal = document.getElementById("profileModal");
+    if (modal) modal.classList.remove("show");
+  }
+
+  // 我的作品：REST 直接查询本人上传的作品（RLS 公开可读，无需 Edge Function）
+  async function openMyWorks() {
+    const modal = document.getElementById("myWorksModal");
+    const body = document.getElementById("myWorksBody");
+    if (!modal || !body || !user) return;
+    body.innerHTML = `<div class="ws-loading">加载中…</div>`;
+    modal.classList.add("show");
+
+    try {
+      const url = `${URL}/rest/v1/workshop_items?user_id=eq.${encodeURIComponent(user.id)}&select=id,title,category,file_name,file_size,download_count,created_at&order=created_at.desc`;
+      const resp = await fetch(url, {
+        headers: {
+          apikey: KEY,
+          Authorization: "Bearer " + KEY,
+        },
+      });
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const items = await resp.json();
+
+      if (!items.length) {
+        body.innerHTML = `<div class="ws-empty">你还没有上传过作品，去创意工坊发布第一个吧 🚀</div>`;
+        return;
+      }
+      const CAT_ICON = { theme: "🎨", channel: "📋", extension: "⚙️", other: "📦" };
+      const rows = items.map((it) => `
+        <div class="my-work-item">
+          <span class="my-work-icon">${CAT_ICON[it.category] || "📦"}</span>
+          <div class="my-work-main">
+            <div class="my-work-title">${escapeHtml(it.title)}</div>
+            <div class="my-work-sub">${escapeHtml(it.file_name)} · ${fmtSize(it.file_size)} · ⬇️ ${it.download_count || 0} · ${fmtDate(it.created_at)}</div>
+          </div>
+        </div>`).join("");
+      body.innerHTML = `<div class="my-work-list">${rows}</div>`;
+    } catch (e) {
+      body.innerHTML = `<div class="ws-empty">加载失败：${escapeHtml(e.message || "请稍后重试")}</div>`;
+    }
+  }
+
+  function fmtSize(bytes) {
+    if (!bytes) return "0 B";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+  }
+  function fmtDate(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  function closeMyWorks() {
+    const modal = document.getElementById("myWorksModal");
     if (modal) modal.classList.remove("show");
   }
 
@@ -291,6 +350,14 @@
     const profileModal = document.getElementById("profileModal");
     if (profileModal) profileModal.addEventListener("click", (e) => {
       if (e.target === profileModal) closeProfile();
+    });
+
+    // 我的作品弹窗
+    const btnMyWorksClose = document.getElementById("btnMyWorksClose");
+    if (btnMyWorksClose) btnMyWorksClose.addEventListener("click", closeMyWorks);
+    const myWorksModal = document.getElementById("myWorksModal");
+    if (myWorksModal) myWorksModal.addEventListener("click", (e) => {
+      if (e.target === myWorksModal) closeMyWorks();
     });
   }
 
