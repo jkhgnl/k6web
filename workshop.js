@@ -179,6 +179,7 @@
         // 加载评论
         if (commentsSection && window.K5COMMENTS) {
           commentsSection.style.display = "block";
+          if (window._wsCommentCtrl) window._wsCommentCtrl.setItemId(it.id);
           window.K5COMMENTS.load(it.id, "workshop", "wsCommentList");
         }
       })
@@ -401,11 +402,10 @@
 
     // 初始化工坊评论区
     if (window.K5COMMENTS) {
-      window.K5COMMENTS.init({
+      window._wsCommentCtrl = window.K5COMMENTS.init({
         inputId: "wsCommentText",
         submitBtnId: "wsCommentSubmit",
         listContainerId: "wsCommentList",
-        itemId: null, // 动态设置
         itemType: "workshop",
       });
     }

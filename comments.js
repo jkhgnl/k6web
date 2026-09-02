@@ -139,7 +139,15 @@
 
     try {
       const params = new URLSearchParams({ item_id: itemId, item_type: itemType });
-      const resp = await fetch(`${FUNC_BASE}/list-comments?${params}`, { headers: anonHeaders() });
+      // 如果已登录，带上用户 token 以便后端判断点赞状态和删除权限
+      const headers = anonHeaders();
+      if (window.K5AUTH && window.K5AUTH.isLoggedIn()) {
+        const token = await window.K5AUTH.getToken();
+        if (token) {
+          headers.Authorization = "Bearer " + token;
+        }
+      }
+      const resp = await fetch(`${FUNC_BASE}/list-comments?${params}`, { headers });
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       const data = await resp.json();
       renderCommentList(container, data.comments || [], itemType);
@@ -248,7 +256,6 @@
       inputId,
       submitBtnId,
       listContainerId,
-      itemId,
       itemType,
     } = config;
 
@@ -256,7 +263,13 @@
     const submitBtn = $(submitBtnId);
     const listContainer = $(listContainerId);
 
-    if (!input || !submitBtn) return;
+    if (!input || !submitBtn) return { setItemId() {} };
+
+    // 当前评论区的 itemId（动态设置）
+    let currentItemId = config.itemId || null;
+    // 当前回复的父评论 ID（null = 顶级评论）
+    let replyingToId = null;
+    let replyingToAuthor = "";
 
     // 输入框事件
     function refreshSubmitBtn() {
@@ -265,12 +278,26 @@
       submitBtn.disabled = !(isLoggedIn && hasContent);
       if (!isLoggedIn) {
         submitBtn.textContent = "🔒 登录后评论";
+      } else if (replyingToId) {
+        submitBtn.textContent = "回复 " + replyingToAuthor;
       } else {
         submitBtn.textContent = "发表";
       }
     }
 
+    // 取消回复状态
+    function cancelReply() {
+      replyingToId = null;
+      replyingToAuthor = "";
+      input.placeholder = "发表评论...";
+      refreshSubmitBtn();
+    }
+
     input.addEventListener("input", refreshSubmitBtn);
+    input.addEventListener("blur", () => {
+      // 如果输入框为空，自动取消回复状态
+      if (!input.value.trim()) cancelReply();
+    });
     window.K5AUTH.onAuth(() => refreshSubmitBtn());
     refreshSubmitBtn();
 
@@ -280,18 +307,20 @@
         window.K5AUTH.openModal();
         return;
       }
+      if (!currentItemId) return;
 
       submitBtn.disabled = true;
       submitBtn.textContent = "发表中...";
 
       const success = await postComment(
-        itemId,
+        currentItemId,
         itemType,
         input.value,
-        null,
+        replyingToId,
         () => {
           input.value = "";
-          loadComments(itemId, itemType, listContainerId);
+          cancelReply();
+          loadComments(currentItemId, itemType, listContainerId);
         }
       );
 
@@ -311,17 +340,27 @@
           await toggleLike(commentId, actionBtn);
         } else if (action === "delete") {
           await deleteComment(commentId, () => {
-            loadComments(itemId, itemType, listContainerId);
+            loadComments(currentItemId, itemType, listContainerId);
           });
         } else if (action === "reply") {
-          // 回复功能：聚焦输入框并添加 @ 提示
-          const author = actionBtn.dataset.author || "";
+          // 设置回复状态
+          replyingToId = commentId;
+          replyingToAuthor = actionBtn.dataset.author || "";
           input.focus();
-          input.value = `@${author} `;
+          input.value = "";
+          input.placeholder = "回复 " + replyingToAuthor + "...";
           input.scrollIntoView({ behavior: "smooth", block: "center" });
+          refreshSubmitBtn();
         }
       });
     }
+
+    // 返回控制接口
+    return {
+      setItemId(id) {
+        currentItemId = id;
+      },
+    };
   }
 
   // ---------- 公开接口 ----------

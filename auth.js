@@ -661,6 +661,7 @@
   window.K5AUTH = {
     init,
     getUser: () => user,
+    getUserId: () => user?.id || null,
     isLoggedIn: () => !!user,
     getToken,
     onAuth: (cb) => { callbacks.push(cb); },
