@@ -61,7 +61,7 @@
       btn.classList.add("secondary");
     } else {
       if (badge) { badge.style.display = "none"; badge.innerHTML = ""; }
-      btn.textContent = "登录";
+      btn.textContent = "登录/注册";
       btn.classList.remove("secondary");
     }
   }
