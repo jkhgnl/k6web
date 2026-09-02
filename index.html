@@ -312,6 +312,7 @@ s.parentNode.insertBefore(el, s);
         <div class="nav-item" data-tab="tabCal" type="button">校准数据</div>
         <div class="nav-item" data-tab="tabFont" type="button">中文字库</div>
         <div class="nav-item" data-tab="tabLogo" type="button">开机图片</div>
+        <div class="nav-item" data-tab="tabWorkshop" type="button">创意工坊</div>
       </div>
     </div>
     <div class="nav-group">
@@ -385,6 +386,11 @@ s.parentNode.insertBefore(el, s);
       <div class="tool-icon">🖼️</div>
       <div class="tool-label">开机图片</div>
       <div class="tool-desc">自定义开机画面</div>
+    </div>
+    <div class="tool-card" data-goto="tabWorkshop">
+      <div class="tool-icon">🛠️</div>
+      <div class="tool-label">创意工坊</div>
+      <div class="tool-desc">社区模板、主题与扩展</div>
     </div>
     <div class="tool-card" data-goto="tabAbout">
       <div class="tool-icon">ℹ️</div>
@@ -666,10 +672,10 @@ s.parentNode.insertBefore(el, s);
     <h2>上传开机图片（128×64 单色）</h2>
     <p class="hint">上传任意格式图片（PNG/JPG/BMP/GIF/WebP），自动转换为 128×64 单色位图并写入对讲机 EEPROM。开机画面为 ST7565 屏幕原生分辨率，黑白两色。</p>
 
-    <div style="display:flex;gap:20px;margin-top:16px;flex-wrap:wrap">
+    <div style="display:flex;gap:20px;margin-top:16px;flex-wrap:wrap;align-items:stretch">
       <!-- 左侧：上传区 -->
-      <div style="flex:1;min-width:240px">
-        <div id="logoDropZone" style="border:2px dashed #ccc;border-radius:8px;padding:32px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;color:#888">
+      <div style="flex:1;min-width:240px;min-height:280px">
+        <div id="logoDropZone" style="border:2px dashed #ccc;border-radius:8px;padding:16px;min-height:140px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;color:#888;box-sizing:border-box">
           <div style="font-size:36px;margin-bottom:8px">🖼️</div>
           <div style="font-size:14px;font-weight:500;color:#555">点击选择或拖拽图片到这里</div>
           <div style="font-size:12px;color:#999;margin-top:4px">支持 PNG / JPG / BMP / GIF / WebP</div>
@@ -697,13 +703,54 @@ s.parentNode.insertBefore(el, s);
       </div>
 
       <!-- 右侧：预览区 -->
-      <div style="flex:1;min-width:240px;display:flex;flex-direction:column;align-items:center;justify-content:center">
+      <div style="flex:1;min-width:240px;min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center">
         <label style="font-size:13px;color:#888;margin-bottom:8px">预览（128×64 像素）</label>
         <div class="logo-preview-wrap">
           <canvas id="logoPreview"></canvas>
         </div>
         <p class="hint" style="margin-top:10px;text-align:center">写入后对讲机自动重启生效<br>格式：魔数 "F4HWNLGO" + 1024B 位图</p>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 选项卡：创意工坊 ========== -->
+<div id="tabWorkshop" class="tabpanel">
+  <h2 class="page-title">创意工坊</h2>
+
+  <div class="card">
+    <h2>社区创意内容</h2>
+    <p class="hint">这里将展示用户贡献的自定义配置、模板、脚本和创意玩法。你可以上传自己的作品，也可以下载他人分享的方案。</p>
+    <div class="tool-grid" id="workshopGrid">
+      <div class="tool-card" data-goto="tabWorkshop">
+        <div class="tool-icon">🎨</div>
+        <div class="tool-label">自定义主题</div>
+        <div class="tool-desc">社区分享的配色与界面主题方案</div>
+      </div>
+      <div class="tool-card" data-goto="tabWorkshop">
+        <div class="tool-icon">📋</div>
+        <div class="tool-label">信道模板</div>
+        <div class="tool-desc">常用频段、中继、卫星快速导入模板</div>
+      </div>
+      <div class="tool-card" data-goto="tabWorkshop">
+        <div class="tool-icon">⚙️</div>
+        <div class="tool-label">功能扩展</div>
+        <div class="tool-desc">用户贡献的脚本和扩展工具</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>上传你的作品</h2>
+    <p class="hint">选择要分享的模板或配置文件，添加描述后即可提交到创意工坊（此功能需要后续接入后端存储）。</p>
+    <label>作品标题</label>
+    <input id="workshopTitle" type="text" placeholder="给你的作品起个名字">
+    <label>作品描述</label>
+    <textarea id="workshopDesc" placeholder="简单描述作品内容、适用场景和使用方法"></textarea>
+    <label>选择文件</label>
+    <input id="workshopFile" type="file">
+    <div class="row" style="margin-top:8px">
+      <button id="btnWorkshopUpload" disabled>🚀 提交作品</button>
     </div>
   </div>
 </div>
