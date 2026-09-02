@@ -174,6 +174,52 @@ s.parentNode.insertBefore(el, s);
   .tool-label { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 4px; }
   .tool-desc { font-size: 12px; color: #888; line-height: 1.4; }
 
+  .coffee-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-top: 28px;
+    padding: 24px 0 16px;
+    border-top: 1px solid #e8e8e8;
+  }
+  .coffee-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 36px;
+    background: linear-gradient(135deg, #f5a623, #f7c948);
+    color: #7a5800;
+    border: none;
+    border-radius: 50px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .2s, box-shadow .2s;
+    box-shadow: 0 4px 16px rgba(245, 166, 35, .35);
+  }
+  .coffee-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(245, 166, 35, .45); }
+  .coffee-btn:active { transform: translateY(0); }
+  .coffee-btn .icon { font-size: 22px; }
+  .coffee-hint { font-size: 12px; color: #999; margin-top: 8px; }
+  .coffee-modal-panel {
+    width: min(92vw, 420px);
+    max-width: 420px;
+    max-height: 92vh;
+    overflow-y: auto;
+    text-align: center;
+  }
+  .coffee-qr {
+    display: block;
+    width: min(100%, 300px);
+    height: auto;
+    max-height: 68vh;
+    object-fit: contain;
+    margin: 0 auto;
+    border-radius: 8px;
+  }
+
   .visit-bar {
     display: flex; align-items: baseline; justify-content: center; gap: 6px;
     margin-top: 24px; padding: 16px 0;
