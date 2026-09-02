@@ -3,6 +3,23 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, handleOptions, getUser } from "../_shared/cors.ts";
 
+// 异步发邮件（不阻塞主流程）
+async function sendEmailToUser(supabase: any, userId: string, type: string, title: string, content: string, fromUsername: string) {
+  try {
+    const { data: userData } = await supabase.auth.admin.getUserById(userId);
+    if (!userData?.user?.email) return;
+    const funcBase = Deno.env.get("SUPABASE_URL") + "/functions/v1";
+    await fetch(`${funcBase}/send-notification-email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+      },
+      body: JSON.stringify({ to: userData.user.email, type, title, content, from_username: fromUsername }),
+    });
+  } catch (e) { console.error("邮件发送失败:", e); }
+}
+
 Deno.serve(async (req) => {
   const pre = handleOptions(req);
   if (pre) return pre;
@@ -100,6 +117,8 @@ Deno.serve(async (req) => {
           item_type,
           comment_id: comment.id,
         });
+        // 异步发邮件
+        sendEmailToUser(supabase, parentCommentUserId, "reply", "回复了你的评论", trimmedContent.slice(0, 100), myUsername);
       } catch (e) { console.error("回复通知失败:", e); }
     }
 
@@ -129,6 +148,8 @@ Deno.serve(async (req) => {
             item_type,
             comment_id: comment.id,
           });
+          // 异步发邮件
+          sendEmailToUser(supabase, mentionedUser.id, "mention", "在评论中提到了你", trimmedContent.slice(0, 100), myUsername);
         } catch (e) { console.error("提及通知失败:", e); }
       }
     }

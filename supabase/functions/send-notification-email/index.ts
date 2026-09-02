@@ -1,6 +1,93 @@
-// 站内信 - 发送邮件通知（供 create-notification 调用）
+// 站内信 - 发送邮件通知（SMTP 直连）
 // POST body: { to, type, title, content, from_username }
 import { jsonResponse, handleOptions } from "../_shared/cors.ts";
+
+// SMTP 配置（阿里云企业邮箱）
+const SMTP_HOST = "smtp.qiye.aliyun.com";
+const SMTP_PORT = 465;
+const SMTP_USER = "noreply@jkhgnl.top";
+const SMTP_PASS = "6429891nihqO!";
+const SMTP_FROM = "K6Web <noreply@jkhgnl.top>";
+
+// 简易 SMTP over TLS 实现
+async function sendSmtp(to: string, subject: string, htmlBody: string): Promise<void> {
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  // TLS 连接（端口 465 直连 TLS）
+  const conn = await Deno.connectTls({ hostname: SMTP_HOST, port: SMTP_PORT });
+
+  const reader = conn.readable.getReader();
+  const writer = conn.writable.getWriter();
+
+  async function send(line: string): Promise<string> {
+    await writer.write(encoder.encode(line + "\r\n"));
+    const result = await reader.read();
+    return decoder.decode(result.value);
+  }
+
+  async function readBanner(): Promise<string> {
+    const result = await reader.read();
+    return decoder.decode(result.value);
+  }
+
+  // 读取服务器 banner
+  await readBanner();
+
+  // EHLO
+  let r = await send("EHLO jkhgnl.top");
+  console.log("EHLO:", r);
+
+  // AUTH LOGIN
+  r = await send("AUTH LOGIN");
+  console.log("AUTH:", r);
+
+  // 用户名（base64）
+  r = await send(btoa(SMTP_USER));
+  console.log("USER:", r);
+
+  // 密码（base64）
+  r = await send(btoa(SMTP_PASS));
+  console.log("PASS:", r);
+
+  // MAIL FROM
+  r = await send(`MAIL FROM:<${SMTP_USER}>`);
+  console.log("MAIL FROM:", r);
+
+  // RCPT TO
+  r = await send(`RCPT TO:<${to}>`);
+  console.log("RCPT TO:", r);
+
+  // DATA
+  r = await send("DATA");
+  console.log("DATA:", r);
+
+  // 邮件内容
+  const rawEmail = [
+    `From: ${SMTP_FROM}`,
+    `To: <${to}>`,
+    `Subject: =?UTF-8?B?${btoa(encodeURIComponent(subject).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))))}?=`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/html; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    btoa(unescape(encodeURIComponent(htmlBody))),
+    ".",
+  ].join("\r\n");
+
+  r = await send(rawEmail);
+  console.log("DATA END:", r);
+
+  // QUIT
+  await send("QUIT");
+
+  conn.close();
+}
+
+function escapeHtml(s: string): string {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+}
 
 Deno.serve(async (req) => {
   const pre = handleOptions(req);
@@ -15,7 +102,6 @@ Deno.serve(async (req) => {
     }
 
     // 构建邮件内容
-    const typeLabel = type === "reply" ? "回复" : type === "mention" ? "@提及" : "通知";
     const subject = `[K6Web] ${from_username || "用户"}${title}`;
     const htmlContent = `
       <div style="font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -34,40 +120,12 @@ Deno.serve(async (req) => {
       </div>
     `;
 
-    // 使用 Resend 发送邮件（免费额度 100 封/天）
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (!resendApiKey) {
-      console.log("RESEND_API_KEY 未配置，跳过邮件发送");
-      return jsonResponse({ success: true, skipped: true, reason: "no_api_key" });
-    }
-
-    const resp = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${resendApiKey}`,
-      },
-      body: JSON.stringify({
-        from: "K6Web <notifications@jkhgnl.top>",
-        to: [to],
-        subject,
-        html: htmlContent,
-      }),
-    });
-
-    if (!resp.ok) {
-      const err = await resp.text();
-      console.error("邮件发送失败:", err);
-      return jsonResponse({ success: false, error: err }, 500);
-    }
+    // 通过 SMTP 发送邮件
+    await sendSmtp(to, subject, htmlContent);
 
     return jsonResponse({ success: true });
   } catch (e) {
-    return jsonResponse({ error: (e as Error).message || "Internal Error" }, 500);
+    console.error("邮件发送失败:", e);
+    return jsonResponse({ success: false, error: (e as Error).message }, 500);
   }
 });
-
-function escapeHtml(s: string): string {
-  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
-}
