@@ -71,8 +71,6 @@ s.parentNode.insertBefore(el, s);
   }
   .topbar .brand { font-size: 18px; font-weight: 600; color: #111; }
   .topbar .top-actions { display: flex; align-items: center; gap: 12px; }
-  .topbar .link { font-size: 14px; color: #444; cursor: pointer; text-decoration: none; }
-  .topbar .link:hover { color: #2f6fdc; }
   .btn-connect { padding: 7px 18px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; background: #2f6fdc; color: #fff; }
   .btn-connect.secondary { background: #6c757d; }
   .top-status { font-size: 13px; color: #444; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -477,6 +475,10 @@ s.parentNode.insertBefore(el, s);
     transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
   }
   .auth-field:focus-within { border-color: #2f6fdc; background: #fff; box-shadow: 0 0 0 4px rgba(47, 111, 220, .12); }
+  .auth-field.match { border-color: #2ea44f; background: #f4fbf7; }
+  .auth-field.match:focus-within { box-shadow: 0 0 0 4px rgba(46, 164, 79, .14); }
+  .auth-field.mismatch { border-color: #e26d5c; background: #fef6f5; }
+  .auth-field.mismatch:focus-within { box-shadow: 0 0 0 4px rgba(226, 109, 92, .12); }
   .auth-field-icon { font-size: 15px; opacity: .55; flex-shrink: 0; }
   .auth-field input {
     flex: 1; min-width: 0; height: 100%; padding: 0;
@@ -662,11 +664,7 @@ s.parentNode.insertBefore(el, s);
   .profile-body .user-dropdown-email { font-size: 13px; max-width: none; margin-top: 4px; }
   .profile-body .profile-joined { font-size: 12px; color: #bbb; margin-top: 6px; }
 
-  /* 移动端顶部栏挤不下时隐藏问题反馈链接 */
-  @media (max-width: 768px) {
-    .topbar .link { display: none; }
-  }
-</style>
+  </style>
 </head>
 <body>
 
@@ -680,7 +678,6 @@ s.parentNode.insertBefore(el, s);
     <span id="userBadge"></span>
     <input id="avatarInput" type="file" accept="image/jpeg,image/png,image/gif,image/webp">
     <button id="btnAuth" class="btn-connect">登录/注册</button>
-    <a class="link" href="https://github.com/jkhgnl/k6web/issues" target="_blank">问题反馈</a>
     <button id="btnConnect" class="btn-connect">连接</button>
     <span id="status" class="top-status"></span>
   </div>
@@ -1556,6 +1553,7 @@ s.parentNode.insertBefore(el, s);
     <p style="margin:8px 0">GitHub：<a href="https://www.github.com/Jkhgnl" target="_blank" style="color:#2f6fdc">github.com/Jkhgnl</a></p>
     <p style="margin:8px 0">Gitee：<a href="https://gitee.com/Jkhgnl/" target="_blank" style="color:#2f6fdc">gitee.com/Jkhgnl</a></p>
     <p style="margin:8px 0">邮箱：<a href="mailto:Jkhgnl@outlook.com" style="color:#2f6fdc">Jkhgnl@outlook.com</a></p>
+    <p style="margin:18px 0 8px"><a class="btn-connect" style="display:inline-block;text-decoration:none" href="https://github.com/jkhgnl/k6web/issues" target="_blank">🐛 问题反馈</a></p>
   </div>
 </div>
 
@@ -1637,6 +1635,11 @@ s.parentNode.insertBefore(el, s);
       <input id="authPassword" type="password" placeholder="密码" autocomplete="current-password">
       <button type="button" class="auth-eye" id="btnAuthEye" aria-label="显示或隐藏密码">👁️</button>
     </div>
+    <div class="auth-field" id="authConfirmRow" style="display:none">
+      <span class="auth-field-icon">🔐</span>
+      <input id="authConfirmPassword" type="password" placeholder="确认密码" autocomplete="new-password">
+      <button type="button" class="auth-eye" id="btnAuthEyeConfirm" aria-label="显示或隐藏密码">👁️</button>
+    </div>
     <div id="authError" class="auth-error" role="status"></div>
     <button id="btnAuthSubmit" type="button" class="auth-submit">登录</button>
     <div class="auth-benefits">
@@ -1655,6 +1658,24 @@ s.parentNode.insertBefore(el, s);
     <div id="profileBody" class="profile-body"></div>
     <div class="ws-detail-actions">
       <button id="btnProfileClose" type="button" class="secondary">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 完善资料弹窗（GitHub 登录后首次） -->
+<div id="completeProfileModal" class="modal-overlay">
+  <div class="modal-panel auth-modal">
+    <h3>完善你的资料</h3>
+    <p class="sub">设置一个独特的用户名，并绑定邮箱用于账号安全</p>
+    <label for="cpUsername">用户名</label>
+    <input id="cpUsername" type="text" maxlength="20" placeholder="2-20 字符，字母/数字/下划线" autocomplete="username">
+    <div id="cpUsernameStatus" style="margin-top:4px"></div>
+    <label for="cpEmail" style="margin-top:10px">绑定邮箱</label>
+    <input id="cpEmail" type="email" placeholder="用于验证和找回密码">
+    <div id="cpError" style="margin-top:8px"></div>
+    <div class="ws-detail-actions" style="margin-top:14px">
+      <button id="btnCpClose" type="button" class="secondary">暂不设置</button>
+      <button id="btnCpSubmit" type="button" disabled>保存</button>
     </div>
   </div>
 </div>
@@ -1686,8 +1707,8 @@ s.parentNode.insertBefore(el, s);
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
 </script>
-<script src="auth.js?v=1.7.1"></script>
-<script src="workshop.js?v=1.7.0"></script>
+<script src="auth.js?v=1.7.2"></script>
+<script src="workshop.js?v=1.7.2"></script>
 <script src="vendor/satellite.min.js"></script>
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>

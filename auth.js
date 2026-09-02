@@ -210,12 +210,17 @@
     const submit = document.getElementById("btnAuthSubmit");
     const email = document.getElementById("authEmail");
     const usernameRow = document.getElementById("authUsernameRow");
+    const confirmRow = document.getElementById("authConfirmRow");
     if (submit) submit.textContent = isLogin ? "登录" : "注册";
     document.querySelectorAll(".auth-tab").forEach((t) => {
       t.classList.toggle("active", t.dataset.mode === mode);
     });
     if (email) email.placeholder = isLogin ? "邮箱" : "注册邮箱（将发送验证邮件）";
     if (usernameRow) usernameRow.style.display = isLogin ? "none" : "";
+    if (confirmRow) {
+      confirmRow.style.display = isLogin ? "none" : "";
+      confirmRow.classList.remove("match", "mismatch");
+    }
     const title = document.getElementById("authTitle");
     const sub = document.getElementById("authSub");
     if (title) title.textContent = isLogin ? "欢迎回来" : "创建你的账号";
@@ -247,11 +252,14 @@
     const email = document.getElementById("authEmail").value.trim();
     const pass = document.getElementById("authPassword").value;
     const username = (document.getElementById("authUsername")?.value || "").trim();
+    const confirmPass = (document.getElementById("authConfirmPassword")?.value || "").trim();
     if (!email || !pass) { setAuthError("请填写邮箱和密码"); return; }
     const mode = getMode();
     if (mode === "register") {
       if (!isValidUsername(username)) { setAuthError("用户名需 2-20 字符，仅字母/数字/下划线"); return; }
       if (pass.length < 6) { setAuthError("密码至少 6 位"); return; }
+      if (!confirmPass) { setAuthError("请再次输入确认密码"); return; }
+      if (pass !== confirmPass) { setAuthError("两次输入的密码不一致"); return; }
     }
     try {
       const btn = document.getElementById("btnAuthSubmit");
@@ -297,6 +305,90 @@
     await supabase.auth.signOut();
   }
 
+  // ---------- 完善资料（GitHub 登录后首次） ----------
+  function maybePromptCompleteProfile() {
+    if (!user) return;
+    // 仅 GitHub 登录且尚未完善资料时提示
+    if (user.app_metadata?.provider !== "github") return;
+    if (user.user_metadata?.profile_completed) return;
+    openCompleteProfile();
+  }
+
+  function openCompleteProfile() {
+    const modal = document.getElementById("completeProfileModal");
+    if (!modal) return;
+    const uEl = document.getElementById("cpUsername");
+    const eEl = document.getElementById("cpEmail");
+    const st = document.getElementById("cpUsernameStatus");
+    const err = document.getElementById("cpError");
+    const meta = user.user_metadata || {};
+    if (uEl) uEl.value = meta.user_name || meta.name || meta.preferred_username || "";
+    if (eEl) eEl.value = user.email || "";
+    if (st) { st.textContent = ""; st.classList.remove("err", "ok"); }
+    if (err) err.textContent = "";
+    refreshCpSubmit();
+    modal.classList.add("show");
+  }
+
+  function closeCompleteProfile() {
+    const modal = document.getElementById("completeProfileModal");
+    if (modal) modal.classList.remove("show");
+  }
+
+  function refreshCpSubmit() {
+    const btn = document.getElementById("btnCpSubmit");
+    if (!btn) return;
+    const u = (document.getElementById("cpUsername")?.value || "").trim();
+    const e = (document.getElementById("cpEmail")?.value || "").trim();
+    btn.disabled = !(isValidUsername(u) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
+  }
+
+  async function submitCompleteProfile() {
+    const uEl = document.getElementById("cpUsername");
+    const eEl = document.getElementById("cpEmail");
+    const st = document.getElementById("cpUsernameStatus");
+    const err = document.getElementById("cpError");
+    const btn = document.getElementById("btnCpSubmit");
+    const username = (uEl?.value || "").trim();
+    const email = (eEl?.value || "").trim();
+    if (!isValidUsername(username)) {
+      if (err) err.textContent = "用户名需 2-20 字符，仅字母/数字/下划线";
+      return;
+    }
+    const token = await getToken();
+    if (!token) { if (err) err.textContent = "登录状态已失效，请重新登录"; return; }
+    if (btn) { btn.disabled = true; btn.textContent = "保存中…"; }
+    try {
+      const resp = await fetch(URL + "/functions/v1/update-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ username, email }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        if (resp.status === 409 && st) {
+          st.textContent = "该用户名已被占用，换一个试试";
+          st.classList.add("err");
+        } else if (err) {
+          err.textContent = data.error || "保存失败，请重试";
+        }
+        return;
+      }
+      // 刷新本地用户元数据
+      const { data: ud } = await supabase.auth.getUser();
+      if (ud.user) user = ud.user;
+      closeCompleteProfile();
+      renderAuthUI();
+      if (window.K5WORKSHOP && typeof window.K5WORKSHOP.loadList === "function") {
+        window.K5WORKSHOP.loadList(1, "all");
+      }
+    } catch (e) {
+      if (err) err.textContent = "保存失败：" + (e.message || "请重试");
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "保存"; }
+    }
+  }
+
   function getToken() {
     return supabase?.auth.getSession().then(({ data }) => data.session?.access_token || null);
   }
@@ -316,6 +408,7 @@
       user = data.session?.user || null;
       emit();
       renderAuthUI();
+      maybePromptCompleteProfile();
     });
 
     // 监听状态变化（登录/登出/token 刷新）
@@ -323,6 +416,7 @@
       user = session?.user || null;
       emit();
       renderAuthUI();
+      maybePromptCompleteProfile();
     });
 
     // 顶部栏按钮
@@ -366,6 +460,31 @@
       eyeBtn.textContent = p.type === "password" ? "👁️" : "🙈";
     });
 
+    // 确认密码：可见性切换 + 实时一致性校验
+    const confirmInput = document.getElementById("authConfirmPassword");
+    const confirmRow = document.getElementById("authConfirmRow");
+    const eyeConfirm = document.getElementById("btnAuthEyeConfirm");
+    if (eyeConfirm) eyeConfirm.addEventListener("click", () => {
+      if (!confirmInput) return;
+      confirmInput.type = confirmInput.type === "password" ? "text" : "password";
+      eyeConfirm.textContent = confirmInput.type === "password" ? "👁️" : "🙈";
+    });
+    if (confirmInput && confirmRow) {
+      const syncConfirm = () => {
+        const p = document.getElementById("authPassword");
+        if (!p) return;
+        if (!confirmInput.value) {
+          confirmRow.classList.remove("match", "mismatch");
+          return;
+        }
+        const ok = confirmInput.value === p.value;
+        confirmRow.classList.toggle("match", ok);
+        confirmRow.classList.toggle("mismatch", !ok);
+      };
+      confirmInput.addEventListener("input", syncConfirm);
+      if (passInput) passInput.addEventListener("input", syncConfirm);
+    }
+
     // 点遮罩关闭
     const modal = document.getElementById("authModal");
     if (modal) modal.addEventListener("click", (e) => {
@@ -386,6 +505,20 @@
     const myWorksModal = document.getElementById("myWorksModal");
     if (myWorksModal) myWorksModal.addEventListener("click", (e) => {
       if (e.target === myWorksModal) closeMyWorks();
+    });
+
+    // 完善资料弹窗
+    const cpClose = document.getElementById("btnCpClose");
+    if (cpClose) cpClose.addEventListener("click", closeCompleteProfile);
+    const cpSubmit = document.getElementById("btnCpSubmit");
+    if (cpSubmit) cpSubmit.addEventListener("click", submitCompleteProfile);
+    const cpModal = document.getElementById("completeProfileModal");
+    if (cpModal) cpModal.addEventListener("click", (e) => {
+      if (e.target === cpModal) closeCompleteProfile();
+    });
+    ["cpUsername", "cpEmail"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener("input", refreshCpSubmit);
     });
   }
 
