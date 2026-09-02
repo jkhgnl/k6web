@@ -1588,8 +1588,11 @@ s.parentNode.insertBefore(el, s);
         </div>
       </div>
       <div class="ws-form-row">
-        <label>效果展示图 <span class="ws-thumb-required">*</span></label>
-        <div class="ws-thumb-picker">
+        <label style="display:flex;align-items:center;gap:8px">
+          <input id="wsThumbEnabled" type="checkbox" style="accent-color:#2f6fdc">
+          上传效果展示图（可选）
+        </label>
+        <div class="ws-thumb-picker" id="wsThumbPicker" hidden>
           <div class="ws-thumb-preview" id="wsThumbPreview">🖼️</div>
           <div>
             <button type="button" class="ws-thumb-btn" id="wsThumbBtn">选择图片</button>

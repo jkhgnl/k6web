@@ -60,11 +60,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "不支持的文件类型" }, 400);
     }
 
-    // 验证缩略图
-    if (!thumbnail) return jsonResponse({ error: "请上传效果展示图" }, 400);
-    if (thumbnail.size > MAX_THUMB_SIZE) return jsonResponse({ error: "展示图不能超过 500KB" }, 413);
-    if (!isAllowedImgExt(thumbnail.name)) {
-      return jsonResponse({ error: "展示图仅支持 jpg/png/gif/webp" }, 400);
+    // 验证缩略图（可选）
+    if (thumbnail) {
+      if (thumbnail.size > MAX_THUMB_SIZE) return jsonResponse({ error: "展示图不能超过 500KB" }, 413);
+      if (!isAllowedImgExt(thumbnail.name)) {
+        return jsonResponse({ error: "展示图仅支持 jpg/png/gif/webp" }, 400);
+      }
     }
 
     // 上传主文件
@@ -75,19 +76,21 @@ Deno.serve(async (req) => {
       .upload(filePath, file, { contentType: file.type || "application/octet-stream" });
     if (upErr) throw upErr;
 
-    // 上传缩略图
-    const thumbExt = thumbnail.name.toLowerCase().slice(thumbnail.name.toLowerCase().lastIndexOf("."));
-    const thumbPath = `${user.id}/${Date.now()}_thumb_${crypto.randomUUID()}${thumbExt}`;
-    const { error: thumbErr } = await supabase.storage
-      .from("workshop")
-      .upload(thumbPath, thumbnail, { contentType: thumbnail.type || "image/jpeg" });
-    if (thumbErr) throw thumbErr;
+    // 上传缩略图（可选）
+    let thumbnailUrl = "";
+    if (thumbnail) {
+      const thumbExt = thumbnail.name.toLowerCase().slice(thumbnail.name.toLowerCase().lastIndexOf("."));
+      const thumbPath = `${user.id}/${Date.now()}_thumb_${crypto.randomUUID()}${thumbExt}`;
+      const { error: thumbErr } = await supabase.storage
+        .from("workshop")
+        .upload(thumbPath, thumbnail, { contentType: thumbnail.type || "image/jpeg" });
+      if (thumbErr) throw thumbErr;
 
-    // 获取缩略图签名 URL（用于显示）
-    const { data: thumbUrlData } = await supabase.storage
-      .from("workshop")
-      .createSignedUrl(thumbPath, 3600 * 24 * 365); // 1年有效
-    const thumbnailUrl = thumbUrlData?.signedUrl || "";
+      const { data: thumbUrlData } = await supabase.storage
+        .from("workshop")
+        .createSignedUrl(thumbPath, 3600 * 24 * 365);
+      thumbnailUrl = thumbUrlData?.signedUrl || "";
+    }
 
     // 写入数据库
     const { data, error } = await supabase

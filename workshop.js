@@ -254,10 +254,25 @@
     const thumbEl = $("workshopThumb");
     const thumbBtn = $("wsThumbBtn");
     const thumbPreview = $("wsThumbPreview");
+    const thumbEnabled = $("wsThumbEnabled");
+    const thumbPicker = $("wsThumbPicker");
     let selectedCat = "theme";
     let selectedThumb = null;
 
     if (!catWrap || !btn) return;
+
+    // 缩略图开关
+    if (thumbEnabled && thumbPicker) {
+      thumbEnabled.addEventListener("change", () => {
+        thumbPicker.hidden = !thumbEnabled.checked;
+        if (!thumbEnabled.checked) {
+          selectedThumb = null;
+          if (thumbEl) thumbEl.value = "";
+          if (thumbPreview) thumbPreview.innerHTML = "🖼️";
+        }
+        refresh();
+      });
+    }
 
     // 缩略图选择
     if (thumbBtn && thumbEl) {
@@ -332,13 +347,10 @@
     function refresh() {
       const title = titleEl.value.trim();
       const hasFile = fileEl.files && fileEl.files.length > 0;
-      const hasThumb = selectedThumb != null;
       const logged = window.K5AUTH.isLoggedIn();
-      btn.disabled = !(logged && title && hasFile && hasThumb);
+      btn.disabled = !(logged && title && hasFile);
       if (!logged) {
         btn.textContent = "🔒 登录后上传";
-      } else if (!hasThumb) {
-        btn.textContent = "请上传效果展示图";
       } else if (title && hasFile) {
         btn.textContent = "🚀 提交作品";
       } else {
@@ -371,10 +383,11 @@
     const files = fileEl.files;
     if (!files || files.length === 0) return;
 
-    // 获取缩略图
+    // 获取缩略图（可选）
     const thumbEl = $("workshopThumb");
-    const thumbFile = thumbEl && thumbEl.files[0];
-    if (!thumbFile) { alert("请上传效果展示图"); return; }
+    const thumbEnabled = $("wsThumbEnabled");
+    const thumbFile = (thumbEnabled && thumbEnabled.checked && thumbEl) ? thumbEl.files[0] : null;
+    if (thumbEnabled && thumbEnabled.checked && !thumbFile) { alert("已勾选展示图但未选择文件"); return; }
 
     // 检查单个文件大小
     for (const f of files) {
@@ -403,7 +416,7 @@
         form.append("description", desc);
         form.append("category", cat);
         form.append("file", f);
-        form.append("thumbnail", thumbFile);
+        if (thumbFile) form.append("thumbnail", thumbFile);
 
         const resp = await fetch(`${FUNC_BASE}/upload-workshop`, {
           method: "POST",
