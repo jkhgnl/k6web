@@ -810,6 +810,10 @@ s.parentNode.insertBefore(el, s);
       <button id="btnGpsQr" class="secondary" type="button" style="flex:1">📱 扫码传定位</button>
     </div>
     <div id="mapWrap" style="display:none;margin-top:8px">
+      <div style="display:flex; gap:6px; margin-bottom:6px">
+        <input id="mapSearch" type="text" placeholder="搜索地址，如：北京市朝阳区" style="flex:1; padding:6px 8px; border:1px solid #bbb; border-radius:4px; min-width:0">
+        <button id="btnMapSearch" class="secondary" type="button" style="padding:6px 12px; flex:0 0 auto">🔍 搜索</button>
+      </div>
       <div id="map" style="height:320px;border:1px solid #bbb;border-radius:6px"></div>
       <p style="font-size:12px;color:#888;margin:4px 0 0">点击地图选点，经纬度自动填入并查询海拔（地图为高德 GCJ-02，已自动转 WGS-84）</p>
     </div>
@@ -1074,6 +1078,15 @@ s.parentNode.insertBefore(el, s);
     <p style="margin:8px 0">Gitee：<a href="https://gitee.com/Jkhgnl/" target="_blank" style="color:#2f6fdc">gitee.com/Jkhgnl</a></p>
     <p style="margin:8px 0">邮箱：<a href="mailto:Jkhgnl@outlook.com" style="color:#2f6fdc">Jkhgnl@outlook.com</a></p>
   </div>
+  <div class="card">
+    <h2>地图地址搜索设置</h2>
+    <p class="hint">地图选点的地址搜索优先使用高德 Web 服务 API（国内地址更准）。请到 <a href="https://lbs.amap.com/" target="_blank" rel="noopener" style="color:#2f6fdc">lbs.amap.com</a> 注册个人开发者并创建「Web 服务」Key 填入下方；留空时自动改用免费的开源 OSM 搜索。</p>
+    <div class="row">
+      <input id="amapKeyInput" type="text" placeholder="高德 Web 服务 Key（可选）" style="flex:1; min-width:0">
+      <button id="btnAmapKeySave" type="button" class="secondary">保存</button>
+    </div>
+    <p id="amapKeyStatus" style="font-size:12px;color:#888;margin:6px 0 0"></p>
+  </div>
 </div>
 
   </div>
@@ -1129,6 +1142,8 @@ s.parentNode.insertBefore(el, s);
     // 移动端自动收起侧边栏
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('overlay').classList.remove('show');
+    // 通知各模块当前激活的 tab
+    document.dispatchEvent(new CustomEvent('tabSwitch', { detail: tabId }));
   }
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', () => window.switchTab(item.dataset.tab));

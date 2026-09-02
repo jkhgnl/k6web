@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.5.5";
+  const K5WEB_VERSION = "1.5.6";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -656,6 +656,94 @@
       clearTimeout(timer);
     }
   }
+
+
+  // ---------- 地址搜索 ----------
+  async function searchAddress(q) {
+    // 优先高德 Web 服务 API（localStorage 存 key）
+    const amapKey = localStorage.getItem("amap_web_key") || "";
+    if (amapKey) {
+      try {
+        const url = "https://restapi.amap.com/v3/geocode/geo?address=" + encodeURIComponent(q) + "&key=" + amapKey + "&output=JSON";
+        const resp = await fetch(url);
+        const d = await resp.json();
+        if (d.status === "1" && d.geocodes && d.geocodes.length) {
+          return d.geocodes.map(g => {
+            const [lng, lat] = g.location.split(",").map(Number);
+            return { lat, lng, name: g.formatted_address || g.location, _provider: "amap" };
+          });
+        }
+      } catch (e) { log("高德搜索失败：" + e.message); }
+    }
+    // 回退 OSM Photon
+    try {
+      const url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(q) + "&limit=5&lang=zh";
+      const resp = await fetch(url);
+      const d = await resp.json();
+      if (d.features && d.features.length) {
+        return d.features.map(f => {
+          const [lng, lat] = f.geometry.coordinates;
+          const name = [f.properties.name, f.properties.city, f.properties.country].filter(Boolean).join(", ");
+          return { lat, lng, name, _provider: "osm" };
+        });
+      }
+    } catch (e) { log("OSM 搜索失败：" + e.message); }
+    return [];
+  }
+
+  async function onMapSearch() {
+    const q = $("mapSearch").value.trim();
+    if (!q) return;
+    const results = await searchAddress(q);
+    if (!results.length) {
+      setStatus("⚠️ 未找到该地址", "err");
+      return;
+    }
+    const r = results[0];
+    // 高德返回 GCJ-02，OSM 返回 WGS-84 → 统一转 GCJ-02 定位地图
+    const gcj = r._provider === "amap" ? { lat: r.lat, lng: r.lng } : coord.wgs84ToGcj02(r.lat, r.lng);
+    const wgs = r._provider === "amap" ? coord.gcj02ToWgs84(r.lat, r.lng) : { lat: r.lat, lng: r.lng };
+
+    initMap();
+    map.setView([gcj.lat, gcj.lng], 14);
+    if (marker) marker.setLatLng([gcj.lat, gcj.lng]);
+    $("lat").value = wgs.lat.toFixed(5);
+    $("lon").value = wgs.lng.toFixed(5);
+    log(`地址搜索：${r.name} → ${wgs.lat.toFixed(5)}, ${wgs.lng.toFixed(5)}（WGS-84）`);
+    // 查询海拔
+    setStatus("📡 查询海拔...");
+    const h = await fetchElevation(wgs.lat, wgs.lng);
+    if (h !== null) {
+      $("alt").value = h.toFixed(1);
+      setStatus(`✅ 已选点：${r.name}，海拔 ${h.toFixed(0)} m`, "ok");
+    } else {
+      setStatus("⚠️ 海拔查询失败", "err");
+    }
+  }
+
+  $("btnMapSearch").addEventListener("click", onMapSearch);
+  $("mapSearch").addEventListener("keydown", (e) => { if (e.key === "Enter") onMapSearch(); });
+
+  // 高德 Key 保存
+  function loadAmapKey() {
+    const key = localStorage.getItem("amap_web_key") || "";
+    $("amapKeyInput").value = key;
+    $("amapKeyStatus").textContent = key ? "✅ 高德地图搜索已启用" : "💡 未设置高德 Key，搜索将使用免费 OSM 服务";
+  }
+  $("btnAmapKeySave").addEventListener("click", () => {
+    const key = $("amapKeyInput").value.trim();
+    if (key) {
+      localStorage.setItem("amap_web_key", key);
+      $("amapKeyStatus").textContent = "✅ 已保存，地址搜索将优先使用高德 API";
+    } else {
+      localStorage.removeItem("amap_web_key");
+      $("amapKeyStatus").textContent = "💡 Key 已清除，搜索将使用免费 OSM 服务";
+    }
+  });
+  // 切换 About 页时加载 Key 显示
+  document.addEventListener("tabSwitch", (e) => { if (e.detail === "tabAbout") loadAmapKey(); });
+  // 首次加载也初始化
+  setTimeout(loadAmapKey, 1000);
 
 
   $("btnLocate").addEventListener("click", () => {
