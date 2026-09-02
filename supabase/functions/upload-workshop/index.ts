@@ -5,8 +5,15 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, getUser, handleOptions } from "../_shared/cors.ts";
 
 const MAX_FILE_SIZE = 1.5 * 1024 * 1024; // 1.5MB
-const ALLOWED_EXT = [".bin", ".csv", ".txt", ".json", ".py", ".js", ".html", ".zip", ".dat"];
+const ALLOWED_EXT = [".bin", ".bxt", ".csv", ".txt", ".json", ".py", ".js", ".html", ".zip", ".dat"];
 const ALLOWED_CATEGORIES = new Set(["theme", "channel", "extension", "other"]);
+
+// 防御性检查：确保 ALLOWED_EXT 是数组
+function isAllowedExt(name: string): boolean {
+  if (!Array.isArray(ALLOWED_EXT)) return true;
+  const lowerName = name.toLowerCase();
+  return ALLOWED_EXT.some((ext) => lowerName.endsWith(ext));
+}
 
 Deno.serve(async (req) => {
   const pre = handleOptions(req);
@@ -44,7 +51,7 @@ Deno.serve(async (req) => {
     if (file.size === 0) return jsonResponse({ error: "文件为空" }, 400);
 
     const lowerName = file.name.toLowerCase();
-    if (!ALLOWED_EXT.some((ext) => lowerName.endsWith(ext))) {
+    if (!isAllowedExt(file.name)) {
       return jsonResponse({ error: "不支持的文件类型" }, 400);
     }
 

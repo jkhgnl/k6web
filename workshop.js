@@ -262,10 +262,17 @@
     });
 
     // 显示已选文件
-    function showFile(f) {
-      if (!f) { fileInfo.hidden = true; return; }
-      fileNameEl.textContent = f.name;
-      fileSizeEl.textContent = fmtSize(f.size) + (f.size > 1.5 * 1024 * 1024 ? " · ⚠️ 超过 1.5MB 限制" : "");
+    function showFiles(files) {
+      if (!files || files.length === 0) { fileInfo.hidden = true; return; }
+      let totalSize = 0;
+      const names = [];
+      for (const f of files) {
+        totalSize += f.size;
+        names.push(escapeHtml(f.name) + " (" + fmtSize(f.size) + ")");
+      }
+      fileNameEl.innerHTML = names.join("<br>");
+      const warn = totalSize > 1.5 * 1024 * 1024 ? ' · <span style="color:#c62828">⚠️ 单个文件不能超过 1.5MB</span>' : "";
+      fileSizeEl.innerHTML = "共 " + files.length + " 个文件，" + fmtSize(totalSize) + warn;
       fileInfo.hidden = false;
     }
 
@@ -277,23 +284,21 @@
       ["dragleave", "drop"].forEach((ev) =>
         dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove("dragover"); }));
       dz.addEventListener("drop", (e) => {
-        const f = e.dataTransfer?.files?.[0];
-        if (f) {
-          const dt = new DataTransfer();
-          dt.items.add(f);
-          fileEl.files = dt.files;
-          showFile(f);
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+          fileEl.files = files;
+          showFiles(files);
           refresh();
         }
       });
     }
     fileEl.addEventListener("change", () => {
-      showFile(fileEl.files?.[0]);
+      showFiles(fileEl.files);
       refresh();
     });
     if (fileRemove) fileRemove.addEventListener("click", () => {
       fileEl.value = "";
-      showFile(null);
+      showFiles(null);
       refresh();
     });
 
@@ -333,56 +338,74 @@
   async function doUpload(titleEl, descEl, fileEl, cat, btn) {
     const title = titleEl.value.trim();
     const desc = descEl.value.trim();
-    const file = fileEl.files[0];
+    const files = fileEl.files;
+    if (!files || files.length === 0) return;
 
-    if (file.size > 1.5 * 1024 * 1024) {
-      alert("文件超过 1.5MB 限制（Supabase Edge Function 免费额度 body 上限 2MB）");
-      return;
+    // 检查单个文件大小
+    for (const f of files) {
+      if (f.size > 1.5 * 1024 * 1024) {
+        alert(`文件 "${f.name}" 超过 1.5MB 限制`);
+        return;
+      }
     }
 
     const token = await window.K5AUTH.getToken();
     if (!token) { alert("登录状态已失效，请重新登录"); window.K5AUTH.openModal(); return; }
 
-    const form = new FormData();
-    form.append("title", title);
-    form.append("description", desc);
-    form.append("category", cat);
-    form.append("file", file);
-
     btn.disabled = true;
     const oldText = btn.textContent;
-    btn.textContent = "⏳ 上传中…";
+    const total = files.length;
+    let successCount = 0;
+    let failCount = 0;
 
-    try {
-      const resp = await fetch(`${FUNC_BASE}/upload-workshop`, {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + token,
-          apikey: window.SUPABASE_PUBLISHABLE_KEY || "",
-        },
-        body: form,
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || "HTTP " + resp.status);
+    for (let i = 0; i < total; i++) {
+      const f = files[i];
+      btn.textContent = `⏳ 上传中 (${i + 1}/${total})...`;
 
-      // 清空表单
-      titleEl.value = ""; descEl.value = ""; fileEl.value = "";
-      const fileInfo = $("wsFileInfo");
-      if (fileInfo) fileInfo.hidden = true;
-      log(`✅ 作品《${data.item.title}》上传成功`, "工坊");
-      alert("✅ 作品上传成功！");
-      loadList(1, "all");
-      // 切回全部分类
-      document.querySelectorAll("#workshopCategories .ws-cat-btn").forEach((b) => {
-        b.classList.toggle("active", b.dataset.cat === "all");
-      });
-    } catch (e) {
-      log(`❌ 上传失败：${e.message}`, "工坊");
-      alert("上传失败：" + e.message);
-    } finally {
-      btn.textContent = oldText;
-      if (refreshUploadBtn) refreshUploadBtn();
+      try {
+        const form = new FormData();
+        form.append("title", total > 1 ? `${title} - ${f.name.replace(/\.[^.]+$/, "")}` : title);
+        form.append("description", desc);
+        form.append("category", cat);
+        form.append("file", f);
+
+        const resp = await fetch(`${FUNC_BASE}/upload-workshop`, {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + token,
+            apikey: window.SUPABASE_PUBLISHABLE_KEY || "",
+          },
+          body: form,
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || "HTTP " + resp.status);
+        successCount++;
+        log(`✅ 作品《${f.name}》上传成功`, "工坊");
+      } catch (e) {
+        failCount++;
+        log(`❌ 上传失败：${f.name} - ${e.message}`, "工坊");
+      }
     }
+
+    // 清空表单
+    titleEl.value = ""; descEl.value = ""; fileEl.value = "";
+    const fileInfo = $("wsFileInfo");
+    if (fileInfo) fileInfo.hidden = true;
+
+    if (total === 1) {
+      alert(successCount > 0 ? "✅ 作品上传成功！" : "上传失败");
+    } else {
+      alert(`上传完成：${successCount} 个成功，${failCount} 个失败`);
+    }
+
+    loadList(1, "all");
+    // 切回全部分类
+    document.querySelectorAll("#workshopCategories .ws-cat-btn").forEach((b) => {
+      b.classList.toggle("active", b.dataset.cat === "all");
+    });
+
+    btn.textContent = oldText;
+    if (refreshUploadBtn) refreshUploadBtn();
   }
 
   // ---------- 初始化 ----------
