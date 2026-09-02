@@ -25,13 +25,14 @@ begin
   values (
     new.id,
     coalesce(
-      new.raw_user_meta_data->>'user_name',
+      nullif(trim(new.raw_user_meta_data->>'user_name'), ''),
       new.raw_user_meta_data->>'name',
       new.raw_user_meta_data->>'full_name',
       split_part(new.email, '@', 1)
     ),
     coalesce(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture')
-  );
+  )
+  on conflict (id) do nothing;
   return new;
 end;
 $$;

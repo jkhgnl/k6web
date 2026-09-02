@@ -36,16 +36,61 @@
       const avatar = safeAvatar(meta.avatar_url || meta.picture);
       if (badge) {
         badge.innerHTML =
-          (avatar ? `<img class="user-avatar" src="${avatar}" alt="">` : `<span class="user-avatar user-avatar-txt">${escapeHtml(name.charAt(0).toUpperCase())}</span>`)
+          (avatar
+            ? `<img class="user-avatar user-avatar-btn" src="${avatar}" alt="头像" title="点击更换头像">`
+            : `<span class="user-avatar user-avatar-txt user-avatar-btn" title="点击更换头像">${escapeHtml(name.charAt(0).toUpperCase())}</span>`)
           + `<span class="user-name">${escapeHtml(name)}</span>`;
         badge.style.display = "inline-flex";
+        bindAvatarClick();
       }
       btn.textContent = "登出";
       btn.classList.add("secondary");
     } else {
-      if (badge) badge.style.display = "none";
+      if (badge) { badge.style.display = "none"; badge.innerHTML = ""; }
       btn.textContent = "登录";
       btn.classList.remove("secondary");
+    }
+  }
+
+  // 点击头像 -> 选择图片上传
+  function bindAvatarClick() {
+    const avatarEl = document.querySelector("#userBadge .user-avatar-btn");
+    const fileEl = document.getElementById("avatarInput");
+    if (!avatarEl || !fileEl) return;
+    avatarEl.addEventListener("click", () => fileEl.click());
+  }
+
+  async function uploadAvatar(file) {
+    const ALLOWED = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!file || !ALLOWED.includes(file.type)) {
+      setAuthError("仅支持 JPG/PNG/GIF/WebP 格式"); openModal(); return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setAuthError("头像图片不能超过 2MB"); openModal(); return;
+    }
+    const token = await getToken();
+    if (!token) { setAuthError("登录状态已失效，请重新登录"); openModal(); return; }
+
+    const fd = new FormData();
+    fd.append("file", file);
+
+    try {
+      const resp = await fetch(URL + "/functions/v1/upload-avatar", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token },
+        body: fd,
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "HTTP " + resp.status);
+
+      // 同步到 auth user_metadata，触发 onAuthStateChange 自动刷新 UI
+      const { error: upErr } = await supabase.auth.updateUser({
+        data: { avatar_url: data.avatar_url },
+      });
+      if (upErr) throw upErr;
+    } catch (e) {
+      setAuthError("头像上传失败：" + (e.message || "请重试"));
+      openModal();
     }
   }
 
@@ -69,11 +114,13 @@
     const isLogin = mode === "login";
     const submit = document.getElementById("btnAuthSubmit");
     const email = document.getElementById("authEmail");
+    const usernameRow = document.getElementById("authUsernameRow");
     if (submit) submit.textContent = isLogin ? "登录" : "注册";
     document.querySelectorAll(".auth-tab").forEach((t) => {
       t.classList.toggle("active", t.dataset.mode === mode);
     });
     if (email) email.placeholder = isLogin ? "邮箱" : "注册邮箱（将发送验证邮件）";
+    if (usernameRow) usernameRow.style.display = isLogin ? "none" : "";
   }
 
   function setAuthError(msg, isError = true) {
@@ -92,20 +139,27 @@
     return active ? active.dataset.mode : "login";
   }
 
+  function isValidUsername(s) {
+    return /^[a-zA-Z0-9_]{2,20}$/.test(s);
+  }
+
   async function submitPassword() {
     clearAuthError();
     const email = document.getElementById("authEmail").value.trim();
     const pass = document.getElementById("authPassword").value;
+    const username = (document.getElementById("authUsername")?.value || "").trim();
     if (!email || !pass) { setAuthError("请填写邮箱和密码"); return; }
-    if (getMode() === "register" && pass.length < 6) {
-      setAuthError("密码至少 6 位"); return;
+    const mode = getMode();
+    if (mode === "register") {
+      if (!isValidUsername(username)) { setAuthError("用户名需 2-20 字符，仅字母/数字/下划线"); return; }
+      if (pass.length < 6) { setAuthError("密码至少 6 位"); return; }
     }
     try {
-      const { error } = getMode() === "register"
-        ? await supabase.auth.signUp({ email, password: pass })
+      const { error } = mode === "register"
+        ? await supabase.auth.signUp({ email, password: pass, options: { data: { user_name: username } } })
         : await supabase.auth.signInWithPassword({ email, password: pass });
       if (error) { setAuthError(error.message); return; }
-      if (getMode() === "register") {
+      if (mode === "register") {
         setAuthError("注册成功，请查收邮箱完成验证后登录", false);
       } else {
         closeModal();
@@ -127,6 +181,10 @@
 
   async function signOut() {
     await supabase.auth.signOut();
+  }
+
+  function getToken() {
+    return supabase?.auth.getSession().then(({ data }) => data.session?.access_token || null);
   }
 
   // ---------- 初始化 ----------
@@ -168,8 +226,16 @@
     document.querySelectorAll(".auth-tab").forEach((t) => {
       t.addEventListener("click", () => setAuthMode(t.dataset.mode));
     });
-    document.getElementById("btnAuthGithub").addEventListener("click", () => oauth("github"));
-    document.getElementById("btnAuthGoogle").addEventListener("click", () => oauth("google"));
+    const ghBtn = document.getElementById("btnAuthGithub");
+    if (ghBtn) ghBtn.addEventListener("click", () => oauth("github"));
+
+    // 头像上传：隐藏的 file input
+    const avatarInput = document.getElementById("avatarInput");
+    if (avatarInput) avatarInput.addEventListener("change", (e) => {
+      const f = e.target.files?.[0];
+      if (f) uploadAvatar(f);
+      e.target.value = "";
+    });
 
     // Enter 提交
     const passInput = document.getElementById("authPassword");
@@ -189,7 +255,7 @@
     init,
     getUser: () => user,
     isLoggedIn: () => !!user,
-    getToken: () => supabase?.auth.getSession().then(({ data }) => data.session?.access_token || null),
+    getToken,
     onAuth: (cb) => { callbacks.push(cb); },
     openModal,
     closeModal,

@@ -358,6 +358,9 @@ s.parentNode.insertBefore(el, s);
     background: #2f6fdc; color: #fff; font-size: 13px; font-weight: 600;
   }
   #userBadge { display: none; align-items: center; gap: 6px; cursor: default; }
+  .user-avatar-btn { cursor: pointer; position: relative; transition: opacity .15s; }
+  .user-avatar-btn:hover { opacity: .8; }
+  #avatarInput { display: none; }
   .user-name { font-size: 13px; color: #333; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .auth-modal { text-align: left; }
   .auth-modal h3 { text-align: center; }
@@ -385,8 +388,12 @@ s.parentNode.insertBefore(el, s);
   .ws-item-cat { font-size: 11px; color: #888; margin-bottom: 2px; }
   .ws-item-title { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ws-item-desc { font-size: 12px; color: #888; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px; }
-  .ws-item-meta { display: flex; gap: 10px; font-size: 11px; color: #999; }
+  .ws-item-meta { display: flex; gap: 10px; font-size: 11px; color: #999; align-items: center; flex-wrap: wrap; }
   .ws-item-date { font-size: 11px; color: #aaa; margin-top: 2px; }
+  .ws-author { display: inline-flex; align-items: center; gap: 4px; }
+  .ws-author-avatar { width: 16px; height: 16px; border-radius: 50%; object-fit: cover; vertical-align: middle; flex-shrink: 0; }
+  .ws-author-txt { display: inline-flex; align-items: center; justify-content: center; background: #c3d4f3; color: #2f6fdc; font-size: 9px; font-weight: 600; width: 16px; height: 16px; border-radius: 50%; }
+  .ws-avatar-wrap { display: inline-flex; }
   #workshopPagination { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; }
   .ws-page-btn { padding: 6px 14px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; color: #555; }
   .ws-page-btn:disabled { opacity: .4; cursor: not-allowed; }
@@ -414,6 +421,7 @@ s.parentNode.insertBefore(el, s);
   </div>
   <div class="top-actions">
     <span id="userBadge"></span>
+    <input id="avatarInput" type="file" accept="image/jpeg,image/png,image/gif,image/webp">
     <button id="btnAuth" class="btn-connect" style="padding:6px 14px;font-size:13px">登录</button>
     <a class="link" href="https://github.com/jkhgnl/k6web/issues" target="_blank">问题反馈</a>
     <button id="btnConnect" class="btn-connect">连接</button>
@@ -896,6 +904,7 @@ s.parentNode.insertBefore(el, s);
         </div>
         <button id="btnBootAudioDisable" class="secondary">🚫 关闭开机音效</button>
         <button id="btnBootAudioCheck" class="secondary">✅ 读取校验</button>
+        <button id="btnBootAudioBackup" class="secondary">⬇️ 备份到电脑</button>
         <div id="bootAudioProgress" class="progress"><div id="bootAudioProgressBar"></div></div>
         <p id="bootAudioStatus" class="hint" style="min-height:18px"></p>
       </div>
@@ -1351,8 +1360,8 @@ s.parentNode.insertBefore(el, s);
   window.SUPABASE_URL = "https://vnxmskoslohxbaslobfp.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_qRHWj9qAvDiqGFLARO6Oiw_w9DquECY";
 </script>
-<script src="auth.js?v=1.6.0"></script>
-<script src="workshop.js?v=1.6.0"></script>
+<script src="auth.js?v=1.6.6"></script>
+<script src="workshop.js?v=1.6.6"></script>
 <script src="vendor/satellite.min.js"></script>
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>

@@ -2272,6 +2272,57 @@
     });
   }
 
+  // 开机音效：备份到电脑（完整读出 0x1F8000 全部 12KB → 本地 .bin）
+  const _btnBootAudioBackup = $("btnBootAudioBackup");
+  if (_btnBootAudioBackup) {
+    _btnBootAudioBackup.addEventListener("click", async () => {
+      if (!port) { setStatus("请先连接串口", "err"); return; }
+      _btnBootAudioBackup.disabled = true;
+      try {
+        const BA = proto.BOOT_AUDIO;
+        const READ_CHUNK = 128;
+        const out = new Uint8Array(BA.FLASH_SIZE);
+        log("备份开机音效区（" + BA.FLASH_SIZE + " 字节，约 " + (BA.FLASH_SIZE / READ_CHUNK) + " 帧）...");
+        updateBootAudioStatus("正在备份到电脑...");
+        for (let off = 0; off < BA.FLASH_SIZE; off += READ_CHUNK) {
+          const payload = new Uint8Array(4);
+          new DataView(payload.buffer).setUint32(0, off, true);
+          const reply = await sendAndWaitRaw(proto.CMD.BOOT_AUDIO_READ, payload, 5000);
+          const dv = new DataView(reply.buffer, reply.byteOffset, reply.byteLength);
+          if (dv.getUint16(0, true) !== proto.CMD.REPLY_BOOT_AUDIO_READ) throw new Error("回复 ID 不符");
+          const echo = dv.getUint32(4, true);
+          if (echo !== off) throw new Error("偏移回显不一致 0x" + echo.toString(16));
+          out.set(reply.slice(8, 8 + Math.min(128, BA.FLASH_SIZE - off)), off);
+        }
+        // 非严格校验，仅提示；为空时也允许备份（内容为全 FF）
+        const allFF = out.every((b) => b === 0xFF);
+        const blob = new Blob([out], { type: "application/octet-stream" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = allFF ? "startup_voice_backup_empty.bin" : "startup_voice_backup.bin";
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        if (allFF) {
+          setStatus("备份完成：当前区为空（全 0xFF），已导出空备份文件", "warn");
+          updateBootAudioStatus("备份完成：为空");
+          log("开机音效备份完成：为空（全 FF）");
+        } else {
+          const dataLen = out[0] | (out[1] << 8) | (out[2] << 16) | (out[3] << 24);
+          setStatus("✅ 已备份到电脑：startup_voice_backup.bin（12 KB，数据 " + dataLen + " 字节）", "ok");
+          updateBootAudioStatus("✅ 已备份 12 KB");
+          log("开机音效备份完成：12 KB（数据 " + dataLen + " 字节）");
+        }
+      } catch (err) {
+        setStatus("备份失败：" + err.message, "err");
+        updateBootAudioStatus("备份失败：" + err.message);
+        log("开机音效备份异常：" + err.message, "err");
+      } finally {
+        _btnBootAudioBackup.disabled = false;
+      }
+    });
+  }
+
   // ---------- 校准数据导出 / 导入（EEPROM 仿真区 0xB000..0xB200，512 字节） ----------
 
   // 会话握手：发 0x0514 建立时间戳，等 0x0515 版本回复

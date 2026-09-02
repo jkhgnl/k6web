@@ -45,6 +45,19 @@
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  // 作者显示：带头像（仅 http/https 合法地址），否则回退首字母
+  function safeAvatarUrl(u) {
+    return /^https?:\/\//i.test(u || "") ? u : "";
+  }
+  function authorHtml(profiles) {
+    const name = escapeHtml((profiles && profiles.username) || "匿名");
+    const avatar = safeAvatarUrl(profiles && profiles.avatar_url);
+    const head = avatar
+      ? `<img class="ws-author-avatar" src="${avatar}" alt="" loading="lazy">`
+      : `<span class="ws-author-avatar ws-author-txt">${escapeHtml((profiles && profiles.username || "匿").charAt(0).toUpperCase())}</span>`;
+    return `<span class="ws-author"><span class="ws-avatar-wrap">${head}</span>${name}</span>`;
+  }
+
   // ---------- 公共请求头：Supabase Edge Function 网关要求带 key ----------
   // 公开接口用 publishable key（匿名角色）；需登录的接口由调用方传入用户 token
   function anonHeaders() {
@@ -96,7 +109,7 @@
             <div class="ws-item-title">${escapeHtml(it.title)}</div>
             <div class="ws-item-desc">${escapeHtml(it.description || "")}</div>
             <div class="ws-item-meta">
-              <span title="作者">👤 ${escapeHtml(authorName)}</span>
+              <span title="作者">${authorHtml(it.profiles)}</span>
               <span title="下载次数">⬇️ ${it.download_count || 0}</span>
               <span title="文件大小">${fmtSize(it.file_size)}</span>
             </div>
@@ -148,7 +161,7 @@
         body.innerHTML = `
           <div style="font-size:34px">${cat.icon}</div>
           <h3 style="margin:6px 0 2px">${escapeHtml(it.title)}</h3>
-          <div style="font-size:12px;color:#888;margin-bottom:8px">${cat.label.replace(/^[^\s]*\s/, "")} · ${fmtDate(it.created_at)} · 👤 ${escapeHtml((it.profiles && it.profiles.username) || "匿名")}</div>
+          <div style="font-size:12px;color:#888;margin-bottom:8px">${cat.label.replace(/^[^\s]*\s/, "")} · ${fmtDate(it.created_at)} · ${authorHtml(it.profiles)}</div>
           <div style="font-size:13px;color:#555;white-space:pre-wrap;margin-bottom:10px">${escapeHtml(it.description || "（无描述）")}</div>
           <div style="font-size:12px;color:#999">文件名：${escapeHtml(it.file_name)}（${fmtSize(it.file_size)}）· 下载 ${it.download_count || 0} 次</div>`;
         dlBtn.disabled = false;
