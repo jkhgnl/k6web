@@ -823,6 +823,113 @@ s.parentNode.insertBefore(el, s);
     padding: 12px 0;
   }
 
+  /* 通知铃铛 */
+  .notify-bell {
+    position: relative;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 4px;
+    border-radius: 6px;
+    transition: background .15s;
+  }
+  .notify-bell:hover { background: #f0f4ff; }
+  .notify-badge {
+    position: absolute;
+    top: -2px;
+    right: -4px;
+    background: #e74c3c;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+  }
+
+  /* 通知面板 */
+  .notify-panel {
+    position: fixed;
+    top: 56px;
+    right: 16px;
+    width: 360px;
+    max-height: 480px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.15);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  @media (max-width: 480px) {
+    .notify-panel { right: 8px; left: 8px; width: auto; }
+  }
+  .notify-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .notify-header-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .notify-filter {
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #666;
+  }
+  .notify-filter.active {
+    background: #2f6fdc;
+    color: #fff;
+    border-color: #2f6fdc;
+  }
+  .notify-mark-all {
+    background: none;
+    border: none;
+    color: #2f6fdc;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .notify-mark-all:hover { text-decoration: underline; }
+  .notify-list {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 400px;
+  }
+  .notify-item {
+    display: flex;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f5f5f5;
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .notify-item:hover { background: #f8f9fb; }
+  .notify-item.unread { background: #f0f7ff; }
+  .notify-item.unread:hover { background: #e6f0ff; }
+  .notify-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+  .notify-body { flex: 1; min-width: 0; }
+  .notify-title { font-size: 13px; color: #333; line-height: 1.4; }
+  .notify-from { color: #2f6fdc; font-weight: 500; }
+  .notify-content { font-size: 12px; color: #888; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .notify-time { font-size: 11px; color: #bbb; margin-top: 3px; }
+  .notify-empty { text-align: center; padding: 40px 16px; color: #999; font-size: 13px; }
+
   /* 星历槽位卡片 */
   .ephem-slots {
     display: grid;
@@ -888,11 +995,30 @@ s.parentNode.insertBefore(el, s);
   <div class="top-actions">
     <span id="userBadge"></span>
     <input id="avatarInput" type="file" accept="image/jpeg,image/png,image/gif,image/webp">
+    <div id="notifyBell" class="notify-bell" title="通知">
+      🔔
+      <span id="notifyBadge" class="notify-badge" style="display:none"></span>
+    </div>
     <button id="btnAuth" class="btn-connect">登录/注册</button>
     <button id="btnConnect" class="btn-connect">连接</button>
     <span id="status" class="top-status"></span>
   </div>
 </header>
+
+<!-- 通知面板 -->
+<div id="notifyPanel" class="notify-panel" style="display:none">
+  <div class="notify-header">
+    <span>🔔 站内信 <span id="notifyCount"></span></span>
+    <div class="notify-header-actions">
+      <button id="notifyFilterAll" class="notify-filter active">全部</button>
+      <button id="notifyFilterUnread" class="notify-filter">未读</button>
+      <button id="notifyMarkAll" class="notify-mark-all">全部已读</button>
+    </div>
+  </div>
+  <div id="notifyList" class="notify-list">
+    <div class="notify-empty">暂无通知 🔔</div>
+  </div>
+</div>
 
 <!-- 主体 -->
 <div class="main">
@@ -1979,6 +2105,7 @@ s.parentNode.insertBefore(el, s);
 <script src="auth.js?v=1.9.0"></script>
 <script src="workshop.js?v=1.9.0"></script>
 <script src="comments.js?v=1.9.0"></script>
+<script src="notifications.js?v=1.9.0"></script>
 <script src="vendor/satellite.min.js"></script>
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>
@@ -2061,6 +2188,8 @@ s.parentNode.insertBefore(el, s);
     });
     window.K5COMMENTS.load(feedbackItemId, "feedback", "feedbackCommentList");
   }
+  // 初始化通知模块
+  if (window.K5NOTIFY) K5NOTIFY.init();
 </script>
 <script>
 (function(){
