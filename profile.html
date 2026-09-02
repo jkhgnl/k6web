@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>个人中心 - 多普勒固件手台工具 | K6Web</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: #f5f6f8; color: #222;
+    display: flex; flex-direction: column;
+  }
+  a { color: #2f6fdc; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* 顶部标题栏 */
+  .topbar {
+    height: 56px; background: #fff; border-bottom: 1px solid #ddd;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px; flex-shrink: 0;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar .brand { font-size: 18px; font-weight: 600; color: #111; }
+  .topbar .top-actions { display: flex; align-items: center; gap: 12px; }
+  .btn-connect { padding: 7px 18px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; background: #2f6fdc; color: #fff; }
+  .btn-connect.secondary { background: #6c757d; }
+  .top-status { font-size: 13px; color: #444; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .top-status.ok { color: #1a7f37; }
+  .top-status.err { color: #c62828; }
+
+  /* 主体：左侧边栏 + 内容区 */
+  .main { display: flex; flex: 1; overflow: hidden; }
+
+  /* 左侧导航栏 */
+  .sidebar {
+    width: 200px; background: #fff; border-right: 1px solid #ddd;
+    display: flex; flex-direction: column; flex-shrink: 0;
+    overflow-y: auto;
+  }
+  .nav-group { padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+  .nav-title {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; font-size: 14px; color: #333; font-weight: 500; cursor: pointer;
+  }
+  .nav-title:hover { background: #f7f8fa; }
+  .nav-title .arrow { font-size: 12px; color: #999; transition: transform .2s; }
+  .nav-title.collapsed .arrow { transform: rotate(-90deg); }
+  .nav-items { display: flex; flex-direction: column; }
+  .nav-items.hidden { display: none; }
+  .nav-item {
+    padding: 10px 16px 10px 32px; font-size: 14px; color: #555; cursor: pointer;
+    border-left: 3px solid transparent; white-space: nowrap;
+  }
+  .nav-item:hover { background: #f7f8fa; color: #2f6fdc; }
+  .nav-item.active { background: #eef4ff; color: #2f6fdc; border-left-color: #2f6fdc; }
+  .sidebar-footer { margin-top: auto; padding: 12px 16px; font-size: 12px; color: #999; display: flex; align-items: center; gap: 8px; }
+  .sidebar-home { font-size: 18px; cursor: pointer; color: #666; transition: color .15s; }
+  .sidebar-home:hover { color: #2f6fdc; }
+
+  /* 内容区 */
+  .content {
+    flex: 1; overflow-y: auto; padding: 20px 24px;
+    width: 100%;
+  }
+  .content-inner {
+    max-width: 900px; margin: 0 auto;
+  }
+  .page-title { font-size: 20px; margin: 0 0 16px; }
+  .welcome { font-size: 16px; color: #333; margin-bottom: 24px; }
+  h2 { font-size: 15px; margin: 18px 0 8px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .card h2:first-child { margin-top: 0; }
+  label { display: block; font-size: 13px; margin: 8px 0 2px; color: #444; }
+  input, select, textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; font-size: 14px; border: 1px solid #bbb; border-radius: 4px; }
+  input[type="checkbox"], input[type="radio"] { width: auto; }
+  textarea { font-family: Consolas, monospace; font-size: 12px; height: 52px; }
+  .row { display: flex; gap: 10px; }
+  .row > div { flex: 1; }
+  button { padding: 8px 16px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; background: #2f6fdc; color: #fff; }
+  button.secondary { background: #6c757d; }
+  button.danger { background: #c62828; }
+  button:disabled { background: #aab; cursor: not-allowed; }
+  #log {
+    font-family: Consolas, monospace; font-size: 12px; background: #111; color: #9f9;
+    padding: 8px; border-radius: 4px; height: 160px; overflow-y: auto; white-space: pre-wrap;
+  }
+  .result { font-size: 13px; line-height: 1.7; }
+  .progress { height: 8px; background: #e0e0e0; border-radius: 4px; margin: 8px 0; overflow: hidden; display: none; }
+  .progress > div { height: 100%; width: 0%; background: #2f6fdc; transition: width .2s; }
+  .hint { font-size: 13px; color: #666; margin: 4px 0 0; }
+  /* 卫星模糊搜索下拉 */
+  .sat-combo { position: relative; }
+  .sat-dropdown { position: absolute; top: 100%; left: 0; right: 0; z-index: 1000; background: #fff; border: 1px solid #bbb; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.15); max-height: 260px; overflow-y: auto; margin-top: 2px; }
+  .map-tip-list { position: absolute; top: 100%; left: 0; right: 0; z-index: 1000; background: #fff; border: 1px solid #bbb; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.15); max-height: 240px; overflow-y: auto; margin-top: 2px; }
+  .map-tip-item { padding: 7px 9px; font-size: 13px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+  .map-tip-item:hover { background: #f0f4ff; }
+  .map-tip-item b { font-weight: 600; color: #222; }
+  .map-tip-item span { font-size: 12px; color: #888; }
+  .sat-item { padding: 6px 8px; font-size: 13px; cursor: pointer; display: flex; align-items: baseline; gap: 8px; }
+  .sat-item span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sat-item .norad { color: #999; font-size: 12px; font-family: Consolas, monospace; flex-shrink: 0; white-space: nowrap; }
+  .sat-item.active { background: #2f6fdc; color: #fff; }
+  .sat-item.active .norad { color: #cfe0ff; }
+  .sat-item mark { background: #ffe58f; padding: 0; }
+  .sat-item.active mark { background: rgba(255,255,255,.3); color: inherit; }
+  .sat-fav { font-size: 15px; cursor: pointer; flex-shrink: 0; padding: 0 2px; color: #ccc; user-select: none; }
+  .sat-fav.active { color: #f5a623; }
+  .sat-fav:hover { transform: scale(1.3); }
+  .sat-separator { height: 1px; background: #e0e0e0; margin: 2px 8px; }
+  .sat-empty { padding: 8px; font-size: 12px; color: #888; text-align: center; }
+  .fav-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .fav-table th { text-align: left; padding: 8px 10px; border-bottom: 2px solid #ddd; font-weight: 600; color: #555; }
+  .fav-table td { padding: 8px 10px; border-bottom: 1px solid #eee; }
+  .fav-table tr:hover { background: #f7f8fa; }
+  .fav-table .norad-cell { font-family: Consolas, monospace; color: #999; font-size: 12px; }
+  .fav-table .fav-btn { cursor: pointer; color: #c62828; font-size: 13px; background: none; border: none; padding: 4px 8px; }
+  .fav-table .fav-btn:hover { text-decoration: underline; }
+  .fav-table .fav-goto { cursor: pointer; color: #2f6fdc; font-size: 13px; background: none; border: none; padding: 4px 8px; }
+  .fav-table .fav-goto:hover { text-decoration: underline; }
+
+  .tool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .tool-card {
+    background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 18px 16px;
+    cursor: pointer; transition: box-shadow .15s, border-color .15s;
+  }
+  .tool-card:hover { border-color: #2f6fdc; box-shadow: 0 2px 8px rgba(47,111,220,.15); }
+  .tool-icon { font-size: 28px; margin-bottom: 8px; }
+  .tool-label { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 4px; }
+  .tool-desc { font-size: 12px; color: #888; line-height: 1.4; }
+
+  .coffee-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-top: 28px;
+    padding: 24px 0 16px;
+    border-top: 1px solid #e8e8e8;
+  }
+  .coffee-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 36px;
+    background: linear-gradient(135deg, #f5a623, #f7c948);
+    color: #7a5800;
+    border: none;
+    border-radius: 50px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .2s, box-shadow .2s;
+    box-shadow: 0 4px 16px rgba(245, 166, 35, .35);
+  }
+  .coffee-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(245, 166, 35, .45); }
+  .coffee-btn:active { transform: translateY(0); }
+  .coffee-btn .icon { font-size: 22px; }
+  .coffee-hint { font-size: 12px; color: #999; margin-top: 8px; }
+  .coffee-modal-panel {
+    width: min(96vw, 760px);
+    max-width: 760px;
+    max-height: 92vh;
+    overflow: hidden;
+    text-align: center;
+  }
+  .coffee-qr-list {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: nowrap;
+    width: 100%;
+  }
+  .coffee-option {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .coffee-option-title { margin: 0 0 8px; font-size: 14px; color: #555; font-weight: 600; }
+  .coffee-qr-frame {
+    width: min(100%, 300px);
+    aspect-ratio: 3 / 4;
+    overflow: hidden;
+    margin: 0 auto;
+    border-radius: 8px;
+  }
+  .coffee-qr {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+  }
+
+  .visit-bar {
+    display: flex; align-items: baseline; justify-content: center; gap: 6px;
+    margin-top: 24px; padding: 16px 0;
+    border-top: 1px solid #e8e8e8; color: #555; font-size: 14px;
+  }
+  .visit-num {
+    font-size: 32px; font-weight: 700; color: #222;
+    font-variant-numeric: tabular-nums;
+  }
+  .app-download-btn {
+    display: inline-block; margin-bottom: 18px; padding: 10px 20px;
+    background: #2f6fdc; color: #fff; border-radius: 6px;
+    font-size: 14px; text-decoration: none; transition: background .15s;
+  }
+  .app-download-btn:hover { background: #1a5bc4; text-decoration: none; }
+
+  .tabpanel { display: none; }
+  .tabpanel.active { display: block; }
+
+  /* 移动端适配 */
+  .menu-toggle { display: none; font-size: 20px; background: none; border: none; color: #444; padding: 4px 8px; margin-right: 8px; }
+  @media (max-width: 768px) {
+    .menu-toggle { display: inline-block; }
+    .sidebar {
+      position: fixed; left: 0; top: 56px; bottom: 0; z-index: 99;
+      transform: translateX(-100%); transition: transform .2s;
+      box-shadow: 2px 0 8px rgba(0,0,0,.1);
+    }
+    .sidebar.open { transform: translateX(0); }
+    .content { padding: 16px; }
+    .overlay { display: none; position: fixed; inset: 56px 0 0 0; background: rgba(0,0,0,.3); z-index: 98; }
+    .overlay.show { display: block; }
+  }
+
+  /* 扫码传定位弹窗 */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    display: none; align-items: center; justify-content: center; z-index: 1500;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-panel {
+    background: #fff; border-radius: 10px; padding: 20px 22px;
+    max-width: 360px; width: 92%; box-shadow: 0 6px 24px rgba(0,0,0,.25);
+    text-align: center; max-height: 92vh; overflow-y: auto;
+  }
+  .modal-panel h3 { margin: 0 0 6px; font-size: 17px; }
+  .modal-panel .sub { font-size: 13px; color: #666; margin: 0 0 12px; }
+  #gpsQr { display: inline-block; padding: 8px; background: #fff; border: 1px solid #ddd; border-radius: 6px; }
+  #gpsQr img, #gpsQr canvas { display: block; }
+  .gps-qr-url {
+    font-family: Consolas, monospace; font-size: 12px; color: #333;
+    background: #f5f6f8; border: 1px solid #ddd; border-radius: 4px;
+    padding: 6px 8px; margin: 10px 0 4px; word-break: break-all;
+  }
+  .gps-qr-iprow { display: flex; gap: 6px; align-items: center; justify-content: center; margin-top: 8px; }
+  .gps-qr-iprow input { width: 170px; font-size: 13px; }
+  .gps-qr-iprow button { padding: 7px 10px; font-size: 13px; }
+  .gps-qr-status { font-size: 13px; color: #1a7f37; margin: 10px 0 0; min-height: 18px; }
+  .gps-qr-status.err { color: #c62828; }
+  .gps-qr-tip { font-size: 12px; color: #999; margin: 8px 0 0; text-align: left; }
+
+  /* 远程固件列表 */
+  .fw-release { border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; background: #fafbfc; }
+  .fw-release-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .fw-release-tag { font-weight: 600; font-size: 14px; color: #2f6fdc; }
+  .fw-release-date { font-size: 12px; color: #888; }
+  .fw-release-body { font-size: 12px; color: #555; white-space: pre-wrap; margin-bottom: 6px; max-height: 60px; overflow: hidden; }
+  .fw-asset { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; background: #fff; border: 1px solid #e8e8e8; border-radius: 4px; margin-top: 4px; }
+  .fw-asset-name { font-size: 13px; font-family: Consolas, monospace; }
+  .fw-asset-size { font-size: 12px; color: #888; margin-left: 8px; }
+  .fw-asset-btn { padding: 4px 10px; font-size: 12px; }
+  /* 信道批量写入表格固定列宽 */
+  #chPreviewTable { table-layout: fixed; width: 100%; }
+  #chPreviewTable th, #chPreviewTable td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0;
+  }
+  #chPreviewTable th:nth-child(1), #chPreviewTable td:nth-child(1) { width: 48px; }
+  #chPreviewTable th:nth-child(2), #chPreviewTable td:nth-child(2) { width: 110px; }
+  #chPreviewTable th:nth-child(3), #chPreviewTable td:nth-child(3),
+  #chPreviewTable th:nth-child(4), #chPreviewTable td:nth-child(4) { width: 96px; }
+  #chPreviewTable th:nth-child(5), #chPreviewTable td:nth-child(5),
+  #chPreviewTable th:nth-child(6), #chPreviewTable td:nth-child(6) { width: 84px; }
+  #chPreviewTable th:nth-child(7), #chPreviewTable td:nth-child(7),
+  #chPreviewTable th:nth-child(8), #chPreviewTable td:nth-child(8),
+  #chPreviewTable th:nth-child(9), #chPreviewTable td:nth-child(9) { width: 64px; }
+  #chPreviewTable th:nth-child(10), #chPreviewTable td:nth-child(10),
+  #chPreviewTable th:nth-child(11), #chPreviewTable td:nth-child(11) { width: 78px; }
+  #chPreviewTable select { width: 100%; max-width: 100%; }
+  .logo-preview-wrap {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px;
+    display: inline-block;
+  }
+  .logo-preview-wrap canvas {
+    width: 256px;
+    height: 128px;
+    image-rendering: pixelated;
+    border: 1px solid #ccc;
+  }
+
+  /* ===== 用户认证 ===== */
+  .user-avatar {
+    width: 24px; height: 24px; border-radius: 50%;
+    object-fit: cover; flex-shrink: 0;
+  }
+  .user-avatar-txt {
+    display: inline-flex !important; align-items: center; justify-content: center;
+    background: #2f6fdc; color: #fff; font-size: 13px; font-weight: 600;
+  }
+  #userBadge { display: none; align-items: center; gap: 6px; cursor: default; position: relative; }
+  #userBadge::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 10px; }
+  .user-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 190px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+    padding: 6px;
+    z-index: 1000;
+  }
+  #userBadge:hover .user-dropdown { display: block; }
+  .user-dropdown-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-bottom: 1px solid #f0f0f0; margin-bottom: 4px;
+  }
+  .user-dropdown-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    object-fit: cover; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #2f6fdc; color: #fff; font-size: 16px; font-weight: 600;
+  }
+  .user-dropdown-name { font-size: 14px; font-weight: 600; color: #222; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+  .user-dropdown-email { font-size: 11px; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+  .user-dropdown-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 10px; border-radius: 6px;
+    font-size: 13px; color: #333; cursor: pointer;
+  }
+  .user-dropdown-item:hover { background: #f3f6fb; color: #2f6fdc; }
+  .user-dropdown-item.danger:hover { background: #fdecec; color: #d93025; }
+
+  .my-works-body { padding: 8px 0; }
+  .my-work-list { display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto; }
+  .my-work-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px; border: 1px solid #eee; border-radius: 8px; text-align: left;
+  }
+  .my-work-icon { font-size: 22px; flex-shrink: 0; }
+  .my-work-main { min-width: 0; flex: 1; }
+  .my-work-title { font-size: 14px; font-weight: 600; color: #222; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .my-work-sub { font-size: 12px; color: #999; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-avatar-btn { cursor: pointer; position: relative; transition: opacity .15s; }
+  .user-avatar-btn:hover { opacity: .8; }
+  #avatarInput { display: none; }
+  .user-name { font-size: 13px; color: #333; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* ===== 登录 / 注册（modern） ===== */
+  .auth-overlay { background: rgba(15, 23, 42, .5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .auth-modal {
+    max-width: 400px; width: 92%; text-align: left;
+    border-radius: 20px; padding: 26px 26px 20px;
+    box-shadow: 0 24px 64px rgba(15, 23, 42, .3);
+    position: relative; overflow: hidden;
+    animation: authIn .32s cubic-bezier(.21, .85, .4, 1);
+  }
+  @keyframes authIn { from { opacity: 0; transform: translateY(16px) scale(.96); } to { opacity: 1; transform: none; } }
+  .auth-modal::before, .auth-modal::after {
+    content: ""; position: absolute; border-radius: 50%; pointer-events: none; z-index: 0;
+  }
+  .auth-modal::before { top: -70px; right: -70px; width: 190px; height: 190px; background: radial-gradient(circle, rgba(91, 141, 239, .22), transparent 68%); }
+  .auth-modal::after { bottom: -80px; left: -80px; width: 210px; height: 210px; background: radial-gradient(circle, rgba(47, 111, 220, .14), transparent 68%); }
+  .auth-modal > * { position: relative; z-index: 1; }
+
+  .auth-close {
+    position: absolute; top: 14px; right: 14px; z-index: 2;
+    width: 32px; height: 32px; border: none; border-radius: 50%;
+    background: #f1f4f9; color: #7c8594; font-size: 17px; line-height: 1;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: all .18s ease;
+  }
+  .auth-close:hover { background: #e7ecf4; color: #161e2e; transform: rotate(90deg); }
+
+  .auth-head { text-align: center; margin-bottom: 16px; }
+  .auth-logo {
+    width: 54px; height: 54px; margin: 0 auto 12px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center; font-size: 26px;
+    background: linear-gradient(135deg, #2f6fdc, #6f9df0);
+    box-shadow: 0 10px 22px rgba(47, 111, 220, .35);
+    animation: logoFloat 3.2s ease-in-out infinite;
+  }
+  @keyframes logoFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  .auth-title { font-size: 21px; font-weight: 700; color: #161e2e; margin: 0 0 4px; }
+  .auth-sub { font-size: 13px; color: #8a93a6; margin: 0; }
+
+  .auth-tabs {
+    display: flex; gap: 4px; padding: 4px; margin-bottom: 16px;
+    background: #f1f4f9; border-radius: 12px;
+  }
+  .auth-tab {
+    flex: 1; padding: 9px 0; border: none; border-radius: 9px;
+    background: transparent; color: #8a93a6; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all .2s ease;
+  }
+  .auth-tab:hover { color: #2f6fdc; }
+  .auth-tab.active { background: #fff; color: #2f6fdc; box-shadow: 0 3px 10px rgba(47, 111, 220, .18); }
+
+  .auth-oauth-btn {
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 11px; border: 1.5px solid #e3e8ef; border-radius: 12px;
+    background: #fff; color: #1c2433; font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: all .18s ease;
+  }
+  .auth-oauth-btn:hover { border-color: #c9d5ea; background: #f8fafc; box-shadow: 0 4px 12px rgba(15, 23, 42, .08); }
+  .auth-oauth-btn:active { transform: scale(.98); }
+  .auth-oauth-btn .gh-icon { color: #161b22; }
+
+  .auth-divider { display: flex; align-items: center; gap: 12px; margin: 15px 0; color: #a6aebf; font-size: 12px; }
+  .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: #eef1f5; }
+
+  .auth-field {
+    display: flex; align-items: center; gap: 10px; height: 50px;
+    padding: 0 14px; margin-bottom: 12px;
+    background: #f7f9fc; border: 1.5px solid #e3e8ef; border-radius: 12px;
+    transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .auth-field:focus-within { border-color: #2f6fdc; background: #fff; box-shadow: 0 0 0 4px rgba(47, 111, 220, .12); }
+  .auth-field.match { border-color: #2ea44f; background: #f4fbf7; }
+  .auth-field.match:focus-within { box-shadow: 0 0 0 4px rgba(46, 164, 79, .14); }
+  .auth-field.mismatch { border-color: #e26d5c; background: #fef6f5; }
+  .auth-field.mismatch:focus-within { box-shadow: 0 0 0 4px rgba(226, 109, 92, .12); }
+  .auth-field.valid { border-color: #2ea44f; background: #f4fbf7; }
+  .auth-field.valid:focus-within { box-shadow: 0 0 0 4px rgba(46, 164, 79, .14); }
+  .auth-field.invalid { border-color: #e26d5c; background: #fef6f5; }
+  .auth-field.invalid:focus-within { box-shadow: 0 0 0 4px rgba(226, 109, 92, .12); }
+  .auth-field-icon { font-size: 15px; opacity: .55; flex-shrink: 0; }
+  .auth-field input {
+    flex: 1; min-width: 0; height: 100%; padding: 0;
+    border: none; background: transparent; outline: none;
+    font-size: 14px; color: #1c2433;
+  }
+  .auth-field input::placeholder { color: #a6aebf; }
+  .auth-eye {
+    border: none; background: none; cursor: pointer; font-size: 15px;
+    padding: 4px; opacity: .5; flex-shrink: 0; transition: opacity .15s;
+  }
+  .auth-eye:hover { opacity: .9; }
+
+  .auth-error { font-size: 13px; border-radius: 10px; margin-bottom: 12px; transition: all .2s ease; }
+  .auth-error:empty { display: none; }
+  .auth-error.err { color: #b43422; background: #fdecea; padding: 9px 12px; }
+  .auth-error:not(.err) { color: #1a7f37; background: #e6f6ee; padding: 9px 12px; }
+
+  .auth-submit {
+    width: 100%; padding: 13px; border: none; border-radius: 12px;
+    background: linear-gradient(135deg, #2f6fdc, #5b8def);
+    color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(47, 111, 220, .32);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+  }
+  .auth-submit:hover:not(:disabled) { filter: brightness(1.06); transform: translateY(-1px); box-shadow: 0 10px 24px rgba(47, 111, 220, .42); }
+  .auth-submit:active:not(:disabled) { transform: translateY(0); }
+  .auth-submit:disabled { opacity: .75; cursor: not-allowed; }
+  .auth-submit.loading::before {
+    content: ""; width: 15px; height: 15px; flex-shrink: 0; border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, .4); border-top-color: #fff;
+    animation: ws-spin .7s linear infinite;
+  }
+
+  .auth-benefits { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 16px 0 4px; }
+  .auth-benefits span {
+    font-size: 12px; color: #5b6472; background: #f4f6fa;
+    border: 1px solid #eef1f5; padding: 5px 11px; border-radius: 999px;
+  }
+
+  /* 忘记密码 */
+  .auth-forgot-row { display: flex; justify-content: flex-end; margin: -4px 0 10px; }
+  .auth-forgot-btn {
+    border: none; background: none; color: #6b7sky; color: #5b6472;
+    font-size: 12.5px; cursor: pointer; padding: 2px 4px;
+    transition: color .15s ease;
+  }
+  .auth-forgot-btn:hover { color: #2f6fdc; text-decoration: underline; }
+  .forgot-step { margin-top: 14px; }
+  .forgot-back-row { text-align: center; margin-top: 14px; }
+  .forgot-back-btn {
+    border: none; background: none; color: #5b6472; font-size: 13px; cursor: pointer;
+    padding: 6px 10px; transition: color .15s ease;
+  }
+  .forgot-back-btn:hover { color: #2f6fdc; }
+  .forgot-hint { font-size: 12.5px; color: #8892a0; line-height: 1.6; margin: 0 0 14px; }
+
+  /* ===== 创意工坊 ===== */
+  .ws-browse-card { padding-bottom: 8px; }
+  .ws-browse-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .ws-browse-head h2 { margin-bottom: 4px; }
+
+  /* 分类胶囊 */
+  .ws-categories { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 16px; }
+  .ws-cat-btn {
+    padding: 7px 16px; font-size: 13px; font-weight: 500;
+    border: 1px solid #e3e8ef; border-radius: 999px; background: #f8fafc;
+    cursor: pointer; color: #5b6472; transition: all .18s ease; user-select: none;
+  }
+  .ws-cat-btn:hover { border-color: #2f6fdc; color: #2f6fdc; background: #eef4ff; transform: translateY(-1px); }
+  .ws-cat-btn.active {
+    background: linear-gradient(135deg, #2f6fdc, #5b8def); color: #fff;
+    border-color: transparent; box-shadow: 0 3px 10px rgba(47, 111, 220, .28);
+  }
+
+  /* 加载 / 空态 */
+  .ws-loading { text-align: center; padding: 48px 20px; color: #8892a0; font-size: 14px; }
+  .ws-loading::before {
+    content: ""; display: block; width: 26px; height: 26px; margin: 0 auto 12px;
+    border: 3px solid #e3e8ef; border-top-color: #2f6fdc; border-radius: 50%;
+    animation: ws-spin .8s linear infinite;
+  }
+  @keyframes ws-spin { to { transform: rotate(360deg); } }
+  .ws-empty { text-align: center; padding: 48px 20px; color: #97a0ad; font-size: 14px; }
+
+  /* 作品卡片 */
+  .ws-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)); gap: 16px; }
+  .ws-item {
+    cursor: pointer; border: 1px solid #eef1f5; border-radius: 14px; padding: 16px;
+    background: #fff; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    display: flex; flex-direction: column; position: relative; overflow: hidden;
+  }
+  .ws-item::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+    background: linear-gradient(90deg, #2f6fdc, #7aa5f0, #2f6fdc); opacity: 0; transition: opacity .2s;
+  }
+  .ws-item:hover { transform: translateY(-4px); box-shadow: 0 10px 26px rgba(31, 45, 80, .12); border-color: #dbe4f5; }
+  .ws-item:hover::before { opacity: 1; }
+  .ws-item-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .ws-item-icon {
+    width: 44px; height: 44px; border-radius: 12px; display: inline-flex;
+    align-items: center; justify-content: center; font-size: 22px;
+    background: linear-gradient(135deg, #eef4ff, #e6ecf9); flex-shrink: 0;
+  }
+  .ws-item-cat { font-size: 11px; color: #8892a0; background: #f4f6fa; padding: 2px 9px; border-radius: 999px; }
+  .ws-item-title { font-size: 15px; font-weight: 600; color: #1c2433; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ws-item-desc { font-size: 12px; color: #7c8594; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; flex: 1; }
+  .ws-item-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #eef1f5; }
+  .ws-item-meta { display: flex; gap: 12px; font-size: 11px; color: #97a0ad; align-items: center; flex-wrap: wrap; }
+  .ws-item-meta span { display: inline-flex; align-items: center; gap: 3px; }
+  .ws-item-date { font-size: 11px; color: #b0b8c4; }
+  .ws-author { display: inline-flex; align-items: center; gap: 4px; }
+  .ws-author-avatar { width: 17px; height: 17px; border-radius: 50%; object-fit: cover; vertical-align: middle; flex-shrink: 0; }
+  .ws-author-txt { display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #2f6fdc, #5b8def); color: #fff; font-size: 9px; font-weight: 600; width: 17px; height: 17px; border-radius: 50%; }
+  .ws-avatar-wrap { display: inline-flex; }
+
+  /* 分页 */
+  #workshopPagination { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 18px; }
+  .ws-page-btn {
+    padding: 7px 16px; font-size: 13px; border: 1px solid #e3e8ef; border-radius: 999px;
+    background: #f8fafc; cursor: pointer; color: #5b6472; transition: all .15s ease;
+  }
+  .ws-page-btn:not(:disabled):hover { border-color: #2f6fdc; color: #2f6fdc; background: #eef4ff; }
+  .ws-page-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .ws-page-info { font-size: 13px; color: #8892a0; }
+  #workshopStatus { font-size: 12px; color: #a3aab6; text-align: center; margin-top: 10px; }
+
+  /* ===== 上传区 ===== */
+  .ws-upload-card { margin-top: 20px; }
+  .ws-upload-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .ws-upload-head h2 { margin-bottom: 2px; }
+  .ws-upload-icon {
+    width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 24px;
+    background: linear-gradient(135deg, #eef4ff, #e3ecff);
+  }
+  .ws-upload-form { display: flex; flex-direction: column; gap: 16px; margin-top: 14px; }
+  .ws-form-row { display: flex; flex-direction: column; gap: 6px; }
+  .ws-form-row label { font-size: 13px; font-weight: 600; color: #3d4655; }
+  .ws-form-row input[type="text"], .ws-form-row textarea {
+    border: 1px solid #e3e8ef; border-radius: 10px; padding: 10px 12px;
+    font-size: 14px; font-family: inherit; color: #1c2433;
+    transition: border-color .15s ease, box-shadow .15s ease; background: #fbfcfe;
+  }
+  .ws-form-row input[type="text"]:focus, .ws-form-row textarea:focus {
+    outline: none; border-color: #2f6fdc; box-shadow: 0 0 0 3px rgba(47, 111, 220, .14); background: #fff;
+  }
+  .ws-form-row textarea { min-height: 84px; resize: vertical; }
+
+  /* 分类按钮组 */
+  .ws-cat-select { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+  .ws-cat-select .ws-cat-btn { justify-content: center; }
+
+  /* 拖拽上传 */
+  .ws-dropzone {
+    border: 2px dashed #cdd6e3; border-radius: 14px; padding: 26px 16px;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    cursor: pointer; background: #fafbfe; transition: all .18s ease;
+  }
+  .ws-dropzone:hover, .ws-dropzone.dragover { border-color: #2f6fdc; background: #eef4ff; }
+  .ws-dropzone-inner { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .ws-dz-icon { font-size: 30px; }
+  .ws-dz-text { font-size: 14px; font-weight: 500; color: #4b5565; }
+  .ws-dz-sub { font-size: 12px; color: #9aa3b0; }
+
+  /* 已选文件卡片 */
+  .ws-file-info {
+    display: flex; align-items: center; gap: 10px; margin-top: 8px;
+    border: 1px solid #d9e6fb; background: #f2f7ff; border-radius: 12px; padding: 10px 12px;
+  }
+  .ws-file-icon { font-size: 20px; }
+  .ws-file-meta { flex: 1; min-width: 0; }
+  .ws-file-name { font-size: 13px; font-weight: 600; color: #1c5bbf; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ws-file-size { font-size: 12px; color: #7c9bd6; }
+  .ws-file-remove {
+    border: none; background: #e3ecff; color: #2f6fdc; width: 24px; height: 24px;
+    border-radius: 50%; cursor: pointer; font-size: 12px; line-height: 1; transition: all .15s;
+  }
+  .ws-file-remove:hover { background: #d93025; color: #fff; }
+
+  /* 上传按钮 */
+  .ws-upload-btn {
+    border: none; border-radius: 12px; padding: 13px 20px; font-size: 15px; font-weight: 600;
+    color: #fff; cursor: pointer; transition: all .18s ease;
+    background: linear-gradient(135deg, #2f6fdc, #5b8def);
+    box-shadow: 0 4px 14px rgba(47, 111, 220, .28);
+  }
+  .ws-upload-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(47, 111, 220, .34); }
+  .ws-upload-btn:disabled { background: #c3cbd8; box-shadow: none; cursor: not-allowed; color: #f4f6fa; }
+
+  /* 工坊详情弹窗 */
+  .ws-detail-body { text-align: center; padding: 8px 0; }
+  .ws-detail-body h3 { margin: 6px 0 2px; font-size: 18px; }
+  .ws-detail-actions { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+
+  .profile-body { text-align: center; padding: 8px 0; }
+  .profile-body .user-dropdown-avatar { width: 64px; height: 64px; font-size: 28px; margin: 0 auto 10px; }
+  .profile-body .user-dropdown-name { font-size: 16px; max-width: none; }
+  .profile-body .user-dropdown-email { font-size: 13px; max-width: none; margin-top: 4px; }
+  .profile-body .profile-joined { font-size: 12px; color: #bbb; margin-top: 6px; }
+
+  /* 完善资料弹窗 */
+  #cpUsernameStatus { font-size: 12px; color: #888; }
+  #cpUsernameStatus.err { color: #d93025; }
+  #cpUsernameStatus.ok { color: #1a7f37; }
+  #cpError { font-size: 13px; color: #d93025; }
+
+  
+
+/* ===== 个人中心页面专属样式 ===== */
+.profile-page { max-width: 720px; margin: 0 auto; padding: 20px 16px 40px; flex: 1; width: 100%; }
+.profile-page h1 { font-size: 22px; margin: 0 0 4px; }
+.profile-page .sub { color: #8892a0; font-size: 13px; margin: 0 0 18px; }
+.pp-card { background: #fff; border: 1px solid #eef1f5; border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+.pp-card h2 { font-size: 16px; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+.pp-user { display: flex; align-items: center; gap: 16px; }
+.pp-avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #2f6fdc, #5b8def); color: #fff; font-size: 30px; font-weight: 600; }
+.pp-user-name { font-size: 18px; font-weight: 600; color: #1c2433; }
+.pp-user-email { font-size: 13px; color: #8892a0; margin-top: 2px; }
+.pp-user-joined { font-size: 12px; color: #aab2c0; margin-top: 4px; }
+.pp-btn { border: none; border-radius: 10px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.pp-btn.primary { background: linear-gradient(135deg, #2f6fdc, #5b8def); color: #fff; }
+.pp-btn.ghost { background: #f4f6fa; color: #5b6472; border: 1px solid #e3e8ef; }
+.pp-btn.small { padding: 6px 12px; font-size: 12px; }
+.pp-bind-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f4f6fa; }
+.pp-bind-item:last-child { border-bottom: none; }
+.pp-bind-icon { width: 38px; height: 38px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 19px; flex-shrink: 0; background: #f4f6fa; }
+.pp-bind-name { font-size: 14px; font-weight: 600; color: #1c2433; }
+.pp-bind-sub { font-size: 12px; color: #8892a0; }
+.pp-bind-status { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.pp-bind-badge { font-size: 12px; padding: 4px 10px; border-radius: 999px; }
+.pp-bind-badge.bound { background: #e6f6ee; color: #1a7f37; }
+.pp-bind-badge.unbound { background: #fdecea; color: #b43422; }
+.pp-bind-badge.pending { background: #fff4e5; color: #b26a00; }
+.pp-works { display: flex; flex-direction: column; gap: 8px; }
+.pp-work { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #eef1f5; border-radius: 10px; }
+.pp-work-icon { font-size: 22px; flex-shrink: 0; }
+.pp-work-main { flex: 1; min-width: 0; }
+.pp-work-title { font-size: 14px; font-weight: 600; color: #1c2433; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-work-sub { font-size: 12px; color: #97a0ad; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-empty { text-align: center; color: #97a0ad; font-size: 13px; padding: 16px; }
+.pp-tip { text-align: center; color: #97a0ad; font-size: 13px; padding: 30px 0; }
+
+</style>
+</head>
+
+<body>
+
+<header class="topbar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <a href="index.html" style="font-size:15px;color:#5b6472;text-decoration:none;display:inline-flex;align-items:center;gap:4px">← 返回主页</a>
+    <span style="width:1px;height:18px;background:#e3e8ef"></span>
+    <span class="brand">个人中心</span>
+  </div>
+  <div class="top-actions">
+    <span id="userBadge"></span>
+    <input id="avatarInput" type="file" accept="image/jpeg,image/png,image/gif,image/webp">
+    <button id="btnAuth" class="btn-connect">登录/注册</button>
+  </div>
+</header>
+
+<div class="profile-page">
+  <div id="ppGuest" class="pp-tip" style="display:none">
+    <div style="font-size:40px;margin-bottom:10px">🔒</div>
+    <div style="font-size:15px;color:#5b6472;margin-bottom:14px">登录后才能查看个人中心</div>
+    <button class="pp-btn primary" id="ppGoLogin">去登录 / 注册</button>
+  </div>
+
+  <div id="ppContent" style="display:none">
+    <h1>个人中心</h1>
+    <p class="sub">管理你的账号信息、绑定第三方登录、查看上传的作品</p>
+
+    <div class="pp-card">
+      <h2>👤 个人资料</h2>
+      <div class="pp-user">
+        <div id="ppAvatar" class="pp-avatar">?</div>
+        <div style="flex:1;min-width:0">
+          <div id="ppName" class="pp-user-name"></div>
+          <div id="ppEmail" class="pp-user-email"></div>
+          <div id="ppJoined" class="pp-user-joined"></div>
+        </div>
+        <button class="pp-btn ghost small" id="ppChangeAvatar">更换头像</button>
+      </div>
+    </div>
+
+    <div class="pp-card">
+      <h2>🔗 账号绑定</h2>
+      <div class="pp-bind-item">
+        <span class="pp-bind-icon">✉️</span>
+        <div>
+          <div class="pp-bind-name">邮箱</div>
+          <div class="pp-bind-sub" id="ppBindEmailSub">邮箱登录账号</div>
+        </div>
+        <div class="pp-bind-status"><span class="pp-bind-badge bound">已绑定</span></div>
+      </div>
+      <div class="pp-bind-item">
+        <span class="pp-bind-icon">🐙</span>
+        <div>
+          <div class="pp-bind-name">GitHub</div>
+          <div class="pp-bind-sub" id="ppBindGhSub">用 GitHub 账号快速登录</div>
+        </div>
+        <div class="pp-bind-status" id="ppBindGhStatus">
+          <span class="pp-bind-badge pending" id="ppGhBadge">检查中…</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pp-card">
+      <h2>🗂️ 我的作品</h2>
+      <div id="ppWorks" class="pp-works">
+        <div class="pp-empty" id="ppWorksLoading">加载中…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <div class="modal-panel">
+    <h3>📱 扫码传定位</h3>
+    <p class="sub">用 UvK6 Tools APP 扫描二维码，自动把手机 GPS 经纬度/海拔填入本页</p>
+    <div id="gpsQr"></div>
+    <div class="gps-qr-url" id="gpsQrUrl" title="点击全选复制"></div>
+    <div class="gps-qr-iprow">
+      <input id="gpsQrIp" type="text" placeholder="电脑局域网 IP，如 192.168.1.5">
+      <button id="gpsQrRegen" type="button" class="secondary">重新生成</button>
+    </div>
+    <div class="gps-qr-status" id="gpsQrStatus">等待手机扫码上报…</div>
+    <div style="margin-top:12px; display:flex; gap:8px; justify-content:center">
+      <button id="gpsQrClose" type="button" class="secondary">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 登录 / 注册弹窗 -->
+<div id="authModal" class="modal-overlay auth-overlay">
+  <div class="modal-panel auth-modal">
+    <button type="button" class="auth-close" id="btnAuthClose" aria-label="关闭">&times;</button>
+    <div class="auth-head">
+      <div class="auth-logo">🛰️</div>
+      <h3 class="auth-title" id="authTitle">欢迎回来</h3>
+      <p class="auth-sub" id="authSub">登录后可上传创意工坊作品</p>
+    </div>
+    <div class="auth-tabs" role="tablist">
+      <button type="button" class="auth-tab active" data-mode="login">登录</button>
+      <button type="button" class="auth-tab" data-mode="register">注册</button>
+    </div>
+    <button type="button" id="btnAuthGithub" class="auth-oauth-btn">
+      <svg class="gh-icon" viewBox="0 0 16 16" width="17" height="17" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+      </svg>
+      <span>使用 GitHub 登录</span>
+    </button>
+    <div class="auth-divider">或使用邮箱</div>
+    <div class="auth-field" id="authUsernameRow" style="display:none">
+      <span class="auth-field-icon">🙋</span>
+      <input id="authUsername" type="text" placeholder="用户名（2-20 字符，字母/数字/下划线）" maxlength="20" autocomplete="username">
+    </div>
+    <div class="auth-field" id="authEmailRow">
+      <span class="auth-field-icon">✉️</span>
+      <input id="authEmail" type="email" placeholder="邮箱" autocomplete="email">
+    </div>
+    <div class="auth-field">
+      <span class="auth-field-icon">🔒</span>
+      <input id="authPassword" type="password" placeholder="密码" autocomplete="current-password">
+      <button type="button" class="auth-eye" id="btnAuthEye" aria-label="显示或隐藏密码">👁️</button>
+    </div>
+    <div class="auth-field" id="authConfirmRow" style="display:none">
+      <span class="auth-field-icon">🔐</span>
+      <input id="authConfirmPassword" type="password" placeholder="确认密码" autocomplete="new-password">
+      <button type="button" class="auth-eye" id="btnAuthEyeConfirm" aria-label="显示或隐藏密码">👁️</button>
+    </div>
+    <div class="auth-forgot-row" id="authForgotRow">
+      <button type="button" class="auth-forgot-btn" id="btnForgotOpen">忘记密码？</button>
+    </div>
+    <div id="authError" class="auth-error" role="status"></div>
+    <button id="btnAuthSubmit" type="button" class="auth-submit">登录</button>
+    <div class="auth-benefits">
+      <span>✨ 上传作品</span>
+      <span>🌐 同步星历</span>
+      <span>🛡️ 数据安全</span>
+    </div>
+    <p class="gps-qr-tip">邮箱注册需验证邮件。第三方登录授权后自动创建账号。</p>
+  </div>
+</div>
+<div id="profileModal" class="modal-overlay">
+  <div class="modal-panel" style="max-width:380px">
+    <h3>个人中心</h3>
+    <div id="profileBody" class="profile-body"></div>
+    <div class="ws-detail-actions">
+      <button id="btnProfileClose" type="button" class="secondary">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 完善资料弹窗（GitHub 登录后首次） -->
+<div id="completeProfileModal" class="modal-overlay">
+  <div class="modal-panel auth-modal">
+    <h3>完善你的资料</h3>
+    <p class="sub">设置一个独特的用户名，并绑定邮箱用于账号安全</p>
+    <label for="cpUsername">用户名</label>
+    <input id="cpUsername" type="text" maxlength="20" placeholder="2-20 字符，字母/数字/下划线" autocomplete="username">
+    <div id="cpUsernameStatus" style="margin-top:4px"></div>
+    <label for="cpEmail" style="margin-top:10px">绑定邮箱</label>
+    <input id="cpEmail" type="email" placeholder="用于验证和找回密码">
+    <div id="cpError" style="margin-top:8px"></div>
+    <div class="ws-detail-actions" style="margin-top:14px">
+      <button id="btnCpClose" type="button" class="secondary">暂不设置</button>
+      <button id="btnCpSubmit" type="button" disabled>保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 我的作品弹窗 -->
+<div id="myWorksModal" class="modal-overlay">
+  <div class="modal-panel" style="max-width:420px">
+    <h3>🗂️ 我的作品</h3>
+    <div id="myWorksBody" class="my-works-body"></div>
+    <div class="ws-detail-actions">
+      <button id="btnMyWorksClose" type="button" class="secondary">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 创意工坊作品详情弹窗 -->
+<div id="wsDetailModal" class="modal-overlay">
+  <div class="modal-panel" style="max-width:440px">
+    <div id="wsDetailBody" class="ws-detail-body"></div>
+    <div class="ws-detail-actions">
+      <button id="btnWsDetailClose" type="button" class="secondary">关闭</button>
+      <button id="btnWsDownload" type="button" disabled>⬇️ 下载</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
+  window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
+</script>
+<script src="auth.js?v=1.7.3"></script>
+<script>
+
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const SB_URL = window.SUPABASE_URL;
+  const SB_KEY = window.SUPABASE_PUBLISHABLE_KEY;
+
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  let supabase = window.supabase.createClient(SB_URL, SB_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true },
+  });
+
+  const CAT_ICON = { theme: "🎨", channel: "📋", extension: "⚙️", other: "📦" };
+  const fmtSize = (b) => {
+    if (!b) return "0 B";
+    if (b < 1024) return b + " B";
+    if (b < 1024 * 1024) return (b / 1024).toFixed(1) + " KB";
+    return (b / (1024 * 1024)).toFixed(2) + " MB";
+  };
+  const fmtDate = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  };
+  const safeAvatar = (u) => /^(https?:)?\/\//i.test(u || "") || /^data:image\//i.test(u || "") ? u : "";
+
+  function render(user) {
+    if (!user) {
+      $("ppGuest").style.display = "block";
+      $("ppContent").style.display = "none";
+      return;
+    }
+    $("ppGuest").style.display = "none";
+    $("ppContent").style.display = "block";
+
+    const meta = user.user_metadata || {};
+    const name = meta.user_name || meta.name || meta.full_name || meta.preferred_username || user.email || "用户";
+    const avatar = safeAvatar(meta.avatar_url || meta.picture);
+    $("ppAvatar").outerHTML = avatar
+      ? `<img class="pp-avatar" src="${avatar}" alt="">`
+      : `<span class="pp-avatar">${esc(name.charAt(0).toUpperCase())}</span>`;
+    $("ppName").textContent = name;
+    $("ppEmail").textContent = user.email || "";
+    $("ppJoined").textContent = user.created_at ? "加入于 " + fmtDate(user.created_at) : "";
+
+    // GitHub 绑定状态
+    const identities = user.identities || [];
+    const gh = identities.find((i) => i.provider === "github");
+    const ghStatus = $("ppBindGhStatus");
+    if (gh) {
+      ghStatus.innerHTML = `<span class="pp-bind-badge bound">已绑定</span>
+        <button class="pp-btn ghost small" id="ppUnbindGh">解绑</button>`;
+      $("ppBindGhSub").textContent = gh.identity_data?.user_name || gh.identity_data?.name || "已绑定 GitHub 账号";
+      $("ppUnbindGh").addEventListener("click", () => unbindGh(gh));
+    } else {
+      ghStatus.innerHTML = `<span class="pp-bind-badge unbound">未绑定</span>
+        <button class="pp-btn primary small" id="ppBindGh">绑定 GitHub</button>`;
+      $("ppBindGhSub").textContent = "用 GitHub 账号快速登录";
+      $("ppBindGh").addEventListener("click", bindGh);
+    }
+
+    loadWorks(user);
+  }
+
+  // 绑定 GitHub（需先登录）
+  async function bindGh() {
+    const btn = $("ppBindGh");
+    btn.disabled = true; btn.textContent = "跳转授权中…";
+    try {
+      const { error } = await supabase.auth.linkIdentity({
+        provider: "github",
+        options: { redirectTo: window.location.href },
+      });
+      if (error) throw error;
+    } catch (e) {
+      alert("绑定失败：" + (e.message || "请重试"));
+      btn.disabled = false; btn.textContent = "绑定 GitHub";
+    }
+  }
+
+  async function unbindGh(identity) {
+    if (!confirm("确定解绑 GitHub 账号？解绑后将不能用 GitHub 登录。")) return;
+    try {
+      const { error } = await supabase.auth.unlinkIdentity(identity);
+      if (error) throw error;
+      const { data } = await supabase.auth.getUser();
+      if (data.user) render(data.user);
+    } catch (e) {
+      alert("解绑失败：" + (e.message || "请重试"));
+    }
+  }
+
+  // 我的作品
+  async function loadWorks(user) {
+    const wrap = $("ppWorks");
+    try {
+      const resp = await fetch(SB_URL + "/rest/v1/workshop_items?user_id=eq." + encodeURIComponent(user.id) +
+        "&select=id,title,category,file_name,file_size,download_count,created_at&order=created_at.desc", {
+        headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY },
+      });
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const items = await resp.json();
+      if (!items.length) {
+        wrap.innerHTML = `<div class="pp-empty">还没有上传过作品，去创意工坊发布第一个吧 🚀</div>`;
+        return;
+      }
+      wrap.innerHTML = items.map((it) => `
+        <div class="pp-work">
+          <span class="pp-work-icon">${CAT_ICON[it.category] || "📦"}</span>
+          <div class="pp-work-main">
+            <div class="pp-work-title">${esc(it.title)}</div>
+            <div class="pp-work-sub">${esc(it.file_name)} · ${fmtSize(it.file_size)} · ⬇️ ${it.download_count || 0} · ${fmtDate(it.created_at)}</div>
+          </div>
+        </div>`).join("");
+    } catch (e) {
+      wrap.innerHTML = `<div class="pp-empty">加载失败：${esc(e.message || "请稍后重试")}</div>`;
+    }
+  }
+
+  // 更换头像：复用顶栏隐藏 input
+  $("ppChangeAvatar")?.addEventListener("click", () => $("avatarInput")?.click());
+  $("ppGoLogin")?.addEventListener("click", () => window.K5AUTH.openModal());
+
+  // 初始化：恢复会话后渲染
+  window.K5AUTH.init();
+  window.K5AUTH.onAuth((u) => render(u));
+  // 立即尝试恢复
+  supabase.auth.getSession().then(({ data }) => {
+    if (data.session?.user) render(data.session.user);
+  });
+})();
+
+</script>
+</body>
+</html>

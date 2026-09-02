@@ -53,7 +53,7 @@
              </div>`;
         badge.style.display = "inline-flex";
         bindAvatarClick();
-        document.getElementById("menuProfile")?.addEventListener("click", openProfile);
+        document.getElementById("menuProfile")?.addEventListener("click", () => { window.location.href = "profile.html"; });
         document.getElementById("menuMyWorks")?.addEventListener("click", openMyWorks);
         document.getElementById("menuLogout")?.addEventListener("click", signOut);
       }
