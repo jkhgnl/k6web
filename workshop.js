@@ -171,7 +171,7 @@
         const it = data.item;
         const cat = CATEGORIES[it.category] || CATEGORIES.other;
         const thumbHtml = it.thumbnail_url
-          ? `<img class="ws-detail-thumb" src="${escapeHtml(it.thumbnail_url)}" alt="">`
+          ? `<img class="ws-detail-thumb" src="${escapeHtml(it.thumbnail_url)}" alt="" loading="lazy">`
           : "";
         body.innerHTML = `
           ${thumbHtml}

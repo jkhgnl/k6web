@@ -28,7 +28,6 @@
 
   const proto = window.K5WEB.protocol;
   const calc = window.K5WEB.calc;
-  const gb = window.K5WEB && window.K5WEB.gb2312;
   const $ = (id) => document.getElementById(id);
 
   let port = null;
@@ -600,8 +599,9 @@
   const coord = window.K5WEB.coord;
   let map = null, marker = null;
 
-  function initMap() {
+  async function initMap() {
     if (map) return;
+    await window.lazyLoad("leaflet");
     map = L.map("map").setView([parseFloat($("lat").value) || 31.23, parseFloat($("lon").value) || 121.47], 10);
     L.tileLayer("https://webrd{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}", {
       subdomains: ["01", "02", "03", "04"],
@@ -919,7 +919,7 @@
     }, 1000);
   }
 
-  function buildGpsQr() {
+  async function buildGpsQr() {
     gpsQrToken = genToken();
     let url;
 
@@ -941,6 +941,7 @@
     $("gpsQrUrl").textContent = url;
     $("gpsQr").innerHTML = "";
     try {
+      await window.lazyLoad("qrcode");
       new QRCode($("gpsQr"), { text: url, width: 210, height: 210, correctLevel: QRCode.CorrectLevel.M });
     } catch (e) {
       const s = $("gpsQrStatus");
@@ -1631,6 +1632,7 @@
   }
 
   function gb2312Index(ch) {
+    const gb = window.K5WEB && window.K5WEB.gb2312;
     if (!gb) throw new Error("GB2312 编码表未加载");
     const r = gb.encode(ch);
     if (!r.ok) throw new Error(`无法编码 '${r.char}' 为 GB2312`);
@@ -2740,8 +2742,7 @@
   async function parseChannelFile(f) {
     const lower = f.name.toLowerCase();
     if (lower.endsWith(".xlsx") || lower.endsWith(".xlsm")) {
-      if (typeof XLSX === "undefined")
-        throw new Error("xlsx 解析库未加载（vendor/xlsx.full.min.js 缺失）");
+      if (typeof XLSX === "undefined") await window.lazyLoad("xlsx");
       const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
       if (!ws) throw new Error("xlsx 中没有工作表");

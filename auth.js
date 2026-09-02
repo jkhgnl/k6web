@@ -36,10 +36,10 @@
       const avatar = safeAvatar(meta.avatar_url || meta.picture);
       if (badge) {
         const avatarHtml = avatar
-          ? `<img class="user-avatar user-avatar-btn" src="${avatar}" alt="头像" title="点击更换头像">`
+          ? `<img class="user-avatar user-avatar-btn" src="${avatar}" alt="头像" title="点击更换头像" loading="lazy">`
           : `<span class="user-avatar user-avatar-txt user-avatar-btn" title="点击更换头像">${escapeHtml(name.charAt(0).toUpperCase())}</span>`;
         const dropdownAvatar = avatar
-          ? `<img class="user-dropdown-avatar" src="${avatar}" alt="">`
+          ? `<img class="user-dropdown-avatar" src="${avatar}" alt="" loading="lazy">`
           : `<span class="user-dropdown-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</span>`;
         badge.innerHTML = avatarHtml + `<span class="user-name">${escapeHtml(name)}</span>`
           + `<div class="user-dropdown">
@@ -83,7 +83,7 @@
     const name = meta.user_name || meta.name || meta.full_name || meta.preferred_username || user.email || "用户";
     const avatar = safeAvatar(meta.avatar_url || meta.picture);
     const head = avatar
-      ? `<img class="user-dropdown-avatar" src="${avatar}" alt="">`
+      ? `<img class="user-dropdown-avatar" src="${avatar}" alt="" loading="lazy">`
       : `<span class="user-dropdown-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</span>`;
     const joined = user.created_at
       ? `<div class="profile-joined">加入于 ${new Date(user.created_at).toLocaleDateString("zh-CN")}</div>`
