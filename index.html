@@ -223,14 +223,19 @@ s.parentNode.insertBefore(el, s);
     min-width: 0;
   }
   .coffee-option-title { margin: 0 0 8px; font-size: 14px; color: #555; font-weight: 600; }
-  .coffee-qr {
-    display: block;
-    width: auto;
-    max-width: 100%;
-    height: min(62vh, 420px);
-    object-fit: contain;
+  .coffee-qr-frame {
+    width: min(100%, 300px);
+    aspect-ratio: 3 / 4;
+    overflow: hidden;
     margin: 0 auto;
     border-radius: 8px;
+  }
+  .coffee-qr {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
   }
 
   .visit-bar {
@@ -337,6 +342,61 @@ s.parentNode.insertBefore(el, s);
     image-rendering: pixelated;
     border: 1px solid #ccc;
   }
+
+  /* ===== 用户认证 ===== */
+  .user-avatar {
+    width: 24px; height: 24px; border-radius: 50%;
+    object-fit: cover; flex-shrink: 0;
+  }
+  .user-avatar-txt {
+    display: inline-flex !important; align-items: center; justify-content: center;
+    background: #2f6fdc; color: #fff; font-size: 13px; font-weight: 600;
+  }
+  #userBadge { display: none; align-items: center; gap: 6px; cursor: default; }
+  .user-name { font-size: 13px; color: #333; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .auth-modal { text-align: left; }
+  .auth-modal h3 { text-align: center; }
+  .auth-tabs { display: flex; border-bottom: 1px solid #e0e0e0; margin-bottom: 14px; }
+  .auth-tab { flex: 1; padding: 8px; background: none; border: none; color: #888; font-size: 14px; cursor: pointer; }
+  .auth-tab.active { color: #2f6fdc; border-bottom: 2px solid #2f6fdc; }
+  .auth-divider { text-align: center; color: #aaa; font-size: 12px; margin: 12px 0; position: relative; }
+  .auth-divider::before, .auth-divider::after { content: ""; position: absolute; top: 50%; width: 40%; height: 1px; background: #e0e0e0; }
+  .auth-divider::before { left: 0; } .auth-divider::after { right: 0; }
+  .auth-oauth-row { display: flex; gap: 8px; }
+  .auth-oauth-row button { flex: 1; font-size: 13px; }
+  #authError { font-size: 13px; min-height: 0; transition: .15s; }
+  #authError.err { color: #c62828; min-height: 18px; }
+  #authError:not(.err) { color: #1a7f37; min-height: 18px; }
+
+  /* ===== 创意工坊 ===== */
+  .ws-categories { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .ws-cat-btn { padding: 6px 14px; font-size: 13px; border: 1px solid #ccc; border-radius: 20px; background: #fff; cursor: pointer; color: #555; transition: .15s; }
+  .ws-cat-btn:hover { border-color: #2f6fdc; color: #2f6fdc; }
+  .ws-cat-btn.active { background: #2f6fdc; color: #fff; border-color: #2f6fdc; }
+  .ws-loading { text-align: center; padding: 40px; color: #888; font-size: 14px; }
+  .ws-empty { text-align: center; padding: 40px; color: #999; font-size: 14px; }
+  .ws-item { cursor: pointer; }
+  .ws-item-icon { font-size: 28px; margin-bottom: 4px; }
+  .ws-item-cat { font-size: 11px; color: #888; margin-bottom: 2px; }
+  .ws-item-title { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ws-item-desc { font-size: 12px; color: #888; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px; }
+  .ws-item-meta { display: flex; gap: 10px; font-size: 11px; color: #999; }
+  .ws-item-date { font-size: 11px; color: #aaa; margin-top: 2px; }
+  #workshopPagination { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; }
+  .ws-page-btn { padding: 6px 14px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; color: #555; }
+  .ws-page-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .ws-page-info { font-size: 13px; color: #888; }
+  #workshopStatus { font-size: 13px; color: #888; text-align: center; margin-top: 8px; }
+
+  /* 工坊详情弹窗 */
+  .ws-detail-body { text-align: center; padding: 8px 0; }
+  .ws-detail-body h3 { margin: 6px 0 2px; font-size: 18px; }
+  .ws-detail-actions { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+
+  /* 移动端顶部栏挤不下时隐藏问题反馈链接 */
+  @media (max-width: 768px) {
+    .topbar .link { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -348,6 +408,8 @@ s.parentNode.insertBefore(el, s);
     <span class="brand">多普勒固件手台工具</span>
   </div>
   <div class="top-actions">
+    <span id="userBadge"></span>
+    <button id="btnAuth" class="btn-connect" style="padding:6px 14px;font-size:13px">登录</button>
     <a class="link" href="https://github.com/jkhgnl/k6web/issues" target="_blank">问题反馈</a>
     <button id="btnConnect" class="btn-connect">连接</button>
     <span id="status" class="top-status"></span>
@@ -1168,11 +1230,15 @@ s.parentNode.insertBefore(el, s);
     <div class="coffee-qr-list">
       <div class="coffee-option">
         <p class="coffee-option-title">微信支付</p>
-        <img src="img/wechat-pay.png" alt="微信收款二维码" class="coffee-qr">
+        <div class="coffee-qr-frame">
+          <img src="img/wechat-pay.png" alt="微信收款二维码" class="coffee-qr">
+        </div>
       </div>
       <div class="coffee-option">
         <p class="coffee-option-title">支付宝</p>
-        <img src="img/alipay-pay.jpg" alt="支付宝收款二维码" class="coffee-qr">
+        <div class="coffee-qr-frame">
+          <img src="img/alipay-pay.jpg" alt="支付宝收款二维码" class="coffee-qr">
+        </div>
       </div>
     </div>
     <button id="coffeeClose" type="button" class="secondary" style="margin-top:12px">关闭</button>
