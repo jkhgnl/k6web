@@ -407,19 +407,116 @@ s.parentNode.insertBefore(el, s);
   .user-avatar-btn:hover { opacity: .8; }
   #avatarInput { display: none; }
   .user-name { font-size: 13px; color: #333; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .auth-modal { text-align: left; }
-  .auth-modal h3 { text-align: center; }
-  .auth-tabs { display: flex; border-bottom: 1px solid #e0e0e0; margin-bottom: 14px; }
-  .auth-tab { flex: 1; padding: 8px; background: none; border: none; color: #888; font-size: 14px; cursor: pointer; }
-  .auth-tab.active { color: #2f6fdc; border-bottom: 2px solid #2f6fdc; }
-  .auth-divider { text-align: center; color: #aaa; font-size: 12px; margin: 12px 0; position: relative; }
-  .auth-divider::before, .auth-divider::after { content: ""; position: absolute; top: 50%; width: 40%; height: 1px; background: #e0e0e0; }
-  .auth-divider::before { left: 0; } .auth-divider::after { right: 0; }
-  .auth-oauth-row { display: flex; gap: 8px; }
-  .auth-oauth-row button { flex: 1; font-size: 13px; }
-  #authError { font-size: 13px; min-height: 0; transition: .15s; }
-  #authError.err { color: #c62828; min-height: 18px; }
-  #authError:not(.err) { color: #1a7f37; min-height: 18px; }
+  /* ===== 登录 / 注册（modern） ===== */
+  .auth-overlay { background: rgba(15, 23, 42, .5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .auth-modal {
+    max-width: 400px; width: 92%; text-align: left;
+    border-radius: 20px; padding: 26px 26px 20px;
+    box-shadow: 0 24px 64px rgba(15, 23, 42, .3);
+    position: relative; overflow: hidden;
+    animation: authIn .32s cubic-bezier(.21, .85, .4, 1);
+  }
+  @keyframes authIn { from { opacity: 0; transform: translateY(16px) scale(.96); } to { opacity: 1; transform: none; } }
+  .auth-modal::before, .auth-modal::after {
+    content: ""; position: absolute; border-radius: 50%; pointer-events: none; z-index: 0;
+  }
+  .auth-modal::before { top: -70px; right: -70px; width: 190px; height: 190px; background: radial-gradient(circle, rgba(91, 141, 239, .22), transparent 68%); }
+  .auth-modal::after { bottom: -80px; left: -80px; width: 210px; height: 210px; background: radial-gradient(circle, rgba(47, 111, 220, .14), transparent 68%); }
+  .auth-modal > * { position: relative; z-index: 1; }
+
+  .auth-close {
+    position: absolute; top: 14px; right: 14px; z-index: 2;
+    width: 32px; height: 32px; border: none; border-radius: 50%;
+    background: #f1f4f9; color: #7c8594; font-size: 17px; line-height: 1;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: all .18s ease;
+  }
+  .auth-close:hover { background: #e7ecf4; color: #161e2e; transform: rotate(90deg); }
+
+  .auth-head { text-align: center; margin-bottom: 16px; }
+  .auth-logo {
+    width: 54px; height: 54px; margin: 0 auto 12px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center; font-size: 26px;
+    background: linear-gradient(135deg, #2f6fdc, #6f9df0);
+    box-shadow: 0 10px 22px rgba(47, 111, 220, .35);
+    animation: logoFloat 3.2s ease-in-out infinite;
+  }
+  @keyframes logoFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  .auth-title { font-size: 21px; font-weight: 700; color: #161e2e; margin: 0 0 4px; }
+  .auth-sub { font-size: 13px; color: #8a93a6; margin: 0; }
+
+  .auth-tabs {
+    display: flex; gap: 4px; padding: 4px; margin-bottom: 16px;
+    background: #f1f4f9; border-radius: 12px;
+  }
+  .auth-tab {
+    flex: 1; padding: 9px 0; border: none; border-radius: 9px;
+    background: transparent; color: #8a93a6; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all .2s ease;
+  }
+  .auth-tab:hover { color: #2f6fdc; }
+  .auth-tab.active { background: #fff; color: #2f6fdc; box-shadow: 0 3px 10px rgba(47, 111, 220, .18); }
+
+  .auth-oauth-btn {
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 11px; border: 1.5px solid #e3e8ef; border-radius: 12px;
+    background: #fff; color: #1c2433; font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: all .18s ease;
+  }
+  .auth-oauth-btn:hover { border-color: #c9d5ea; background: #f8fafc; box-shadow: 0 4px 12px rgba(15, 23, 42, .08); }
+  .auth-oauth-btn:active { transform: scale(.98); }
+  .auth-oauth-btn .gh-icon { color: #161b22; }
+
+  .auth-divider { display: flex; align-items: center; gap: 12px; margin: 15px 0; color: #a6aebf; font-size: 12px; }
+  .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: #eef1f5; }
+
+  .auth-field {
+    display: flex; align-items: center; gap: 10px; height: 50px;
+    padding: 0 14px; margin-bottom: 12px;
+    background: #f7f9fc; border: 1.5px solid #e3e8ef; border-radius: 12px;
+    transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .auth-field:focus-within { border-color: #2f6fdc; background: #fff; box-shadow: 0 0 0 4px rgba(47, 111, 220, .12); }
+  .auth-field-icon { font-size: 15px; opacity: .55; flex-shrink: 0; }
+  .auth-field input {
+    flex: 1; min-width: 0; height: 100%; padding: 0;
+    border: none; background: transparent; outline: none;
+    font-size: 14px; color: #1c2433;
+  }
+  .auth-field input::placeholder { color: #a6aebf; }
+  .auth-eye {
+    border: none; background: none; cursor: pointer; font-size: 15px;
+    padding: 4px; opacity: .5; flex-shrink: 0; transition: opacity .15s;
+  }
+  .auth-eye:hover { opacity: .9; }
+
+  .auth-error { font-size: 13px; border-radius: 10px; margin-bottom: 12px; transition: all .2s ease; }
+  .auth-error:empty { display: none; }
+  .auth-error.err { color: #b43422; background: #fdecea; padding: 9px 12px; }
+  .auth-error:not(.err) { color: #1a7f37; background: #e6f6ee; padding: 9px 12px; }
+
+  .auth-submit {
+    width: 100%; padding: 13px; border: none; border-radius: 12px;
+    background: linear-gradient(135deg, #2f6fdc, #5b8def);
+    color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(47, 111, 220, .32);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+  }
+  .auth-submit:hover:not(:disabled) { filter: brightness(1.06); transform: translateY(-1px); box-shadow: 0 10px 24px rgba(47, 111, 220, .42); }
+  .auth-submit:active:not(:disabled) { transform: translateY(0); }
+  .auth-submit:disabled { opacity: .75; cursor: not-allowed; }
+  .auth-submit.loading::before {
+    content: ""; width: 15px; height: 15px; flex-shrink: 0; border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, .4); border-top-color: #fff;
+    animation: ws-spin .7s linear infinite;
+  }
+
+  .auth-benefits { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 16px 0 4px; }
+  .auth-benefits span {
+    font-size: 12px; color: #5b6472; background: #f4f6fa;
+    border: 1px solid #eef1f5; padding: 5px 11px; border-radius: 999px;
+  }
 
   /* ===== 创意工坊 ===== */
   .ws-browse-card { padding-bottom: 8px; }
@@ -1507,31 +1604,45 @@ s.parentNode.insertBefore(el, s);
   </div>
 </div>
 
-<!-- 登录弹窗 -->
-<div id="authModal" class="modal-overlay">
+<!-- 登录 / 注册弹窗 -->
+<div id="authModal" class="modal-overlay auth-overlay">
   <div class="modal-panel auth-modal">
-    <h3>登录 / 注册</h3>
-    <p class="sub">登录后可上传创意工坊作品</p>
-    <div class="auth-tabs">
+    <button type="button" class="auth-close" id="btnAuthClose" aria-label="关闭">&times;</button>
+    <div class="auth-head">
+      <div class="auth-logo">🛰️</div>
+      <h3 class="auth-title" id="authTitle">欢迎回来</h3>
+      <p class="auth-sub" id="authSub">登录后可上传创意工坊作品</p>
+    </div>
+    <div class="auth-tabs" role="tablist">
       <button type="button" class="auth-tab active" data-mode="login">登录</button>
       <button type="button" class="auth-tab" data-mode="register">注册</button>
     </div>
-    <div class="auth-oauth-row">
-      <button type="button" id="btnAuthGithub" class="secondary">🐙 GitHub</button>
-    </div>
+    <button type="button" id="btnAuthGithub" class="auth-oauth-btn">
+      <svg class="gh-icon" viewBox="0 0 16 16" width="17" height="17" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+      </svg>
+      <span>使用 GitHub 登录</span>
+    </button>
     <div class="auth-divider">或使用邮箱</div>
-    <div id="authUsernameRow" style="display:none">
-      <label for="authUsername">用户名</label>
+    <div class="auth-field" id="authUsernameRow" style="display:none">
+      <span class="auth-field-icon">🙋</span>
       <input id="authUsername" type="text" placeholder="用户名（2-20 字符，字母/数字/下划线）" maxlength="20" autocomplete="username">
     </div>
-    <label for="authEmail">邮箱</label>
-    <input id="authEmail" type="email" placeholder="邮箱">
-    <label for="authPassword">密码</label>
-    <input id="authPassword" type="password" placeholder="密码">
-    <div id="authError" style="margin-top:8px"></div>
-    <div class="ws-detail-actions" style="margin-top:14px">
-      <button id="btnAuthClose" type="button" class="secondary">取消</button>
-      <button id="btnAuthSubmit" type="button">登录</button>
+    <div class="auth-field">
+      <span class="auth-field-icon">✉️</span>
+      <input id="authEmail" type="email" placeholder="邮箱" autocomplete="email">
+    </div>
+    <div class="auth-field">
+      <span class="auth-field-icon">🔒</span>
+      <input id="authPassword" type="password" placeholder="密码" autocomplete="current-password">
+      <button type="button" class="auth-eye" id="btnAuthEye" aria-label="显示或隐藏密码">👁️</button>
+    </div>
+    <div id="authError" class="auth-error" role="status"></div>
+    <button id="btnAuthSubmit" type="button" class="auth-submit">登录</button>
+    <div class="auth-benefits">
+      <span>✨ 上传作品</span>
+      <span>🌐 同步星历</span>
+      <span>🛡️ 数据安全</span>
     </div>
     <p class="gps-qr-tip">邮箱注册需验证邮件。第三方登录授权后自动创建账号。</p>
   </div>
@@ -1575,8 +1686,8 @@ s.parentNode.insertBefore(el, s);
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
 </script>
-<script src="auth.js?v=1.6.9"></script>
-<script src="workshop.js?v=1.6.9"></script>
+<script src="auth.js?v=1.7.0"></script>
+<script src="workshop.js?v=1.7.0"></script>
 <script src="vendor/satellite.min.js"></script>
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>

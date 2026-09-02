@@ -216,6 +216,10 @@
     });
     if (email) email.placeholder = isLogin ? "邮箱" : "注册邮箱（将发送验证邮件）";
     if (usernameRow) usernameRow.style.display = isLogin ? "none" : "";
+    const title = document.getElementById("authTitle");
+    const sub = document.getElementById("authSub");
+    if (title) title.textContent = isLogin ? "欢迎回来" : "创建你的账号";
+    if (sub) sub.textContent = isLogin ? "登录后可上传创意工坊作品" : "注册后即可上传作品、同步数据";
   }
 
   function setAuthError(msg, isError = true) {
@@ -250,6 +254,13 @@
       if (pass.length < 6) { setAuthError("密码至少 6 位"); return; }
     }
     try {
+      const btn = document.getElementById("btnAuthSubmit");
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add("loading");
+        btn.dataset.original = btn.textContent;
+        btn.textContent = mode === "register" ? "注册中…" : "登录中…";
+      }
       const { error } = mode === "register"
         ? await supabase.auth.signUp({ email, password: pass, options: { data: { user_name: username } } })
         : await supabase.auth.signInWithPassword({ email, password: pass });
@@ -261,6 +272,14 @@
       }
     } catch (e) {
       setAuthError(e.message || "登录失败");
+    } finally {
+      const btn = document.getElementById("btnAuthSubmit");
+      if (btn) {
+        btn.disabled = false;
+        btn.classList.remove("loading");
+        btn.textContent = btn.dataset.original || (mode === "register" ? "注册" : "登录");
+        delete btn.dataset.original;
+      }
     }
   }
 
@@ -336,6 +355,15 @@
     const passInput = document.getElementById("authPassword");
     if (passInput) passInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") submitPassword();
+    });
+
+    // 密码可见性切换
+    const eyeBtn = document.getElementById("btnAuthEye");
+    if (eyeBtn) eyeBtn.addEventListener("click", () => {
+      const p = document.getElementById("authPassword");
+      if (!p) return;
+      p.type = p.type === "password" ? "text" : "password";
+      eyeBtn.textContent = p.type === "password" ? "👁️" : "🙈";
     });
 
     // 点遮罩关闭
