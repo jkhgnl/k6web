@@ -407,6 +407,14 @@ s.parentNode.insertBefore(el, s);
     <span class="visit-num" id="homeVisitCount">-</span>
     <span class="visit-unit">人次</span>
   </div>
+
+  <div class="coffee-wrap">
+    <button id="coffeeBtn" class="coffee-btn" type="button">
+      <span class="icon">☕</span>
+      <span>请他喝咖啡</span>
+    </button>
+    <div class="coffee-hint">如果这个工具对你有帮助，欢迎支持一下作者</div>
+  </div>
 </div>
 
 <!-- ========== 选项卡：写频（独立） ========== -->
@@ -1093,6 +1101,16 @@ s.parentNode.insertBefore(el, s);
   </main>
 </div>
 
+<!-- 请他喝咖啡弹窗 -->
+<div id="coffeeModal" class="modal-overlay">
+  <div class="modal-panel coffee-modal-panel">
+    <h3>☕ 请他喝咖啡</h3>
+    <p class="sub">感谢你的支持！请使用微信扫一扫完成赞赏</p>
+    <img src="img/wechat-pay.png" alt="微信收款二维码" class="coffee-qr">
+    <button id="coffeeClose" type="button" class="secondary" style="margin-top:12px">关闭</button>
+  </div>
+</div>
+
 <!-- 扫码传定位弹窗：网页生成二维码，手机 APP 扫描后把 GPS 经纬度/海拔上报到本机 -->
 <div id="gpsQrModal" class="modal-overlay">
   <div class="modal-panel">
@@ -1160,6 +1178,16 @@ s.parentNode.insertBefore(el, s);
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('overlay').classList.remove('show');
   });
+
+  // 请他喝咖啡弹窗
+  const coffeeModal = document.getElementById('coffeeModal');
+  const closeCoffeeModal = () => coffeeModal.classList.remove('show');
+  document.getElementById('coffeeBtn').addEventListener('click', () => coffeeModal.classList.add('show'));
+  document.getElementById('coffeeClose').addEventListener('click', closeCoffeeModal);
+  coffeeModal.addEventListener('click', (event) => {
+    if (event.target === coffeeModal) closeCoffeeModal();
+  });
+
   window.switchTab = switchTab;
   // 显示版本号
   (function(){
