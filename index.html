@@ -852,37 +852,26 @@ s.parentNode.insertBefore(el, s);
 
   <div class="card">
     <h2>社区创意内容</h2>
-    <p class="hint">这里将展示用户贡献的自定义配置、模板、脚本和创意玩法。你可以上传自己的作品，也可以下载他人分享的方案。</p>
-    <div class="tool-grid" id="workshopGrid">
-      <div class="tool-card" data-goto="tabWorkshop">
-        <div class="tool-icon">🎨</div>
-        <div class="tool-label">自定义主题</div>
-        <div class="tool-desc">社区分享的配色与界面主题方案</div>
-      </div>
-      <div class="tool-card" data-goto="tabWorkshop">
-        <div class="tool-icon">📋</div>
-        <div class="tool-label">信道模板</div>
-        <div class="tool-desc">常用频段、中继、卫星快速导入模板</div>
-      </div>
-      <div class="tool-card" data-goto="tabWorkshop">
-        <div class="tool-icon">⚙️</div>
-        <div class="tool-label">功能扩展</div>
-        <div class="tool-desc">用户贡献的脚本和扩展工具</div>
-      </div>
-    </div>
+    <p class="hint">浏览用户分享的射频频段配置、信道模板、功能扩展和创意方案。上传自己的作品或下载他人分享的内容。</p>
+    <div class="ws-categories" id="workshopCategories"></div>
+    <div id="workshopGrid" class="tool-grid"></div>
+    <div id="workshopPagination"></div>
+    <div id="workshopStatus"></div>
   </div>
 
   <div class="card">
     <h2>上传你的作品</h2>
-    <p class="hint">选择要分享的模板或配置文件，添加描述后即可提交到创意工坊（此功能需要后续接入后端存储）。</p>
+    <p class="hint">分享你的信道模板、配置方案或脚本扩展。支持 .bin / .csv / .txt / .json / .py / .zip 等格式，<b>文件 ≤ 1.5MB</b>。</p>
     <label>作品标题</label>
-    <input id="workshopTitle" type="text" placeholder="给你的作品起个名字">
+    <input id="workshopTitle" type="text" maxlength="60" placeholder="给你的作品起个名字">
     <label>作品描述</label>
-    <textarea id="workshopDesc" placeholder="简单描述作品内容、适用场景和使用方法"></textarea>
+    <textarea id="workshopDesc" maxlength="1000" placeholder="简单描述作品内容、适用场景和使用方法"></textarea>
+    <label>分类</label>
+    <select id="workshopCategory"></select>
     <label>选择文件</label>
     <input id="workshopFile" type="file">
     <div class="row" style="margin-top:8px">
-      <button id="btnWorkshopUpload" disabled>🚀 提交作品</button>
+      <button id="btnWorkshopUpload" disabled>🔒 登录后上传</button>
     </div>
   </div>
 </div>
@@ -1263,6 +1252,51 @@ s.parentNode.insertBefore(el, s);
   </div>
 </div>
 
+<!-- 登录弹窗 -->
+<div id="authModal" class="modal-overlay">
+  <div class="modal-panel auth-modal">
+    <h3>登录 / 注册</h3>
+    <p class="sub">登录后可上传创意工坊作品</p>
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" data-mode="login">登录</button>
+      <button type="button" class="auth-tab" data-mode="register">注册</button>
+    </div>
+    <div class="auth-oauth-row">
+      <button type="button" id="btnAuthGithub" class="secondary">🐙 GitHub</button>
+      <button type="button" id="btnAuthGoogle" class="secondary">🔵 Google</button>
+    </div>
+    <div class="auth-divider">或使用邮箱</div>
+    <label for="authEmail">邮箱</label>
+    <input id="authEmail" type="email" placeholder="邮箱">
+    <label for="authPassword">密码</label>
+    <input id="authPassword" type="password" placeholder="密码">
+    <div id="authError" style="margin-top:8px"></div>
+    <div class="ws-detail-actions" style="margin-top:14px">
+      <button id="btnAuthClose" type="button" class="secondary">取消</button>
+      <button id="btnAuthSubmit" type="button">登录</button>
+    </div>
+    <p class="gps-qr-tip">邮箱注册需验证邮件。第三方登录授权后自动创建账号。</p>
+  </div>
+</div>
+
+<!-- 创意工坊作品详情弹窗 -->
+<div id="wsDetailModal" class="modal-overlay">
+  <div class="modal-panel" style="max-width:440px">
+    <div id="wsDetailBody" class="ws-detail-body"></div>
+    <div class="ws-detail-actions">
+      <button id="btnWsDetailClose" type="button" class="secondary">关闭</button>
+      <button id="btnWsDownload" type="button" disabled>⬇️ 下载</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  window.SUPABASE_URL = "https://vnxmskoslohxbaslobfp.supabase.co";
+  window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_qRHWj9qAvDiqGFLARO6Oiw_w9DquECY";
+</script>
+<script src="auth.js?v=1.6.0"></script>
+<script src="workshop.js?v=1.6.0"></script>
 <script src="vendor/satellite.min.js"></script>
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>
@@ -1331,6 +1365,10 @@ s.parentNode.insertBefore(el, s);
     const aboutEl = document.getElementById('aboutVersion');
     if (aboutEl) aboutEl.textContent = v;
   })();
+  // 初始化认证模块
+  if (window.K5AUTH) K5AUTH.init();
+  // 初始化创意工坊
+  if (window.K5WORKSHOP) K5WORKSHOP.init();
 </script>
 </body>
 </html>

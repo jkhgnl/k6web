@@ -658,23 +658,23 @@
   }
 
 
-  // ---------- 地址搜索 ----------
-  async function searchAddress(q) {
-    // 优先高德 Web 服务 API（在关于页设置 Key 后生效）
-    const amapKey = localStorage.getItem("amap_web_key") || "";
-    if (amapKey) {
-      try {
-        const url = "https://restapi.amap.com/v3/geocode/geo?address=" + encodeURIComponent(q) + "&key=" + amapKey + "&output=JSON";
-        const resp = await fetch(url);
-        const d = await resp.json();
-        if (d.status === "1" && d.geocodes && d.geocodes.length) {
-          return d.geocodes.map(g => {
-            const [lng, lat] = g.location.split(",").map(Number);
-            return { lat, lng, name: g.formatted_address || g.location, _provider: "amap" };
-          });
-        }
-      } catch (e) { log("高德搜索失败：" + e.message); }
-    }
+  // ---------- 地址搜索（高德 Worker 代理，Key 存环境变量不公开） ----------
+  const GEO_WORKER_URL = "https://geo.jkhgnl.top";
+
+  // 地理编码：地址 → [{lat, lng, name}]（高德 GCJ-02）
+  async function geocodeAddress(q) {
+    try {
+      const resp = await fetch(GEO_WORKER_URL + "/geocode?address=" + encodeURIComponent(q));
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const d = await resp.json();
+      if (d.status === "1" && d.geocodes && d.geocodes.length) {
+        return d.geocodes.map(g => {
+          const [lng, lat] = g.location.split(",").map(Number);
+          return { lat, lng, name: g.formatted_address || g.location };
+        });
+      }
+      log("高德地理编码无结果：" + (d.info || ""));
+    } catch (e) { log("高德搜索失败：" + e.message); }
     // 回退 OSM Photon
     try {
       const url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(q) + "&limit=5&lang=zh";
@@ -684,33 +684,62 @@
         return d.features.map(f => {
           const [lng, lat] = f.geometry.coordinates;
           const name = [f.properties.name, f.properties.city, f.properties.country].filter(Boolean).join(", ");
-          return { lat, lng, name, _provider: "osm" };
+          return { lat, lng, name };
         });
       }
     } catch (e) { log("OSM 搜索失败：" + e.message); }
     return [];
   }
 
-  async function onMapSearch() {
-    const q = $("mapSearch").value.trim();
-    if (!q) return;
-    const results = await searchAddress(q);
-    if (!results.length) {
-      setStatus("⚠️ 未找到该地址", "err");
-      return;
-    }
-    const r = results[0];
-    // 高德返回 GCJ-02，OSM 返回 WGS-84 → 统一转 GCJ-02 定位地图
-    const gcj = r._provider === "amap" ? { lat: r.lat, lng: r.lng } : coord.wgs84ToGcj02(r.lat, r.lng);
-    const wgs = r._provider === "amap" ? coord.gcj02ToWgs84(r.lat, r.lng) : { lat: r.lat, lng: r.lng };
+  // 输入提示：边输入边模糊匹配
+  async function getAddressTips(kw) {
+    try {
+      const resp = await fetch(GEO_WORKER_URL + "/tips?keywords=" + encodeURIComponent(kw));
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const d = await resp.json();
+      if (d.status === "1" && d.tips && d.tips.length) {
+        return d.tips
+          .filter(t => t.location) // 只有带坐标的才可定位
+          .map(t => {
+            const [lng, lat] = t.location.split(",").map(Number);
+            return { lat, lng, name: t.name || "", addr: t.district || "" };
+          });
+      }
+    } catch (e) { log("输入提示失败：" + e.message); }
+    return [];
+  }
 
+  // 下拉提示渲染
+  let tipTimer = null;
+  function showTipList(items) {
+    const box = $("mapTipList");
+    box.innerHTML = "";
+    if (!items.length) { box.classList.remove("show"); return; }
+    items.slice(0, 8).forEach(it => {
+      const div = document.createElement("div");
+      div.className = "map-tip-item";
+      div.innerHTML = "<b>" + it.name + "</b><span>" + it.addr + "</span>";
+      div.addEventListener("click", () => {
+        box.classList.remove("show");
+        $("mapSearch").value = it.name;
+        placeSearchPoint(it);
+      });
+      box.appendChild(div);
+    });
+    box.classList.add("show");
+  }
+
+  // 把搜索结果定位到地图并填表
+  async function placeSearchPoint(r) {
+    // r 来自高德（GCJ-02）或 OSM 回退（WGS-84）
+    const gcj = r._wgs ? coord.wgs84ToGcj02(r.lat, r.lng) : { lat: r.lat, lng: r.lng };
+    const wgs = r._wgs ? { lat: r.lat, lng: r.lng } : coord.gcj02ToWgs84(r.lat, r.lng);
     initMap();
     map.setView([gcj.lat, gcj.lng], 14);
     if (marker) marker.setLatLng([gcj.lat, gcj.lng]);
     $("lat").value = wgs.lat.toFixed(5);
     $("lon").value = wgs.lng.toFixed(5);
     log(`地址搜索：${r.name} → ${wgs.lat.toFixed(5)}, ${wgs.lng.toFixed(5)}（WGS-84）`);
-    // 查询海拔
     setStatus("📡 查询海拔...");
     const h = await fetchElevation(wgs.lat, wgs.lng);
     if (h !== null) {
@@ -721,33 +750,37 @@
     }
   }
 
-  $("btnMapSearch").addEventListener("click", onMapSearch);
-  $("mapSearch").addEventListener("keydown", (e) => { if (e.key === "Enter") onMapSearch(); });
-
-  // 高德 Key 保存
-  function loadAmapKey() {
-    const key = localStorage.getItem("amap_web_key") || "";
-    $("amapKeyInput").value = key;
-    if (key) {
-      $("amapKeyStatus").textContent = "✅ 高德地图搜索已启用";
-    } else {
-      $("amapKeyStatus").textContent = "💡 未设置高德 Key，搜索将使用免费 OSM 服务";
+  async function onMapSearch() {
+    const q = $("mapSearch").value.trim();
+    if (!q) return;
+    hideTipList();
+    const results = await geocodeAddress(q);
+    if (!results.length) {
+      setStatus("⚠️ 未找到该地址", "err");
+      return;
     }
+    await placeSearchPoint(results[0]);
   }
-  $("btnAmapKeySave").addEventListener("click", () => {
-    const key = $("amapKeyInput").value.trim();
-    if (key) {
-      localStorage.setItem("amap_web_key", key);
-      $("amapKeyStatus").textContent = "✅ 已保存，地址搜索将优先使用高德 API";
-    } else {
-      localStorage.removeItem("amap_web_key");
-      $("amapKeyStatus").textContent = "💡 Key 已清除，搜索将使用免费 OSM 服务";
-    }
+
+  function hideTipList() { const b = $("mapTipList"); if (b) b.classList.remove("show"); }
+
+  $("btnMapSearch").addEventListener("click", onMapSearch);
+  $("mapSearch").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { onMapSearch(); }
+    else if (e.key === "Escape") { hideTipList(); }
   });
-  // 切换 About 页时加载 Key 显示
-  document.addEventListener("tabSwitch", (e) => { if (e.detail === "tabAbout") loadAmapKey(); });
-  // 首次加载也初始化
-  setTimeout(loadAmapKey, 1000);
+  $("mapSearch").addEventListener("input", (e) => {
+    const kw = e.target.value.trim();
+    clearTimeout(tipTimer);
+    if (kw.length < 2) { hideTipList(); return; }
+    tipTimer = setTimeout(async () => {
+      const items = await getAddressTips(kw);
+      showTipList(items);
+    }, 250);
+  });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#mapTipWrap")) hideTipList();
+  });
 
 
   $("btnLocate").addEventListener("click", () => {

@@ -1,0 +1,336 @@
+/**
+ * K6Web 创意工坊 - 作品浏览/上传/下载逻辑
+ * 依赖：window.K5AUTH（auth.js）
+ *       window.SUPABASE_URL（index.html 配置）
+ * 暴露：window.K5WORKSHOP
+ */
+(function () {
+  "use strict";
+
+  const FUNC_BASE = (window.SUPABASE_URL || "").replace(/\/$/, "") + "/functions/v1";
+  const CATEGORIES = {
+    theme:     { label: "🎨 自定义主题",  icon: "🎨" },
+    channel:   { label: "📋 信道模板",    icon: "📋" },
+    extension: { label: "⚙️ 功能扩展",    icon: "⚙️" },
+    other:     { label: "📦 其他作品",    icon: "📦" },
+  };
+  const CATEGORY_KEYS = ["theme", "channel", "extension", "other"];
+
+  let currentCategory = "all";
+  let currentPage = 1;
+  let total = 0;
+  const PAGE_SIZE = 12;
+
+  const $ = (id) => document.getElementById(id);
+  const log = (msg, cls) => {
+    const line = (cls ? `[${cls}] ` : "") + msg;
+    console.log(line);
+    const el = $("log");
+    if (el) { el.textContent += line + "\n"; el.scrollTop = el.scrollHeight; }
+  };
+
+  function fmtSize(bytes) {
+    if (!bytes) return "0 B";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+  }
+  function fmtDate(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function escapeHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ---------- 公共请求头：Supabase Edge Function 网关要求带 key ----------
+  // 公开接口用 publishable key（匿名角色）；需登录的接口由调用方传入用户 token
+  function anonHeaders() {
+    const h = { Authorization: "Bearer " + (window.SUPABASE_PUBLISHABLE_KEY || "") };
+    if (window.SUPABASE_PUBLISHABLE_KEY) h.apikey = window.SUPABASE_PUBLISHABLE_KEY;
+    return h;
+  }
+
+  // ---------- 列表 ----------
+  async function loadList(page = currentPage, category = currentCategory) {
+    const grid = $("workshopGrid");
+    const status = $("workshopStatus");
+    if (!grid) return;
+    currentPage = page;
+    currentCategory = category;
+    grid.innerHTML = `<div class="ws-loading">加载中…</div>`;
+    if (status) status.textContent = "";
+
+    const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+    if (category && category !== "all") params.set("category", category);
+
+    try {
+      const resp = await fetch(`${FUNC_BASE}/list-workshop?${params}`, { headers: anonHeaders() });
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const data = await resp.json();
+      total = data.total || 0;
+      renderList(data.items || []);
+    } catch (e) {
+      grid.innerHTML = `<div class="ws-empty">加载失败：${escapeHtml(e.message)}<br><small>请确认 Edge Function 已部署，或稍后重试</small></div>`;
+      if (status) status.textContent = "加载失败";
+    }
+  }
+
+  function renderList(items) {
+    const grid = $("workshopGrid");
+    const status = $("workshopStatus");
+    if (!grid) return;
+
+    if (!items.length) {
+      grid.innerHTML = `<div class="ws-empty">暂无作品，快来上传第一个吧 🚀</div>`;
+    } else {
+      grid.innerHTML = items.map((it) => {
+        const cat = CATEGORIES[it.category] || CATEGORIES.other;
+        const authorName = (it.profiles && it.profiles.username) || "匿名";
+        return `
+          <div class="tool-card ws-item" data-id="${it.id}" title="${escapeHtml(it.title)}">
+            <div class="ws-item-icon">${cat.icon}</div>
+            <div class="ws-item-cat">${cat.label.replace(/^[^\s]*\s/, "")}</div>
+            <div class="ws-item-title">${escapeHtml(it.title)}</div>
+            <div class="ws-item-desc">${escapeHtml(it.description || "")}</div>
+            <div class="ws-item-meta">
+              <span title="作者">👤 ${escapeHtml(authorName)}</span>
+              <span title="下载次数">⬇️ ${it.download_count || 0}</span>
+              <span title="文件大小">${fmtSize(it.file_size)}</span>
+            </div>
+            <div class="ws-item-date">${fmtDate(it.created_at)}</div>
+          </div>`;
+      }).join("");
+    }
+
+    // 点击作品 → 详情
+    grid.querySelectorAll(".ws-item").forEach((el) => {
+      el.addEventListener("click", () => openDetail(el.dataset.id));
+    });
+
+    // 分页
+    renderPagination();
+    if (status) status.textContent = `共 ${total} 个作品`;
+  }
+
+  function renderPagination() {
+    const wrap = $("workshopPagination");
+    if (!wrap) return;
+    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (pages <= 1) { wrap.innerHTML = ""; return; }
+    let html = `<button class="ws-page-btn" data-page="${currentPage - 1}" ${currentPage <= 1 ? "disabled" : ""}>‹ 上一页</button>
+                <span class="ws-page-info">第 ${currentPage} / ${pages} 页</span>
+                <button class="ws-page-btn" data-page="${currentPage + 1}" ${currentPage >= pages ? "disabled" : ""}>下一页 ›</button>`;
+    wrap.innerHTML = html;
+    wrap.querySelectorAll(".ws-page-btn:not([disabled])").forEach((b) => {
+      b.addEventListener("click", () => loadList(parseInt(b.dataset.page, 10), currentCategory));
+    });
+  }
+
+  // ---------- 详情 ----------
+  function openDetail(id) {
+    const modal = $("wsDetailModal");
+    if (!modal) return;
+    modal.classList.add("show");
+    const body = $("wsDetailBody");
+    const dlBtn = $("btnWsDownload");
+    body.innerHTML = `<div class="ws-loading">加载中…</div>`;
+    dlBtn.disabled = true;
+
+    fetch(`${FUNC_BASE}/get-workshop-item?id=${encodeURIComponent(id)}`, { headers: anonHeaders() })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.item) throw new Error(data.error || "加载失败");
+        const it = data.item;
+        const cat = CATEGORIES[it.category] || CATEGORIES.other;
+        body.innerHTML = `
+          <div style="font-size:34px">${cat.icon}</div>
+          <h3 style="margin:6px 0 2px">${escapeHtml(it.title)}</h3>
+          <div style="font-size:12px;color:#888;margin-bottom:8px">${cat.label.replace(/^[^\s]*\s/, "")} · ${fmtDate(it.created_at)} · 👤 ${escapeHtml((it.profiles && it.profiles.username) || "匿名")}</div>
+          <div style="font-size:13px;color:#555;white-space:pre-wrap;margin-bottom:10px">${escapeHtml(it.description || "（无描述）")}</div>
+          <div style="font-size:12px;color:#999">文件名：${escapeHtml(it.file_name)}（${fmtSize(it.file_size)}）· 下载 ${it.download_count || 0} 次</div>`;
+        dlBtn.disabled = false;
+        dlBtn.dataset.id = it.id;
+        dlBtn.dataset.path = data.download_url || "";
+      })
+      .catch((e) => {
+        body.innerHTML = `<div class="ws-empty">加载失败：${escapeHtml(e.message)}</div>`;
+      });
+  }
+
+  function closeDetail() {
+    const modal = $("wsDetailModal");
+    if (modal) modal.classList.remove("show");
+  }
+
+  function download() {
+    const btn = $("btnWsDownload");
+    const url = btn.dataset.path;
+    const id = btn.dataset.id;
+    if (!url) return;
+
+    // 先通知计数（不阻塞下载）
+    fetch(`${FUNC_BASE}/bump-download?id=${encodeURIComponent(id)}`, { method: "POST", headers: anonHeaders() }).catch(() => {});
+
+    // 触发浏览器下载
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  // ---------- 分类切换 ----------
+  function initCategoryTabs() {
+    const wrap = $("workshopCategories");
+    if (!wrap) return;
+    const keys = ["all", ...CATEGORY_KEYS];
+    wrap.innerHTML = keys.map((k) => {
+      const label = k === "all" ? "全部" : CATEGORIES[k].label;
+      return `<button class="ws-cat-btn ${k === currentCategory ? "active" : ""}" data-cat="${k}">${label}</button>`;
+    }).join("");
+    wrap.querySelectorAll(".ws-cat-btn").forEach((b) => {
+      b.addEventListener("click", () => {
+        wrap.querySelectorAll(".ws-cat-btn").forEach((x) => x.classList.remove("active"));
+        b.classList.add("active");
+        loadList(1, b.dataset.cat);
+      });
+    });
+  }
+
+  // ---------- 上传 ----------
+  function initUploadForm() {
+    const titleEl = $("workshopTitle");
+    const descEl = $("workshopDesc");
+    const fileEl = $("workshopFile");
+    const catEl = $("workshopCategory");
+    const btn = $("btnWorkshopUpload");
+
+    if (!catEl) return;
+    // 填充分类下拉
+    catEl.innerHTML = CATEGORY_KEYS.map((k) => `<option value="${k}">${CATEGORIES[k].label}</option>`).join("");
+
+    function refresh() {
+      const title = titleEl.value.trim();
+      const hasFile = fileEl.files && fileEl.files.length > 0;
+      const logged = window.K5AUTH.isLoggedIn();
+      btn.disabled = !(logged && title && hasFile);
+      if (!logged) {
+        btn.textContent = "🔒 登录后上传";
+      } else {
+        btn.textContent = "🚀 提交作品";
+      }
+    }
+
+    [titleEl, fileEl, catEl].forEach((el) => {
+      if (el) el.addEventListener("input", refresh);
+      if (el) el.addEventListener("change", refresh);
+    });
+    descEl.addEventListener("input", refresh);
+
+    // 未登录点击上传按钮 → 提示登录
+    btn.addEventListener("click", async () => {
+      if (!window.K5AUTH.isLoggedIn()) {
+        window.K5AUTH.openModal();
+        return;
+      }
+      await doUpload(titleEl, descEl, fileEl, catEl, btn);
+    });
+
+    // 登录状态变化时刷新按钮
+    window.K5AUTH.onAuth(() => refresh());
+    refresh();
+  }
+
+  async function doUpload(titleEl, descEl, fileEl, catEl, btn) {
+    const title = titleEl.value.trim();
+    const desc = descEl.value.trim();
+    const file = fileEl.files[0];
+    const cat = catEl.value;
+
+    if (file.size > 1.5 * 1024 * 1024) {
+      alert("文件超过 1.5MB 限制（Supabase Edge Function 免费额度 body 上限 2MB）");
+      return;
+    }
+
+    const token = await window.K5AUTH.getToken();
+    if (!token) { alert("登录状态已失效，请重新登录"); window.K5AUTH.openModal(); return; }
+
+    const form = new FormData();
+    form.append("title", title);
+    form.append("description", desc);
+    form.append("category", cat);
+    form.append("file", file);
+
+    btn.disabled = true;
+    const oldText = btn.textContent;
+    btn.textContent = "⏳ 上传中…";
+
+    try {
+      const resp = await fetch(`${FUNC_BASE}/upload-workshop`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          apikey: window.SUPABASE_PUBLISHABLE_KEY || "",
+        },
+        body: form,
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "HTTP " + resp.status);
+
+      // 清空表单
+      titleEl.value = ""; descEl.value = ""; fileEl.value = "";
+      log(`✅ 作品《${data.item.title}》上传成功`, "工坊");
+      alert("✅ 作品上传成功！");
+      loadList(1, "all");
+      // 切回全部分类
+      document.querySelectorAll(".ws-cat-btn").forEach((b) => {
+        b.classList.toggle("active", b.dataset.cat === "all");
+      });
+    } catch (e) {
+      log(`❌ 上传失败：${e.message}`, "工坊");
+      alert("上传失败：" + e.message);
+    } finally {
+      btn.textContent = oldText;
+      const logged = window.K5AUTH.isLoggedIn();
+      btn.disabled = !(logged && titleEl.value.trim() && fileEl.files.length > 0);
+    }
+  }
+
+  // ---------- 初始化 ----------
+  function init() {
+    initCategoryTabs();
+    initUploadForm();
+    loadList(1, "all");
+
+    const closeBtn = $("btnWsDetailClose");
+    if (closeBtn) closeBtn.addEventListener("click", closeDetail);
+    const dlBtn = $("btnWsDownload");
+    if (dlBtn) dlBtn.addEventListener("click", download);
+    const modal = $("wsDetailModal");
+    if (modal) modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeDetail();
+    });
+
+    // 进入工坊 tab 时刷新（首次 init 已加载；重复进入只刷新一次避免刷屏）
+    let loadedOnce = false;
+    const origSwitch = window.switchTab;
+    if (typeof origSwitch === "function") {
+      const orig = origSwitch;
+      window.switchTab = function (tabId) {
+        orig.apply(this, arguments);
+        if (tabId === "tabWorkshop" && !loadedOnce) {
+          loadedOnce = true;
+          // 延迟等待 DOM/布局就绪
+          setTimeout(() => loadList(currentPage, currentCategory), 50);
+        }
+      };
+    }
+  }
+
+  window.K5WORKSHOP = { init, loadList };
+})();
