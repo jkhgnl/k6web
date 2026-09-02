@@ -12,9 +12,10 @@
   const K5WEB_VERSION = "1.5.4";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
-  // GitHub Pages 模式：检测是否运行在无后端的静态托管环境
+  // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
   const IS_GITHUB_PAGES = !window.location.port || window.location.port === "443" || window.location.port === ""
-    || window.location.hostname.endsWith(".github.io");
+    || window.location.hostname.endsWith(".github.io")
+    || window.location.hostname === "jkhgnl.top";
   // Cloudflare Worker 代理地址：用于绕过 Gitee raw 文件的 CORS 限制，实现固件一键下载
   // 部署 cloudflare-worker.js 后，把你的 Worker URL 填到这里
   const WORKER_PROXY_URL = "https://cors.jkhgnl.top";
