@@ -16,6 +16,7 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="多普勒固件手台工具 - UV-K5/K6 刷写、星历、信道管理一站式在线操作 | K6Web">
 <meta name="twitter:description" content="UV-K5/K6 多普勒固件手台在线工具">
+<meta name="baidu-site-verification" content="codeva-tEmJDvIiJj" />
 <link rel="canonical" href="https://jkhgnl.top/">
 <script type="application/ld+json">
 {
@@ -691,6 +692,137 @@ s.parentNode.insertBefore(el, s);
   #cpUsernameStatus.ok { color: #1a7f37; }
   #cpError { font-size: 13px; color: #d93025; }
 
+  /* 评论区 */
+  .comments-section {
+    border-top: 1px solid #eef1f5;
+    margin-top: 14px;
+    padding-top: 12px;
+    text-align: left;
+  }
+  .comments-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 12px;
+  }
+  .comment-input-wrap {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .comment-input {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    resize: none;
+    min-height: 60px;
+    font-family: inherit;
+  }
+  .comment-input:focus {
+    outline: none;
+    border-color: #2f6fdc;
+  }
+  .comment-submit {
+    align-self: flex-end;
+    padding: 8px 16px;
+    background: #2f6fdc;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .comment-submit:disabled {
+    background: #c3cbd8;
+    cursor: not-allowed;
+  }
+  .comment-item {
+    padding: 10px 0;
+    border-bottom: 1px solid #f5f5f5;
+  }
+  .comment-item:last-child {
+    border-bottom: none;
+  }
+  .comment-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .comment-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .comment-avatar-txt {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #e0e7ff;
+    color: #2f6fdc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .comment-author {
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+  }
+  .comment-time {
+    font-size: 11px;
+    color: #999;
+  }
+  .comment-content {
+    font-size: 13px;
+    color: #555;
+    line-height: 1.5;
+    margin-bottom: 6px;
+    word-break: break-word;
+  }
+  .comment-actions {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+  }
+  .comment-action {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 12px;
+  }
+  .comment-action:hover {
+    color: #2f6fdc;
+  }
+  .comment-action.liked {
+    color: #e74c3c;
+  }
+  .comment-replies {
+    margin-left: 36px;
+    border-left: 2px solid #eef1f5;
+    padding-left: 12px;
+  }
+  .comment-empty {
+    font-size: 13px;
+    color: #999;
+    text-align: center;
+    padding: 12px 0;
+  }
+  .comment-loading {
+    font-size: 13px;
+    color: #888;
+    text-align: center;
+    padding: 12px 0;
+  }
+
   </style>
 </head>
 <body>
@@ -768,7 +900,10 @@ s.parentNode.insertBefore(el, s);
   <h1 class="page-title">多普勒固件手台工具</h1>
   <p class="hint" style="margin-bottom:18px">适用于 UV-K1 / UV-K5 V3 / UV-K6 V3（PY32F071）F4HWN 固件。选择下方功能开始使用。</p>
 
-  <a id="appDownloadBtn" href="https://gitee.com/jkhgnl/uvk6-tools-android/releases" target="_blank" rel="noopener" class="app-download-btn">📱 下载配套 APP（Android）</a>
+  <!-- 注意：href 指向当前最新 APK 的直接下载链接（手机浏览器无法跨域请求 Gitee API 时仍可一键下载）。
+       发布新版本后请同步更新这里（格式：.../releases/download/{tag}/uvk6tools-{tag}.apk），
+       app.js 会在 fetch 到最新 release 时自动更新为最新链接。 -->
+  <a id="appDownloadBtn" href="https://gitee.com/jkhgnl/uvk6-tools-android/releases/download/v1.4.21/uvk6tools-v1.4.21.apk" target="_blank" rel="noopener" class="app-download-btn">📱 下载配套 APP（Android）</a>
 
   <div class="tool-grid">
     <div class="tool-card" data-goto="tabWriteFreq">
@@ -835,6 +970,17 @@ s.parentNode.insertBefore(el, s);
       <span>请他喝咖啡</span>
     </button>
     <div class="coffee-hint">如果这个工具对你有帮助，欢迎支持一下作者</div>
+  </div>
+
+  <!-- 网站反馈区 -->
+  <div class="card" id="feedbackCard">
+    <h3 style="margin:0 0 4px;font-size:16px">💬 网站反馈</h3>
+    <p style="font-size:13px;color:#666;margin:0 0 12px">对网站有任何建议或问题？欢迎留言讨论</p>
+    <div class="comment-input-wrap">
+      <textarea id="feedbackCommentText" class="comment-input" placeholder="发表反馈..."></textarea>
+      <button id="feedbackCommentSubmit" class="comment-submit" disabled>🔒 登录后评论</button>
+    </div>
+    <div id="feedbackCommentList"></div>
   </div>
 </div>
 
@@ -1762,6 +1908,14 @@ s.parentNode.insertBefore(el, s);
 <div id="wsDetailModal" class="modal-overlay">
   <div class="modal-panel" style="max-width:440px">
     <div id="wsDetailBody" class="ws-detail-body"></div>
+    <div id="wsComments" class="comments-section" style="display:none">
+      <div class="comments-title">💬 评论</div>
+      <div class="comment-input-wrap">
+        <textarea id="wsCommentText" class="comment-input" placeholder="发表评论..."></textarea>
+        <button id="wsCommentSubmit" class="comment-submit" disabled>🔒 登录后评论</button>
+      </div>
+      <div id="wsCommentList"></div>
+    </div>
     <div class="ws-detail-actions">
       <button id="btnWsDetailClose" type="button" class="secondary">关闭</button>
       <button id="btnWsDownload" type="button" disabled>⬇️ 下载</button>
@@ -1776,6 +1930,7 @@ s.parentNode.insertBefore(el, s);
 </script>
 <script src="auth.js?v=1.8.0"></script>
 <script src="workshop.js?v=1.8.0"></script>
+<script src="comments.js?v=1.8.0"></script>
 <script src="vendor/satellite.min.js"></script>
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>
@@ -1846,6 +2001,18 @@ s.parentNode.insertBefore(el, s);
   if (window.K5AUTH) K5AUTH.init();
   // 初始化创意工坊
   if (window.K5WORKSHOP) K5WORKSHOP.init();
+  // 初始化首页反馈评论区
+  if (window.K5COMMENTS) {
+    const feedbackItemId = "site-feedback";
+    window.K5COMMENTS.init({
+      inputId: "feedbackCommentText",
+      submitBtnId: "feedbackCommentSubmit",
+      listContainerId: "feedbackCommentList",
+      itemId: feedbackItemId,
+      itemType: "feedback",
+    });
+    window.K5COMMENTS.load(feedbackItemId, "feedback", "feedbackCommentList");
+  }
 </script>
 </body>
 </html>
