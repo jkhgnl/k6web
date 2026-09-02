@@ -36,6 +36,8 @@
   let writer = null;
   let replyQueue = [];
   let passData = null; // findPass 结果
+  let selectedSlot = 0; // 当前选中的槽位 (0-3)
+  const slotNames = ["", "", "", ""]; // 缓存四个槽位的名称
 
   const log = (msg, cls) => {
     const line = (cls ? `[${cls}] ` : "") + msg;
@@ -1129,6 +1131,8 @@
       $("btnConnect").textContent = "连接";
       $("btnConnect").classList.remove("secondary");
       log("串口已断开");
+      // 断开时清空槽位显示
+      for (let i = 0; i < 4; i++) updateSlotCard(i, "");
       return;
     }
     if (!navigator.serial) {
@@ -1145,6 +1149,8 @@
       $("btnConnect").classList.add("secondary");
       setStatus("串口已连接 ✓", "ok");
       log("串口已连接");
+      // 自动读取四个槽位名称
+      readAllSlots();
     } catch (e) {
       setStatus("连接失败：" + e.message, "err");
     }
@@ -1161,7 +1167,7 @@
     bar.style.width = "0%";
     try {
       // 0. 目标槽位（0..3），每槽 16 KB / 最多 1020 条（约 17 分钟过境）
-      const slot = parseInt($("slotSelect").value, 10) - 1;
+      const slot = selectedSlot;
       if (passData.entries.length > 1020) {
         throw new Error(`过境 ${passData.durationS} 秒超过单槽上限 1020 秒（约 17 分钟），请更换过境窗口`);
       }
@@ -1224,6 +1230,8 @@
 
       setStatus(`✅ 星历已写入槽 ${slot + 1}，北京时间已同步！机内长按 0 进入多普勒模式，F+1~4 切换槽位`, "ok");
       log("全部完成");
+      // 刷新写入的槽位卡片
+      await readSlot(slot);
     } catch (err) {
       setStatus("写入失败：" + err.message, "err");
       log("写入异常：" + err.message, "err");
@@ -1246,6 +1254,9 @@
         log(`槽位 ${slot + 1} 删除完成`);
       }
       setStatus("✅ 1-4 槽位星历已全部删除", "ok");
+      // 刷新所有槽位卡片
+      for (let i = 0; i < 4; i++) updateSlotCard(i, "");
+      selectSlot(selectedSlot);
     } catch (err) {
       setStatus("删除失败：" + err.message, "err");
       log("删除异常：" + err.message, "err");
@@ -1254,72 +1265,114 @@
     }
   });
 
-  // ---------- 槽位名称编辑（读-改-写回卫星块，其他字段不变） ----------
-  let slotEditBlock = null; // 读取到的 32 字节卫星块缓存（写回时保持其他字段）
+  // ---------- 槽位卡片 UI ----------
+  let slotEditBlock = null; // 当前选中槽位的 32 字节卫星块缓存
 
-  // 切槽时丢弃缓存，防止把槽 A 的数据改名后误写到槽 B
-  $("slotEditSelect").addEventListener("change", () => {
-    slotEditBlock = null;
-    $("slotNameInput").value = "";
-    $("btnSlotRename").disabled = true;
-  });
+  // 更新单个槽位卡片显示
+  function updateSlotCard(idx, name) {
+    slotNames[idx] = name || "";
+    const nameEl = $("slotName" + idx);
+    const card = $("slotCard" + idx);
+    if (nameEl) {
+      nameEl.textContent = name || "空";
+      nameEl.classList.toggle("empty", !name);
+    }
+    if (card) card.classList.toggle("has-data", !!name);
+  }
 
-  $("btnSlotRead").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
-    const slot = parseInt($("slotEditSelect").value, 10) - 1;
-    const btn = $("btnSlotRead");
-    btn.disabled = true;
+  // 选中槽位卡片
+  function selectSlot(idx) {
+    selectedSlot = idx;
+    document.querySelectorAll(".ephem-slot").forEach((el, i) => {
+      el.classList.toggle("selected", i === idx);
+    });
+    // 同步名称输入框
+    $("slotNameInput").value = slotNames[idx] || "";
+    $("btnSlotRename").disabled = !port || !slotNames[idx];
+  }
+
+  // 读取单个槽位
+  async function readSlot(idx) {
+    if (!port) return;
     try {
-      const reply = await sendAndWaitRaw(proto.CMD.DOPPLER_READ_SAT, new Uint8Array([slot, 0]));
+      const reply = await sendAndWaitRaw(proto.CMD.DOPPLER_READ_SAT, new Uint8Array([idx, 0]));
       const dv = new DataView(reply.buffer, reply.byteOffset, reply.byteLength);
-      if (dv.getUint16(0, true) !== proto.CMD.REPLY_READ_SAT) throw new Error("回复 ID 不符");
+      if (dv.getUint16(0, true) !== proto.CMD.REPLY_READ_SAT) return;
       // payload: header(4) + status(1) + slot(1) + pad(2) + satellite(32)
-      if (reply[4] !== 0) throw new Error(`槽位 ${slot + 1} 无有效星历数据`);
-      slotEditBlock = reply.slice(8, 40);
+      if (reply[4] !== 0) { updateSlotCard(idx, ""); return; }
+      const block = reply.slice(8, 40);
       let name = "";
-      for (const b of slotEditBlock.subarray(4, 14)) {
+      for (const b of block.subarray(4, 14)) {
         if (b === 0) break;
         name += String.fromCharCode(b);
       }
-      $("slotNameInput").value = name;
-      $("btnSlotRename").disabled = false;
-      log(`槽位 ${slot + 1} 当前名称："${name}"`);
-      setStatus(`槽位 ${slot + 1} 已读取，可编辑名称`, "ok");
-    } catch (err) {
-      slotEditBlock = null;
-      $("slotNameInput").value = "";
-      $("btnSlotRename").disabled = true;
-      setStatus("读取失败：" + err.message, "err");
-      log("读取槽位异常：" + err.message, "err");
-    } finally {
-      btn.disabled = false;
+      updateSlotCard(idx, name);
+      // 如果是当前选中槽位，缓存块数据
+      if (idx === selectedSlot) slotEditBlock = block;
+    } catch (e) {
+      updateSlotCard(idx, "");
     }
+  }
+
+  // 连接后自动读取全部 4 个槽位
+  async function readAllSlots() {
+    if (!port) return;
+    log("正在读取全部槽位...");
+    for (let i = 0; i < 4; i++) {
+      await readSlot(i);
+    }
+    // 重新选中当前槽位以刷新缓存
+    selectSlot(selectedSlot);
+    log("槽位读取完成：" + slotNames.map((n, i) => `${i + 1}:${n || "空"}`).join("，"));
+  }
+
+  // 点击槽位卡片
+  document.querySelectorAll(".ephem-slot").forEach((el) => {
+    el.addEventListener("click", async () => {
+      const idx = parseInt(el.dataset.slot, 10);
+      selectSlot(idx);
+      // 如果已连接，读取该槽位详情
+      if (port) {
+        await readSlot(idx);
+        $("btnSlotRename").disabled = !slotNames[idx];
+      }
+    });
   });
 
+  // 初始化选中第一个槽位
+  selectSlot(0);
+
+  // 名称输入框变化时启用保存按钮
+  $("slotNameInput").addEventListener("input", () => {
+    $("btnSlotRename").disabled = !port || !$("slotNameInput").value.trim();
+  });
+
+  // 保存槽位名称
   $("btnSlotRename").addEventListener("click", async () => {
     if (!port) { setStatus("请先连接串口", "err"); return; }
-    if (!slotEditBlock) { setStatus("请先读取槽位", "err"); return; }
-    const slot = parseInt($("slotEditSelect").value, 10) - 1;
+    // 先读取当前选中槽位确保有最新数据
+    await readSlot(selectedSlot);
+    if (!slotEditBlock) { setStatus("请先点击槽位卡片读取数据", "err"); return; }
     const name = $("slotNameInput").value.trim();
     if (!name) { setStatus("名称不能为空", "err"); return; }
     const btn = $("btnSlotRename");
     btn.disabled = true;
     try {
-      const block = new Uint8Array(slotEditBlock); // 副本，改完才写回
-      // name 字段：偏移 4..13，最多 9 字符 + '\0'（name[9] 必须为 0，见 doppler.h 有效性校验）
+      const block = new Uint8Array(slotEditBlock);
       block.fill(0, 4, 14);
       const nb = new TextEncoder().encode(name.slice(0, 9));
       block.set(nb, 4);
-      block[30] = proto.crc8(block.subarray(0, 30)); // 重算 CRC8
+      block[30] = proto.crc8(block.subarray(0, 30));
       block[31] = 0;
-      const payload = new Uint8Array(34); // 卫星块 32B + slot + pad（与写入星历的 satPayload 布局一致）
+      const payload = new Uint8Array(34);
       payload.set(block, 0);
-      payload[32] = slot;
+      payload[32] = selectedSlot;
       const r = await sendCommand(proto.CMD.DOPPLER_WRITE_SAT, payload);
       if (r.status !== 0) throw new Error("写回失败 status=" + r.status);
       slotEditBlock = block;
-      setStatus(`✅ 槽位 ${slot + 1} 名称已改为"${name.slice(0, 9)}"，机内 F+${slot + 1} 重新选中即可看到`, "ok");
-      log(`槽位 ${slot + 1} 名称已更新为"${name.slice(0, 9)}"`);
+      updateSlotCard(selectedSlot, name.slice(0, 9));
+      setStatus(`✅ 槽位 ${selectedSlot + 1} 名称已改为"${name.slice(0, 9)}"，机内 F+${selectedSlot + 1} 重新选中即可看到`, "ok");
+      log(`槽位 ${selectedSlot + 1} 名称已更新为"${name.slice(0, 9)}"`);
     } catch (err) {
       setStatus("保存失败：" + err.message, "err");
       log("保存名称异常：" + err.message, "err");
