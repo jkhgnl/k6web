@@ -1316,9 +1316,12 @@ s.parentNode.insertBefore(el, s);
     </div>
     <div class="auth-oauth-row">
       <button type="button" id="btnAuthGithub" class="secondary">🐙 GitHub</button>
-      <button type="button" id="btnAuthGoogle" class="secondary">🔵 Google</button>
     </div>
     <div class="auth-divider">或使用邮箱</div>
+    <div id="authUsernameRow" style="display:none">
+      <label for="authUsername">用户名</label>
+      <input id="authUsername" type="text" placeholder="用户名（2-20 字符，字母/数字/下划线）" maxlength="20" autocomplete="username">
+    </div>
     <label for="authEmail">邮箱</label>
     <input id="authEmail" type="email" placeholder="邮箱">
     <label for="authPassword">密码</label>
@@ -1359,7 +1362,7 @@ s.parentNode.insertBefore(el, s);
 <script src="coord.js"></script>
 <script src="calc.js"></script>
 <script src="freqdb.js"></script>
-<script src="app.js?v=geo2"></script>
+<script src="app.js?v=geo3"></script>
 <script>
   // 侧边栏展开/折叠
   document.querySelectorAll('.nav-title').forEach(title => {

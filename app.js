@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.6.3";
+  const K5WEB_VERSION = "1.6.4";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -675,38 +675,51 @@
       }
       log("高德地理编码无结果：" + (d.info || ""));
     } catch (e) { log("高德搜索失败：" + e.message); }
-    // 回退 OSM Photon
+    // 回退 OSM Photon（带 3s 超时，避免拖慢）
     try {
-      const url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(q) + "&limit=5&lang=zh";
-      const resp = await fetch(url);
-      const d = await resp.json();
-      if (d.features && d.features.length) {
-        return d.features.map(f => {
-          const [lng, lat] = f.geometry.coordinates;
-          const name = [f.properties.name, f.properties.city, f.properties.country].filter(Boolean).join(", ");
-          return { lat, lng, name, _wgs: true };
-        });
-      }
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3000);
+      try {
+        const url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(q) + "&limit=5&lang=zh";
+        const resp = await fetch(url, { signal: ctrl.signal });
+        const d = await resp.json();
+        if (d.features && d.features.length) {
+          return d.features.map(f => {
+            const [lng, lat] = f.geometry.coordinates;
+            const name = [f.properties.name, f.properties.city, f.properties.country].filter(Boolean).join(", ");
+            return { lat, lng, name, _wgs: true };
+          });
+        }
+      } finally { clearTimeout(timer); }
     } catch (e) { log("OSM 搜索失败：" + e.message); }
     return [];
   }
 
-  // 输入提示：边输入边模糊匹配
-  async function getAddressTips(kw) {
+  // 输入提示：边输入边模糊匹配（带超时 + 只接受最新一次请求的响应）
+  let tipSeq = 0;
+  async function getAddressTips(kw, seq) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
     try {
-      const resp = await fetch(GEO_WORKER_URL + "/tips?keywords=" + encodeURIComponent(kw));
+      const resp = await fetch(GEO_WORKER_URL + "/tips?keywords=" + encodeURIComponent(kw), { signal: ctrl.signal });
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       const d = await resp.json();
+      if (seq !== tipSeq) return; // 过期响应丢弃，避免旧结果覆盖新输入
       if (d.status === "1" && d.tips && d.tips.length) {
-        return d.tips
+        showTipList(d.tips
           .filter(t => t.location) // 只有带坐标的才可定位
           .map(t => {
             const [lng, lat] = t.location.split(",").map(Number);
             return { lat, lng, name: t.name || "", addr: t.district || "" };
-          });
+          }));
+      } else {
+        showTipList([]);
       }
-    } catch (e) { log("输入提示失败：" + e.message); }
-    return [];
+    } catch (e) {
+      if (seq === tipSeq) showTipList([]); // 超时/失败则隐藏，不卡住
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   // 下拉提示渲染
@@ -773,10 +786,8 @@
     const kw = e.target.value.trim();
     clearTimeout(tipTimer);
     if (kw.length < 2) { hideTipList(); return; }
-    tipTimer = setTimeout(async () => {
-      const items = await getAddressTips(kw);
-      showTipList(items);
-    }, 250);
+    const seq = ++tipSeq;
+    tipTimer = setTimeout(() => { getAddressTips(kw, seq); }, 120);
   });
   document.addEventListener("click", (e) => {
     if (!e.target.closest("#mapTipWrap")) hideTipList();
