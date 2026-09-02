@@ -422,28 +422,137 @@ s.parentNode.insertBefore(el, s);
   #authError:not(.err) { color: #1a7f37; min-height: 18px; }
 
   /* ===== 创意工坊 ===== */
-  .ws-categories { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-  .ws-cat-btn { padding: 6px 14px; font-size: 13px; border: 1px solid #ccc; border-radius: 20px; background: #fff; cursor: pointer; color: #555; transition: .15s; }
-  .ws-cat-btn:hover { border-color: #2f6fdc; color: #2f6fdc; }
-  .ws-cat-btn.active { background: #2f6fdc; color: #fff; border-color: #2f6fdc; }
-  .ws-loading { text-align: center; padding: 40px; color: #888; font-size: 14px; }
-  .ws-empty { text-align: center; padding: 40px; color: #999; font-size: 14px; }
-  .ws-item { cursor: pointer; }
-  .ws-item-icon { font-size: 28px; margin-bottom: 4px; }
-  .ws-item-cat { font-size: 11px; color: #888; margin-bottom: 2px; }
-  .ws-item-title { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ws-item-desc { font-size: 12px; color: #888; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px; }
-  .ws-item-meta { display: flex; gap: 10px; font-size: 11px; color: #999; align-items: center; flex-wrap: wrap; }
-  .ws-item-date { font-size: 11px; color: #aaa; margin-top: 2px; }
+  .ws-browse-card { padding-bottom: 8px; }
+  .ws-browse-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .ws-browse-head h2 { margin-bottom: 4px; }
+
+  /* 分类胶囊 */
+  .ws-categories { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 16px; }
+  .ws-cat-btn {
+    padding: 7px 16px; font-size: 13px; font-weight: 500;
+    border: 1px solid #e3e8ef; border-radius: 999px; background: #f8fafc;
+    cursor: pointer; color: #5b6472; transition: all .18s ease; user-select: none;
+  }
+  .ws-cat-btn:hover { border-color: #2f6fdc; color: #2f6fdc; background: #eef4ff; transform: translateY(-1px); }
+  .ws-cat-btn.active {
+    background: linear-gradient(135deg, #2f6fdc, #5b8def); color: #fff;
+    border-color: transparent; box-shadow: 0 3px 10px rgba(47, 111, 220, .28);
+  }
+
+  /* 加载 / 空态 */
+  .ws-loading { text-align: center; padding: 48px 20px; color: #8892a0; font-size: 14px; }
+  .ws-loading::before {
+    content: ""; display: block; width: 26px; height: 26px; margin: 0 auto 12px;
+    border: 3px solid #e3e8ef; border-top-color: #2f6fdc; border-radius: 50%;
+    animation: ws-spin .8s linear infinite;
+  }
+  @keyframes ws-spin { to { transform: rotate(360deg); } }
+  .ws-empty { text-align: center; padding: 48px 20px; color: #97a0ad; font-size: 14px; }
+
+  /* 作品卡片 */
+  .ws-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)); gap: 16px; }
+  .ws-item {
+    cursor: pointer; border: 1px solid #eef1f5; border-radius: 14px; padding: 16px;
+    background: #fff; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    display: flex; flex-direction: column; position: relative; overflow: hidden;
+  }
+  .ws-item::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+    background: linear-gradient(90deg, #2f6fdc, #7aa5f0, #2f6fdc); opacity: 0; transition: opacity .2s;
+  }
+  .ws-item:hover { transform: translateY(-4px); box-shadow: 0 10px 26px rgba(31, 45, 80, .12); border-color: #dbe4f5; }
+  .ws-item:hover::before { opacity: 1; }
+  .ws-item-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .ws-item-icon {
+    width: 44px; height: 44px; border-radius: 12px; display: inline-flex;
+    align-items: center; justify-content: center; font-size: 22px;
+    background: linear-gradient(135deg, #eef4ff, #e6ecf9); flex-shrink: 0;
+  }
+  .ws-item-cat { font-size: 11px; color: #8892a0; background: #f4f6fa; padding: 2px 9px; border-radius: 999px; }
+  .ws-item-title { font-size: 15px; font-weight: 600; color: #1c2433; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ws-item-desc { font-size: 12px; color: #7c8594; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; flex: 1; }
+  .ws-item-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #eef1f5; }
+  .ws-item-meta { display: flex; gap: 12px; font-size: 11px; color: #97a0ad; align-items: center; flex-wrap: wrap; }
+  .ws-item-meta span { display: inline-flex; align-items: center; gap: 3px; }
+  .ws-item-date { font-size: 11px; color: #b0b8c4; }
   .ws-author { display: inline-flex; align-items: center; gap: 4px; }
-  .ws-author-avatar { width: 16px; height: 16px; border-radius: 50%; object-fit: cover; vertical-align: middle; flex-shrink: 0; }
-  .ws-author-txt { display: inline-flex; align-items: center; justify-content: center; background: #c3d4f3; color: #2f6fdc; font-size: 9px; font-weight: 600; width: 16px; height: 16px; border-radius: 50%; }
+  .ws-author-avatar { width: 17px; height: 17px; border-radius: 50%; object-fit: cover; vertical-align: middle; flex-shrink: 0; }
+  .ws-author-txt { display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #2f6fdc, #5b8def); color: #fff; font-size: 9px; font-weight: 600; width: 17px; height: 17px; border-radius: 50%; }
   .ws-avatar-wrap { display: inline-flex; }
-  #workshopPagination { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; }
-  .ws-page-btn { padding: 6px 14px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; color: #555; }
+
+  /* 分页 */
+  #workshopPagination { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 18px; }
+  .ws-page-btn {
+    padding: 7px 16px; font-size: 13px; border: 1px solid #e3e8ef; border-radius: 999px;
+    background: #f8fafc; cursor: pointer; color: #5b6472; transition: all .15s ease;
+  }
+  .ws-page-btn:not(:disabled):hover { border-color: #2f6fdc; color: #2f6fdc; background: #eef4ff; }
   .ws-page-btn:disabled { opacity: .4; cursor: not-allowed; }
-  .ws-page-info { font-size: 13px; color: #888; }
-  #workshopStatus { font-size: 13px; color: #888; text-align: center; margin-top: 8px; }
+  .ws-page-info { font-size: 13px; color: #8892a0; }
+  #workshopStatus { font-size: 12px; color: #a3aab6; text-align: center; margin-top: 10px; }
+
+  /* ===== 上传区 ===== */
+  .ws-upload-card { margin-top: 20px; }
+  .ws-upload-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .ws-upload-head h2 { margin-bottom: 2px; }
+  .ws-upload-icon {
+    width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 24px;
+    background: linear-gradient(135deg, #eef4ff, #e3ecff);
+  }
+  .ws-upload-form { display: flex; flex-direction: column; gap: 16px; margin-top: 14px; }
+  .ws-form-row { display: flex; flex-direction: column; gap: 6px; }
+  .ws-form-row label { font-size: 13px; font-weight: 600; color: #3d4655; }
+  .ws-form-row input[type="text"], .ws-form-row textarea {
+    border: 1px solid #e3e8ef; border-radius: 10px; padding: 10px 12px;
+    font-size: 14px; font-family: inherit; color: #1c2433;
+    transition: border-color .15s ease, box-shadow .15s ease; background: #fbfcfe;
+  }
+  .ws-form-row input[type="text"]:focus, .ws-form-row textarea:focus {
+    outline: none; border-color: #2f6fdc; box-shadow: 0 0 0 3px rgba(47, 111, 220, .14); background: #fff;
+  }
+  .ws-form-row textarea { min-height: 84px; resize: vertical; }
+
+  /* 分类按钮组 */
+  .ws-cat-select { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+  .ws-cat-select .ws-cat-btn { justify-content: center; }
+
+  /* 拖拽上传 */
+  .ws-dropzone {
+    border: 2px dashed #cdd6e3; border-radius: 14px; padding: 26px 16px;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    cursor: pointer; background: #fafbfe; transition: all .18s ease;
+  }
+  .ws-dropzone:hover, .ws-dropzone.dragover { border-color: #2f6fdc; background: #eef4ff; }
+  .ws-dropzone-inner { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .ws-dz-icon { font-size: 30px; }
+  .ws-dz-text { font-size: 14px; font-weight: 500; color: #4b5565; }
+  .ws-dz-sub { font-size: 12px; color: #9aa3b0; }
+
+  /* 已选文件卡片 */
+  .ws-file-info {
+    display: flex; align-items: center; gap: 10px; margin-top: 8px;
+    border: 1px solid #d9e6fb; background: #f2f7ff; border-radius: 12px; padding: 10px 12px;
+  }
+  .ws-file-icon { font-size: 20px; }
+  .ws-file-meta { flex: 1; min-width: 0; }
+  .ws-file-name { font-size: 13px; font-weight: 600; color: #1c5bbf; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ws-file-size { font-size: 12px; color: #7c9bd6; }
+  .ws-file-remove {
+    border: none; background: #e3ecff; color: #2f6fdc; width: 24px; height: 24px;
+    border-radius: 50%; cursor: pointer; font-size: 12px; line-height: 1; transition: all .15s;
+  }
+  .ws-file-remove:hover { background: #d93025; color: #fff; }
+
+  /* 上传按钮 */
+  .ws-upload-btn {
+    border: none; border-radius: 12px; padding: 13px 20px; font-size: 15px; font-weight: 600;
+    color: #fff; cursor: pointer; transition: all .18s ease;
+    background: linear-gradient(135deg, #2f6fdc, #5b8def);
+    box-shadow: 0 4px 14px rgba(47, 111, 220, .28);
+  }
+  .ws-upload-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(47, 111, 220, .34); }
+  .ws-upload-btn:disabled { background: #c3cbd8; box-shadow: none; cursor: not-allowed; color: #f4f6fa; }
 
   /* 工坊详情弹窗 */
   .ws-detail-body { text-align: center; padding: 8px 0; }
@@ -969,28 +1078,61 @@ s.parentNode.insertBefore(el, s);
 <div id="tabWorkshop" class="tabpanel">
   <h2 class="page-title">创意工坊</h2>
 
-  <div class="card">
-    <h2>社区创意内容</h2>
-    <p class="hint">浏览用户分享的射频频段配置、信道模板、功能扩展和创意方案。上传自己的作品或下载他人分享的内容。</p>
+  <div class="card ws-browse-card">
+    <div class="ws-browse-head">
+      <div>
+        <h2>社区创意内容</h2>
+        <p class="hint">浏览用户分享的射频频段配置、信道模板、功能扩展和创意方案。上传自己的作品或下载他人分享的内容。</p>
+      </div>
+    </div>
     <div class="ws-categories" id="workshopCategories"></div>
-    <div id="workshopGrid" class="tool-grid"></div>
+    <div id="workshopGrid" class="ws-grid"></div>
     <div id="workshopPagination"></div>
     <div id="workshopStatus"></div>
   </div>
 
-  <div class="card">
-    <h2>上传你的作品</h2>
-    <p class="hint">分享你的信道模板、配置方案或脚本扩展。支持 .bin / .csv / .txt / .json / .py / .zip 等格式，<b>文件 ≤ 1.5MB</b>。</p>
-    <label>作品标题</label>
-    <input id="workshopTitle" type="text" maxlength="60" placeholder="给你的作品起个名字">
-    <label>作品描述</label>
-    <textarea id="workshopDesc" maxlength="1000" placeholder="简单描述作品内容、适用场景和使用方法"></textarea>
-    <label>分类</label>
-    <select id="workshopCategory"></select>
-    <label>选择文件</label>
-    <input id="workshopFile" type="file">
-    <div class="row" style="margin-top:8px">
-      <button id="btnWorkshopUpload" disabled>🔒 登录后上传</button>
+  <div class="card ws-upload-card">
+    <div class="ws-upload-head">
+      <span class="ws-upload-icon">📤</span>
+      <div>
+        <h2>上传你的作品</h2>
+        <p class="hint">分享你的信道模板、配置方案或脚本扩展。支持 .bin / .csv / .txt / .json / .py / .zip 等格式，<b>文件 ≤ 1.5MB</b>。</p>
+      </div>
+    </div>
+
+    <div class="ws-upload-form">
+      <div class="ws-form-row">
+        <label for="workshopTitle">作品标题</label>
+        <input id="workshopTitle" type="text" maxlength="60" placeholder="给你的作品起个名字">
+      </div>
+      <div class="ws-form-row">
+        <label for="workshopDesc">作品描述</label>
+        <textarea id="workshopDesc" maxlength="1000" placeholder="简单描述作品内容、适用场景和使用方法"></textarea>
+      </div>
+      <div class="ws-form-row">
+        <label>分类</label>
+        <div class="ws-cat-select" id="workshopCategoryBtns"></div>
+      </div>
+      <div class="ws-form-row">
+        <label>选择文件</label>
+        <div class="ws-dropzone" id="wsDropzone" tabindex="0">
+          <input id="workshopFile" type="file" hidden>
+          <div class="ws-dropzone-inner">
+            <span class="ws-dz-icon">📁</span>
+            <span class="ws-dz-text">点击选择或拖拽文件到这里</span>
+            <span class="ws-dz-sub">.bin / .csv / .txt / .json / .py / .zip · ≤ 1.5MB</span>
+          </div>
+        </div>
+        <div class="ws-file-info" id="wsFileInfo" hidden>
+          <span class="ws-file-icon">📎</span>
+          <div class="ws-file-meta">
+            <div class="ws-file-name" id="wsFileName"></div>
+            <div class="ws-file-size" id="wsFileSize"></div>
+          </div>
+          <button type="button" class="ws-file-remove" id="wsFileRemove" title="移除文件">✕</button>
+        </div>
+      </div>
+      <button id="btnWorkshopUpload" class="ws-upload-btn" disabled>🔒 登录后上传</button>
     </div>
   </div>
 </div>
@@ -1433,8 +1575,8 @@ s.parentNode.insertBefore(el, s);
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
 </script>
-<script src="auth.js?v=1.6.8"></script>
-<script src="workshop.js?v=1.6.8"></script>
+<script src="auth.js?v=1.6.9"></script>
+<script src="workshop.js?v=1.6.9"></script>
 <script src="vendor/satellite.min.js"></script>
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>
