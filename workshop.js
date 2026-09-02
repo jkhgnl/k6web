@@ -102,10 +102,13 @@
       grid.innerHTML = items.map((it) => {
         const cat = CATEGORIES[it.category] || CATEGORIES.other;
         const authorName = (it.profiles && it.profiles.username) || "匿名";
+        const thumbHtml = it.thumbnail_url
+          ? `<img class="ws-item-thumb" src="${escapeHtml(it.thumbnail_url)}" alt="" loading="lazy">`
+          : `<div class="ws-item-nothumb">${cat.icon}</div>`;
         return `
           <div class="ws-item" data-id="${it.id}" title="${escapeHtml(it.title)}">
+            ${thumbHtml}
             <div class="ws-item-top">
-              <span class="ws-item-icon">${cat.icon}</span>
               <span class="ws-item-cat">${cat.label.replace(/^[^\s]*\s/, "")}</span>
             </div>
             <div class="ws-item-title">${escapeHtml(it.title)}</div>
@@ -166,7 +169,11 @@
         if (!data.item) throw new Error(data.error || "加载失败");
         const it = data.item;
         const cat = CATEGORIES[it.category] || CATEGORIES.other;
+        const thumbHtml = it.thumbnail_url
+          ? `<img class="ws-detail-thumb" src="${escapeHtml(it.thumbnail_url)}" alt="">`
+          : "";
         body.innerHTML = `
+          ${thumbHtml}
           <div style="font-size:34px">${cat.icon}</div>
           <h3 style="margin:6px 0 2px">${escapeHtml(it.title)}</h3>
           <div style="font-size:12px;color:#888;margin-bottom:8px">${cat.label.replace(/^[^\s]*\s/, "")} · ${fmtDate(it.created_at)} · ${authorHtml(it.profiles)}</div>
@@ -244,9 +251,29 @@
     const fileNameEl = $("wsFileName");
     const fileSizeEl = $("wsFileSize");
     const fileRemove = $("wsFileRemove");
+    const thumbEl = $("workshopThumb");
+    const thumbBtn = $("wsThumbBtn");
+    const thumbPreview = $("wsThumbPreview");
     let selectedCat = "theme";
+    let selectedThumb = null;
 
     if (!catWrap || !btn) return;
+
+    // 缩略图选择
+    if (thumbBtn && thumbEl) {
+      thumbBtn.addEventListener("click", () => thumbEl.click());
+      thumbEl.addEventListener("change", () => {
+        const f = thumbEl.files[0];
+        if (!f) { selectedThumb = null; thumbPreview.innerHTML = "🖼️"; return; }
+        if (f.size > 500 * 1024) { alert("展示图不能超过 500KB"); thumbEl.value = ""; return; }
+        if (!/\.(jpe?g|png|gif|webp)$/i.test(f.name)) { alert("仅支持 jpg/png/gif/webp"); thumbEl.value = ""; return; }
+        selectedThumb = f;
+        const reader = new FileReader();
+        reader.onload = () => { thumbPreview.innerHTML = `<img src="${reader.result}" alt="预览">`; };
+        reader.readAsDataURL(f);
+        refresh();
+      });
+    }
 
     // 分类按钮组（替代原下拉框）
     catWrap.innerHTML = CATEGORY_KEYS.map((k) =>
@@ -305,10 +332,13 @@
     function refresh() {
       const title = titleEl.value.trim();
       const hasFile = fileEl.files && fileEl.files.length > 0;
+      const hasThumb = selectedThumb != null;
       const logged = window.K5AUTH.isLoggedIn();
-      btn.disabled = !(logged && title && hasFile);
+      btn.disabled = !(logged && title && hasFile && hasThumb);
       if (!logged) {
         btn.textContent = "🔒 登录后上传";
+      } else if (!hasThumb) {
+        btn.textContent = "请上传效果展示图";
       } else if (title && hasFile) {
         btn.textContent = "🚀 提交作品";
       } else {
@@ -341,6 +371,11 @@
     const files = fileEl.files;
     if (!files || files.length === 0) return;
 
+    // 获取缩略图
+    const thumbEl = $("workshopThumb");
+    const thumbFile = thumbEl && thumbEl.files[0];
+    if (!thumbFile) { alert("请上传效果展示图"); return; }
+
     // 检查单个文件大小
     for (const f of files) {
       if (f.size > 1.5 * 1024 * 1024) {
@@ -368,6 +403,7 @@
         form.append("description", desc);
         form.append("category", cat);
         form.append("file", f);
+        form.append("thumbnail", thumbFile);
 
         const resp = await fetch(`${FUNC_BASE}/upload-workshop`, {
           method: "POST",
@@ -391,6 +427,9 @@
     titleEl.value = ""; descEl.value = ""; fileEl.value = "";
     const fileInfo = $("wsFileInfo");
     if (fileInfo) fileInfo.hidden = true;
+    if (thumbEl) { thumbEl.value = ""; }
+    const thumbPreview = $("wsThumbPreview");
+    if (thumbPreview) thumbPreview.innerHTML = "🖼️";
 
     if (total === 1) {
       alert(successCount > 0 ? "✅ 作品上传成功！" : "上传失败");

@@ -596,6 +596,16 @@ s.parentNode.insertBefore(el, s);
   .ws-item-meta { display: flex; gap: 12px; font-size: 11px; color: #97a0ad; align-items: center; flex-wrap: wrap; }
   .ws-item-meta span { display: inline-flex; align-items: center; gap: 3px; }
   .ws-item-date { font-size: 11px; color: #b0b8c4; }
+  .ws-item-thumb { width: 100%; aspect-ratio: 16/10; object-fit: cover; border-radius: 10px; margin-bottom: 10px; background: #f4f6fa; }
+  .ws-item-nothumb { width: 100%; aspect-ratio: 16/10; border-radius: 10px; margin-bottom: 10px; background: linear-gradient(135deg, #eef4ff, #e6ecf9); display: flex; align-items: center; justify-content: center; font-size: 32px; }
+  .ws-detail-thumb { width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; }
+  .ws-thumb-picker { display: flex; align-items: center; gap: 12px; }
+  .ws-thumb-preview { width: 100px; height: 64px; border-radius: 8px; object-fit: cover; border: 2px dashed #cdd6e3; background: #f8fafc; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #a3aab6; }
+  .ws-thumb-preview img { border: none; }
+  .ws-thumb-btn { padding: 8px 14px; font-size: 13px; border: 1px solid #e3e8ef; border-radius: 8px; background: #fff; cursor: pointer; color: #5b6472; transition: all .15s; white-space: nowrap; }
+  .ws-thumb-btn:hover { border-color: #2f6fdc; color: #2f6fdc; background: #eef4ff; }
+  .ws-thumb-hint { font-size: 12px; color: #a3aab6; margin-top: 4px; }
+  .ws-thumb-required { color: #c62828; font-weight: 600; }
   .ws-author { display: inline-flex; align-items: center; gap: 4px; }
   .ws-author-avatar { width: 17px; height: 17px; border-radius: 50%; object-fit: cover; vertical-align: middle; flex-shrink: 0; }
   .ws-author-txt { display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #2f6fdc, #5b8def); color: #fff; font-size: 9px; font-weight: 600; width: 17px; height: 17px; border-radius: 50%; }
@@ -1577,6 +1587,17 @@ s.parentNode.insertBefore(el, s);
           <button type="button" class="ws-file-remove" id="wsFileRemove" title="移除文件">✕</button>
         </div>
       </div>
+      <div class="ws-form-row">
+        <label>效果展示图 <span class="ws-thumb-required">*</span></label>
+        <div class="ws-thumb-picker">
+          <div class="ws-thumb-preview" id="wsThumbPreview">🖼️</div>
+          <div>
+            <button type="button" class="ws-thumb-btn" id="wsThumbBtn">选择图片</button>
+            <input id="workshopThumb" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
+            <div class="ws-thumb-hint">jpg / png / gif / webp · ≤ 500KB</div>
+          </div>
+        </div>
+      </div>
       <button id="btnWorkshopUpload" class="ws-upload-btn" disabled>🔒 登录后上传</button>
     </div>
   </div>
@@ -1971,7 +1992,7 @@ s.parentNode.insertBefore(el, s);
     <div class="auth-divider">或使用邮箱</div>
     <div class="auth-field" id="authUsernameRow" style="display:none">
       <span class="auth-field-icon">🙋</span>
-      <input id="authUsername" type="text" placeholder="用户名（2-20 字符，字母/数字/下划线）" maxlength="20" autocomplete="username">
+      <input id="authUsername" type="text" placeholder="用户名（2-20 字符，中文/字母/数字/下划线）" maxlength="20" autocomplete="username">
     </div>
     <div class="auth-field" id="authEmailRow">
       <span class="auth-field-icon">✉️</span>

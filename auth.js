@@ -248,7 +248,7 @@
   }
 
   function isValidUsername(s) {
-    return /^[a-zA-Z0-9_]{2,20}$/.test(s);
+    return /^[\w\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]{2,20}$/.test(s);
   }
 
   function isValidEmail(s) {
@@ -267,7 +267,7 @@
     if (!isValidEmail(email)) { setAuthError("请输入有效的邮箱地址"); return; }
     const mode = getMode();
     if (mode === "register") {
-      if (!isValidUsername(username)) { setAuthError("用户名需 2-20 字符，仅字母/数字/下划线"); return; }
+      if (!isValidUsername(username)) { setAuthError("用户名需 2-20 字符，支持中文/字母/数字/下划线"); return; }
       if (pass.length < 6) { setAuthError("密码至少 6 位"); return; }
       if (!confirmPass) { setAuthError("请再次输入确认密码"); return; }
       if (pass !== confirmPass) { setAuthError("两次输入的密码不一致"); return; }
@@ -363,7 +363,7 @@
     const username = (uEl?.value || "").trim();
     const email = (eEl?.value || "").trim();
     if (!isValidUsername(username)) {
-      if (err) err.textContent = "用户名需 2-20 字符，仅字母/数字/下划线";
+      if (err) err.textContent = "用户名需 2-20 字符，支持中文/字母/数字/下划线";
       return;
     }
     const token = await getToken();
