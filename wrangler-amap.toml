@@ -1,0 +1,7 @@
+name = "k6web-amap-geocode"
+main = "amap-geocode-worker.js"
+compatibility_date = "2024-01-01"
+
+routes = [
+  { pattern = "geo.jkhgnl.top", custom_domain = true }
+]

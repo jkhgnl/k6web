@@ -684,7 +684,7 @@
         return d.features.map(f => {
           const [lng, lat] = f.geometry.coordinates;
           const name = [f.properties.name, f.properties.city, f.properties.country].filter(Boolean).join(", ");
-          return { lat, lng, name };
+          return { lat, lng, name, _wgs: true };
         });
       }
     } catch (e) { log("OSM 搜索失败：" + e.message); }
