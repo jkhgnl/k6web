@@ -357,7 +357,40 @@ s.parentNode.insertBefore(el, s);
     display: inline-flex !important; align-items: center; justify-content: center;
     background: #2f6fdc; color: #fff; font-size: 13px; font-weight: 600;
   }
-  #userBadge { display: none; align-items: center; gap: 6px; cursor: default; }
+  #userBadge { display: none; align-items: center; gap: 6px; cursor: default; position: relative; }
+  #userBadge::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 10px; }
+  .user-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 190px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+    padding: 6px;
+    z-index: 1000;
+  }
+  #userBadge:hover .user-dropdown { display: block; }
+  .user-dropdown-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-bottom: 1px solid #f0f0f0; margin-bottom: 4px;
+  }
+  .user-dropdown-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    object-fit: cover; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #2f6fdc; color: #fff; font-size: 16px; font-weight: 600;
+  }
+  .user-dropdown-name { font-size: 14px; font-weight: 600; color: #222; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+  .user-dropdown-email { font-size: 11px; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+  .user-dropdown-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 10px; border-radius: 6px;
+    font-size: 13px; color: #333; cursor: pointer;
+  }
+  .user-dropdown-item:hover { background: #f3f6fb; color: #2f6fdc; }
   .user-avatar-btn { cursor: pointer; position: relative; transition: opacity .15s; }
   .user-avatar-btn:hover { opacity: .8; }
   #avatarInput { display: none; }
@@ -404,6 +437,12 @@ s.parentNode.insertBefore(el, s);
   .ws-detail-body { text-align: center; padding: 8px 0; }
   .ws-detail-body h3 { margin: 6px 0 2px; font-size: 18px; }
   .ws-detail-actions { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+
+  .profile-body { text-align: center; padding: 8px 0; }
+  .profile-body .user-dropdown-avatar { width: 64px; height: 64px; font-size: 28px; margin: 0 auto 10px; }
+  .profile-body .user-dropdown-name { font-size: 16px; max-width: none; }
+  .profile-body .user-dropdown-email { font-size: 13px; max-width: none; margin-top: 4px; }
+  .profile-body .profile-joined { font-size: 12px; color: #bbb; margin-top: 6px; }
 
   /* 移动端顶部栏挤不下时隐藏问题反馈链接 */
   @media (max-width: 768px) {
@@ -1341,6 +1380,17 @@ s.parentNode.insertBefore(el, s);
       <button id="btnAuthSubmit" type="button">登录</button>
     </div>
     <p class="gps-qr-tip">邮箱注册需验证邮件。第三方登录授权后自动创建账号。</p>
+  </div>
+</div>
+
+<!-- 个人中心弹窗 -->
+<div id="profileModal" class="modal-overlay">
+  <div class="modal-panel" style="max-width:380px">
+    <h3>个人中心</h3>
+    <div id="profileBody" class="profile-body"></div>
+    <div class="ws-detail-actions">
+      <button id="btnProfileClose" type="button" class="secondary">关闭</button>
+    </div>
   </div>
 </div>
 

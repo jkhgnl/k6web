@@ -35,13 +35,23 @@
       const name = meta.user_name || meta.name || meta.full_name || meta.preferred_username || user.email || "用户";
       const avatar = safeAvatar(meta.avatar_url || meta.picture);
       if (badge) {
-        badge.innerHTML =
-          (avatar
-            ? `<img class="user-avatar user-avatar-btn" src="${avatar}" alt="头像" title="点击更换头像">`
-            : `<span class="user-avatar user-avatar-txt user-avatar-btn" title="点击更换头像">${escapeHtml(name.charAt(0).toUpperCase())}</span>`)
-          + `<span class="user-name">${escapeHtml(name)}</span>`;
+        const avatarHtml = avatar
+          ? `<img class="user-avatar user-avatar-btn" src="${avatar}" alt="头像" title="点击更换头像">`
+          : `<span class="user-avatar user-avatar-txt user-avatar-btn" title="点击更换头像">${escapeHtml(name.charAt(0).toUpperCase())}</span>`;
+        const dropdownAvatar = avatar
+          ? `<img class="user-dropdown-avatar" src="${avatar}" alt="">`
+          : `<span class="user-dropdown-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</span>`;
+        badge.innerHTML = avatarHtml + `<span class="user-name">${escapeHtml(name)}</span>`
+          + `<div class="user-dropdown">
+               <div class="user-dropdown-head">
+                 ${dropdownAvatar}
+                 <div><div class="user-dropdown-name">${escapeHtml(name)}</div><div class="user-dropdown-email">${escapeHtml(user.email || "")}</div></div>
+               </div>
+               <div class="user-dropdown-item" id="menuProfile">👤 个人中心</div>
+             </div>`;
         badge.style.display = "inline-flex";
         bindAvatarClick();
+        document.getElementById("menuProfile")?.addEventListener("click", openProfile);
       }
       btn.textContent = "登出";
       btn.classList.add("secondary");
@@ -58,6 +68,32 @@
     const fileEl = document.getElementById("avatarInput");
     if (!avatarEl || !fileEl) return;
     avatarEl.addEventListener("click", () => fileEl.click());
+  }
+
+  // 个人中心弹窗
+  function openProfile() {
+    const modal = document.getElementById("profileModal");
+    const body = document.getElementById("profileBody");
+    if (!modal || !body || !user) return;
+    const meta = user.user_metadata || {};
+    const name = meta.user_name || meta.name || meta.full_name || meta.preferred_username || user.email || "用户";
+    const avatar = safeAvatar(meta.avatar_url || meta.picture);
+    const head = avatar
+      ? `<img class="user-dropdown-avatar" src="${avatar}" alt="">`
+      : `<span class="user-dropdown-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</span>`;
+    const joined = user.created_at
+      ? `<div class="profile-joined">加入于 ${new Date(user.created_at).toLocaleDateString("zh-CN")}</div>`
+      : "";
+    body.innerHTML = head
+      + `<div class="user-dropdown-name">${escapeHtml(name)}</div>`
+      + `<div class="user-dropdown-email">${escapeHtml(user.email || "")}</div>`
+      + joined;
+    modal.classList.add("show");
+  }
+
+  function closeProfile() {
+    const modal = document.getElementById("profileModal");
+    if (modal) modal.classList.remove("show");
   }
 
   async function uploadAvatar(file) {
@@ -247,6 +283,14 @@
     const modal = document.getElementById("authModal");
     if (modal) modal.addEventListener("click", (e) => {
       if (e.target === modal) closeModal();
+    });
+
+    // 个人中心弹窗
+    const btnProfileClose = document.getElementById("btnProfileClose");
+    if (btnProfileClose) btnProfileClose.addEventListener("click", closeProfile);
+    const profileModal = document.getElementById("profileModal");
+    if (profileModal) profileModal.addEventListener("click", (e) => {
+      if (e.target === profileModal) closeProfile();
     });
   }
 
