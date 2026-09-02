@@ -204,34 +204,34 @@ s.parentNode.insertBefore(el, s);
   .coffee-btn .icon { font-size: 22px; }
   .coffee-hint { font-size: 12px; color: #999; margin-top: 8px; }
   .coffee-modal-panel {
-    width: min(92vw, 760px);
+    width: min(96vw, 760px);
     max-width: 760px;
     max-height: 92vh;
-    overflow-y: auto;
+    overflow: hidden;
     text-align: center;
   }
   .coffee-qr-list {
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    gap: 16px;
-    flex-wrap: wrap;
+    gap: 12px;
+    flex-wrap: nowrap;
+    width: 100%;
   }
-  .coffee-option { flex: 1 1 260px; min-width: 0; }
+  .coffee-option {
+    flex: 1 1 0;
+    min-width: 0;
+  }
   .coffee-option-title { margin: 0 0 8px; font-size: 14px; color: #555; font-weight: 600; }
   .coffee-qr {
     display: block;
-    width: min(100%, 300px);
+    width: 100%;
+    max-width: 320px;
     height: auto;
-    max-height: 62vh;
+    max-height: 68vh;
     object-fit: contain;
     margin: 0 auto;
     border-radius: 8px;
-  }
-  @media (max-width: 600px) {
-    .coffee-modal-panel { width: 92vw; }
-    .coffee-option { flex-basis: 100%; }
-    .coffee-qr { max-height: 52vh; }
   }
 
   .visit-bar {
