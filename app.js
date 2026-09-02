@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.6.1";
+  const K5WEB_VERSION = "1.6.2";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -1930,6 +1930,336 @@
       $("btnLogoRead").disabled = false;
     }
   });
+
+  // ---------- 开机音效刷写（外部 SPI Flash 0x1F8000，12 KB） ----------
+  // VOICE_SAMPLES 与固件 App/driver/startup_voice.c s_VoiceSamples[256] 完全一致
+  const VOICE_SAMPLES = [
+    0x06a8, 0x06b8, 0x0688, 0x0698, 0x06e8, 0x06f8, 0x06c8, 0x06d8,
+    0x0628, 0x0638, 0x0608, 0x0618, 0x0668, 0x0678, 0x0648, 0x0658,
+    0x0754, 0x075c, 0x0744, 0x074c, 0x0774, 0x077c, 0x0764, 0x076c,
+    0x0714, 0x071c, 0x0704, 0x070c, 0x0734, 0x073c, 0x0724, 0x072c,
+    0x02a0, 0x02e0, 0x0220, 0x0260, 0x03a0, 0x03e0, 0x0320, 0x0360,
+    0x00a0, 0x00e0, 0x0020, 0x0060, 0x01a0, 0x01e0, 0x0120, 0x0160,
+    0x0550, 0x0570, 0x0510, 0x0530, 0x05d0, 0x05f0, 0x0590, 0x05b0,
+    0x0450, 0x0470, 0x0410, 0x0430, 0x04d0, 0x04f0, 0x0490, 0x04b0,
+    0x07ea, 0x07eb, 0x07e8, 0x07e9, 0x07ee, 0x07ef, 0x07ec, 0x07ed,
+    0x07e2, 0x07e3, 0x07e0, 0x07e1, 0x07e6, 0x07e7, 0x07e4, 0x07e5,
+    0x07fa, 0x07fb, 0x07f8, 0x07f9, 0x07fe, 0x07ff, 0x07fc, 0x07fd,
+    0x07f2, 0x07f3, 0x07f0, 0x07f1, 0x07f6, 0x07f7, 0x07f4, 0x07f5,
+    0x07aa, 0x07ae, 0x07a2, 0x07a6, 0x07ba, 0x07be, 0x07b2, 0x07b6,
+    0x078a, 0x078e, 0x0782, 0x0786, 0x079a, 0x079e, 0x0792, 0x0796,
+    0x07d5, 0x07d7, 0x07d1, 0x07d3, 0x07dd, 0x07df, 0x07d9, 0x07db,
+    0x07c5, 0x07c7, 0x07c1, 0x07c3, 0x07cd, 0x07cf, 0x07c9, 0x07cb,
+    0x0958, 0x0948, 0x0978, 0x0968, 0x0918, 0x0908, 0x0938, 0x0928,
+    0x09d8, 0x09c8, 0x09f8, 0x09e8, 0x0998, 0x0988, 0x09b8, 0x09a8,
+    0x08ac, 0x08a4, 0x08bc, 0x08b4, 0x088c, 0x0884, 0x089c, 0x0894,
+    0x08ec, 0x08e4, 0x08fc, 0x08f4, 0x08cc, 0x08c4, 0x08dc, 0x08d4,
+    0x0d60, 0x0d20, 0x0de0, 0x0da0, 0x0c60, 0x0c20, 0x0ce0, 0x0ca0,
+    0x0f60, 0x0f20, 0x0fe0, 0x0fa0, 0x0e60, 0x0e20, 0x0ee0, 0x0ea0,
+    0x0ab0, 0x0a90, 0x0af0, 0x0ad0, 0x0a30, 0x0a10, 0x0a70, 0x0a50,
+    0x0bb0, 0x0b90, 0x0bf0, 0x0bd0, 0x0b30, 0x0b10, 0x0b70, 0x0b50,
+    0x0815, 0x0814, 0x0817, 0x0816, 0x0811, 0x0810, 0x0813, 0x0812,
+    0x081d, 0x081c, 0x081f, 0x081e, 0x0819, 0x0818, 0x081b, 0x081a,
+    0x0805, 0x0804, 0x0807, 0x0806, 0x0801, 0x0800, 0x0803, 0x0802,
+    0x080d, 0x080c, 0x080f, 0x080e, 0x0809, 0x0808, 0x080b, 0x080a,
+    0x0856, 0x0852, 0x085e, 0x085a, 0x0846, 0x0842, 0x084e, 0x084a,
+    0x0876, 0x0872, 0x087e, 0x087a, 0x0866, 0x0862, 0x086e, 0x086a,
+    0x082b, 0x0829, 0x082f, 0x082d, 0x0823, 0x0821, 0x0827, 0x0825,
+    0x083b, 0x0839, 0x083f, 0x083d, 0x0833, 0x0831, 0x0837, 0x0835,
+  ];
+
+  function nearestVoiceIndex(v) {
+    let best = 0, bestDiff = 0xFFFF;
+    for (let i = 0; i < 256; i++) {
+      const diff = Math.abs(VOICE_SAMPLES[i] - v);
+      if (diff < bestDiff) { bestDiff = diff; best = i; }
+    }
+    return best;
+  }
+
+  function encodePcm16ToVoice(pcm16) {
+    const out = new Uint8Array(pcm16.length);
+    for (let i = 0; i < pcm16.length; i++) {
+      let v = ((pcm16[i] + 32768) >> 4);
+      if (v < 0) v = 0;
+      if (v > 4095) v = 4095;
+      out[i] = nearestVoiceIndex(v);
+    }
+    return out;
+  }
+
+  function buildBootAudioBin(encodedData) {
+    const dataLen = encodedData.length;
+    const rawLen = 4 + dataLen;
+    const paddedLen = Math.ceil(rawLen / 4096) * 4096;
+    const bin = new Uint8Array(paddedLen);
+    bin.fill(0xFF);
+    new DataView(bin.buffer).setUint32(0, dataLen >>> 0, true);
+    bin.set(encodedData, 4);
+    return bin;
+  }
+
+  let bootAudioBin = null;
+  let bootAudioRawFileBuf = null;
+  let bootAudioPreviewUrl = null;
+
+  const audioDropZone = () => $("audioDropZone");
+  const audioFileInput = () => $("audioFileInput");
+  const audioInfo = () => $("audioInfo");
+  const bootAudioStatus = () => $("bootAudioStatus");
+
+  function updateAudioInfo(text, cls) {
+    const el = audioInfo();
+    if (el) el.textContent = text;
+  }
+  function updateBootAudioStatus(text, cls) {
+    const el = bootAudioStatus();
+    if (el) el.textContent = text;
+  }
+
+  function bootAudioResetState() {
+    bootAudioBin = null;
+    bootAudioRawFileBuf = null;
+    if (bootAudioPreviewUrl) { try { URL.revokeObjectURL(bootAudioPreviewUrl); } catch (_) {} bootAudioPreviewUrl = null; }
+    const preview = $("audioPreview");
+    if (preview) { preview.removeAttribute("src"); preview.style.display = "none"; }
+    const wBtn = $("btnBootAudioWrite");
+    const eBtn = $("btnBootAudioExport");
+    if (wBtn) wBtn.disabled = true;
+    if (eBtn) eBtn.disabled = true;
+  }
+
+  async function processAudioFile(file) {
+    bootAudioResetState();
+    if (!file) return;
+    updateAudioInfo("正在解码音频...");
+    updateBootAudioStatus("");
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      bootAudioRawFileBuf = new Uint8Array(arrayBuffer);
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) throw new Error("当前浏览器不支持 AudioContext，无法解码音频");
+      const audioCtx = new AudioCtx();
+      let audioBuffer;
+      try {
+        audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+      } finally {
+        try { await audioCtx.close(); } catch (_) {}
+      }
+      const duration = audioBuffer.duration;
+      const targetSamples = Math.ceil(duration * 8000);
+      if (targetSamples === 0) throw new Error("音频时长为 0");
+      const offline = new OfflineAudioContext(1, targetSamples, 8000);
+      const src = offline.createBufferSource();
+      src.buffer = audioBuffer;
+      src.connect(offline.destination);
+      src.start(0);
+      const resampled = await offline.startRendering();
+      let floatData = resampled.getChannelData(0);
+      let floatLen = floatData.length;
+      let pcm16 = new Int16Array(floatLen);
+      for (let i = 0; i < floatLen; i++) {
+        let v = floatData[i];
+        if (v > 1) v = 1; if (v < -1) v = -1;
+        pcm16[i] = Math.round(v * 32767);
+      }
+      if ($("audioNormalize") && $("audioNormalize").checked) {
+        let peak = 0;
+        for (let i = 0; i < pcm16.length; i++) { const a = Math.abs(pcm16[i]); if (a > peak) peak = a; }
+        if (peak > 0 && peak < 32767) {
+          const gain = (32767 * 0.95) / peak;
+          for (let i = 0; i < pcm16.length; i++) {
+            let v = Math.round(pcm16[i] * gain);
+            if (v > 32767) v = 32767; if (v < -32768) v = -32768;
+            pcm16[i] = v;
+          }
+        }
+      }
+      const encoded = encodePcm16ToVoice(pcm16);
+      const bin = buildBootAudioBin(encoded);
+      const BA = proto.BOOT_AUDIO;
+      if (bin.length > BA.FLASH_SIZE) {
+        throw new Error("音频过长：bin " + bin.length + " 字节超过 " + BA.FLASH_SIZE + " 字节（12 KB），请缩短到 1.5 秒以内");
+      }
+      if (encoded.length > BA.RECOMMENDED_MAX_SIZE) {
+        log("提示：音频数据 " + encoded.length + " 字节超过建议 8 KB（约 1 秒），可能接近上限", "info");
+      }
+      bootAudioBin = bin;
+      const durStr = duration.toFixed(2) + "s（转码后 " + (encoded.length / 8000).toFixed(2) + "s @" + "8kHz）";
+      updateAudioInfo("已加载：" + file.name + "  原时长 " + durStr + "  编码 " + encoded.length + " 字节  bin " + bin.length + " 字节（" + (bin.length / 1024).toFixed(1) + " KB）");
+      updateBootAudioStatus("已就绪，点“写入开机音效”刷入（需先连接串口）");
+      const wBtn = $("btnBootAudioWrite");
+      const eBtn = $("btnBootAudioExport");
+      if (wBtn) wBtn.disabled = false;
+      if (eBtn) eBtn.disabled = false;
+      const blob = new Blob([bootAudioRawFileBuf], { type: file.type || "audio/*" });
+      bootAudioPreviewUrl = URL.createObjectURL(blob);
+      const preview = $("audioPreview");
+      if (preview) { preview.src = bootAudioPreviewUrl; preview.style.display = "block"; }
+      log("开机音效已处理：" + file.name + "（" + encoded.length + " 字节，bin " + bin.length + " 字节）");
+    } catch (err) {
+      bootAudioBin = null;
+      updateAudioInfo("处理失败：" + err.message);
+      updateBootAudioStatus("");
+      log("开机音效处理失败：" + err.message, "err");
+    }
+  }
+
+  // 开机音效：文件选择
+  const _afInput = $("audioFileInput");
+  if (_afInput) {
+    _afInput.addEventListener("change", async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      await processAudioFile(f);
+    });
+  }
+  const _adZone = $("audioDropZone");
+  if (_adZone) {
+    _adZone.addEventListener("click", () => { const inp = $("audioFileInput"); if (inp) inp.click(); });
+    _adZone.addEventListener("dragover", (e) => { e.preventDefault(); _adZone.style.borderColor = "#2f6fdc"; _adZone.style.background = "#f0f6ff"; });
+    _adZone.addEventListener("dragleave", () => { _adZone.style.borderColor = ""; _adZone.style.background = ""; });
+    _adZone.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      _adZone.style.borderColor = ""; _adZone.style.background = "";
+      const f = e.dataTransfer.files[0];
+      if (!f) return;
+      await processAudioFile(f);
+    });
+  }
+
+  // 开机音效：导出 bin
+  const _btnExport = $("btnBootAudioExport");
+  if (_btnExport) {
+    _btnExport.addEventListener("click", () => {
+      if (!bootAudioBin) { setStatus("请先选择并处理音频文件", "err"); return; }
+      const blob = new Blob([bootAudioBin], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "startup_voice.bin"; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      log("开机音效 bin 已导出：startup_voice.bin（" + bootAudioBin.length + " 字节）");
+    });
+  }
+
+  // 开机音效：写入
+  const _btnWrite = $("btnBootAudioWrite");
+  if (_btnWrite) {
+    _btnWrite.addEventListener("click", async () => {
+      if (!port) { setStatus("请先连接串口", "err"); return; }
+      if (!bootAudioBin) { setStatus("请先选择音频文件", "err"); return; }
+      const BA = proto.BOOT_AUDIO;
+      if (bootAudioBin.length > BA.FLASH_SIZE) { setStatus("bin 过大（" + bootAudioBin.length + " 字节），超过 12 KB 上限", "err"); return; }
+      if (bootAudioBin.length % BA.SECTOR_SIZE !== 0) { setStatus("bin 未按 4 KB 对齐（" + bootAudioBin.length + " 字节）", "err"); return; }
+      _btnWrite.disabled = true;
+      const progress = $("bootAudioProgress");
+      const bar = $("bootAudioProgressBar");
+      if (progress) progress.style.display = "block";
+      if (bar) bar.style.width = "0%";
+      try {
+        const needSectors = bootAudioBin.length / BA.SECTOR_SIZE;
+        log("擦除开机音效区（" + needSectors + " 个扇区）...");
+        updateBootAudioStatus("正在擦除...");
+        for (let s = 0; s < needSectors; s++) {
+          const payload = new Uint8Array(4);
+          new DataView(payload.buffer).setUint16(0, s, true);
+          const r = await sendCommand(proto.CMD.BOOT_AUDIO_ERASE, payload);
+          if (r.status !== 0) throw new Error("扇区 " + s + " 擦除失败 status=" + r.status);
+          if (bar) bar.style.width = ((s + 1) / needSectors * 30).toFixed(1) + "%";
+          log("擦除 " + (s + 1) + "/" + needSectors);
+        }
+        const total = bootAudioBin.length, chunk = BA.CHUNK;
+        log("写入开机音效数据（" + total + " 字节，chunk " + chunk + "）...");
+        updateBootAudioStatus("正在写入...");
+        await new Promise((r) => setTimeout(r, 100));
+        for (let off = 0; off < total; off += chunk) {
+          const n = Math.min(chunk, total - off);
+          const payload = new Uint8Array(4 + n);
+          new DataView(payload.buffer).setUint32(0, off, true);
+          payload.set(bootAudioBin.subarray(off, off + n), 4);
+          const r = await sendCommand(proto.CMD.BOOT_AUDIO_WRITE, payload);
+          if (r.status !== 0) throw new Error("偏移 0x" + off.toString(16) + " 写入失败 status=" + r.status);
+          if (bar) bar.style.width = (30 + (off + n) / total * 70).toFixed(1) + "%";
+          if ((off / chunk) % 50 === 49 || off + n === total) log("写入 " + (off + n) + "/" + total);
+        }
+        if (bar) bar.style.width = "100%";
+        log("开机音效写入完成，发送重启命令...");
+        await writer.write(proto.buildFrame(proto.CMD.REBOOT, new Uint8Array(0)));
+        setStatus("✅ 开机音效刷入完成，对讲机正在重启生效", "ok");
+        updateBootAudioStatus("✅ 刷入完成，重启生效");
+        log("开机音效刷入完成");
+      } catch (err) {
+        setStatus("开机音效刷入失败：" + err.message, "err");
+        updateBootAudioStatus("失败：" + err.message);
+        log("开机音效刷入异常：" + err.message, "err");
+      } finally {
+        _btnWrite.disabled = false;
+      }
+    });
+  }
+
+  // 开机音效：关闭（擦除长度头所在扇区）
+  const _btnDisable = $("btnBootAudioDisable");
+  if (_btnDisable) {
+    _btnDisable.addEventListener("click", async () => {
+      if (!port) { setStatus("请先连接串口", "err"); return; }
+      if (!confirm("确定要关闭开机音效吗？这会擦除 0x1F8000 扇区，长度头变为 0xFF（禁用播放）。")) return;
+      _btnDisable.disabled = true;
+      try {
+        log("关闭开机音效：擦除 sector 0（0x1F8000）...");
+        const payload = new Uint8Array(4);
+        new DataView(payload.buffer).setUint16(0, 0, true);
+        const r = await sendCommand(proto.CMD.BOOT_AUDIO_ERASE, payload);
+        if (r.status !== 0) throw new Error("擦除失败 status=" + r.status);
+        setStatus("✅ 已关闭开机音效（长度头已擦为 0xFF），重启后生效", "ok");
+        updateBootAudioStatus("已关闭，需重启生效");
+        log("开机音效已关闭");
+      } catch (err) {
+        setStatus("关闭失败：" + err.message, "err");
+        log("关闭开机音效异常：" + err.message, "err");
+      } finally {
+        _btnDisable.disabled = false;
+      }
+    });
+  }
+
+  // 开机音效：读取校验
+  const _btnCheck = $("btnBootAudioCheck");
+  if (_btnCheck) {
+    _btnCheck.addEventListener("click", async () => {
+      if (!port) { setStatus("请先连接串口", "err"); return; }
+      _btnCheck.disabled = true;
+      try {
+        log("读取开机音效区校验（0x1F8000 起 128 字节）...");
+        const payload = new Uint8Array(4);
+        new DataView(payload.buffer).setUint32(0, 0, true);
+        const reply = await sendAndWaitRaw(proto.CMD.BOOT_AUDIO_READ, payload, 5000);
+        const dv = new DataView(reply.buffer, reply.byteOffset, reply.byteLength);
+        if (dv.getUint16(0, true) !== proto.CMD.REPLY_BOOT_AUDIO_READ) throw new Error("回复 ID 不符");
+        const echo = dv.getUint32(4, true);
+        if (echo !== 0) throw new Error("偏移回显不一致 0x" + echo.toString(16));
+        const data = reply.slice(8, 8 + 128);
+        const len = data.length >= 4 ? (data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24)) >>> 0 : 0xFFFFFFFF;
+        const allFF = data.every((b) => b === 0xFF);
+        if (allFF || len === 0xFFFFFFFF || len === 0) {
+          setStatus("开机音效区为空（长度头 0xFF/0），未设置开机音效", "warn");
+          updateBootAudioStatus("校验：为空，未设置音效");
+          log("开机音效校验：为空");
+        } else {
+          const binSize = Math.ceil((4 + len) / 4096) * 4096;
+          const dur = (len / 8000).toFixed(2) + "s";
+          setStatus("✅ 开机音效已存在：数据 " + len + " 字节（约 " + dur + "），bin " + binSize + " 字节", "ok");
+          updateBootAudioStatus("校验：存在，" + len + " 字节 / " + dur);
+          log("开机音效校验：长度 " + len + " 字节，约 " + dur);
+        }
+      } catch (err) {
+        setStatus("读取校验失败：" + err.message, "err");
+        log("开机音效校验异常：" + err.message, "err");
+      } finally {
+        _btnCheck.disabled = false;
+      }
+    });
+  }
 
   // ---------- 校准数据导出 / 导入（EEPROM 仿真区 0xB000..0xB200，512 字节） ----------
 

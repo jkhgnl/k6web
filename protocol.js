@@ -50,6 +50,12 @@ const CMD = {
   REPLY_CN_FONT_READ: 0x05ef,
   DOPPLER_READ_SAT: 0x05ed, // payload {u8 slot, u8 pad} -> reply 0x05f0
   REPLY_READ_SAT: 0x05f0,   // {u8 status, u8 slot, u8 pad[2], 32B satellite}
+  BOOT_AUDIO_ERASE: 0x05f2,  // payload {u16 sectorIndex} -> reply 0x05f3 {u8 status}
+  REPLY_BOOT_AUDIO_ERASE: 0x05f3,
+  BOOT_AUDIO_WRITE: 0x05f4,  // payload {u32 offset, bytes data} -> reply 0x05f5 {u8 status}
+  REPLY_BOOT_AUDIO_WRITE: 0x05f5,
+  BOOT_AUDIO_READ: 0x05f6,   // payload {u32 offset} -> reply 0x05f7 {u32 offset, u8 data[128]}
+  REPLY_BOOT_AUDIO_READ: 0x05f7,
 };
 
 // 校准区（EEPROM 仿真地址，见 App/driver/eeprom_compat.c：0xB000..0xB200 -> SPI 0x10000）
@@ -84,6 +90,17 @@ const CN_FONT = {
   // 固件 (uart.c UART_IsCommandAvailable) 会误判"缓冲空"而丢弃整帧 → 主机回复超时。
   // C 口（Type-C）时序裕量较小，适当降低 CHUNK 留出缓冲余量。
   CHUNK: 200,
+};
+
+// 开机音效区参数（外部 SPI Flash 0x1F8000，见 App/app/uart.c BOOT_AUDIO 命令）
+const BOOT_AUDIO = {
+  FLASH_ADDR: 0x1f8000,
+  FLASH_SIZE: 0x3000,        // 12 KB 最大可用
+  SECTOR_COUNT: 3,           // 12 KB / 4 KB = 3 个 sector
+  SECTOR_SIZE: 0x1000,       // 4 KB 每扇区
+  CHUNK: 232,                // 每帧写入上限（256B 环形缓冲余量）
+  MAX_DATA_SIZE: 0x3000,     // 音频数据最大 12 KB
+  RECOMMENDED_MAX_SIZE: 8192, // 建议 ≤1 秒（8 KB）
 };
 
 // MR 信道存储参数（EEPROM 仿真地址，经 eeprom_compat.c 1:1 映射到 SPI Flash）
@@ -670,7 +687,7 @@ function concat(a, b) {
   }
 })(typeof self !== "undefined" ? self : this, function () {
   return {
-    OBFUSCATION, CMD, CN_FONT, FLASH_MSG, CALIB, LOGO, CHAN, CTCSS_OPTIONS, DCS_OPTIONS,
+    OBFUSCATION, CMD, CN_FONT, BOOT_AUDIO, FLASH_MSG, CALIB, LOGO, CHAN, CTCSS_OPTIONS, DCS_OPTIONS,
     CODE_TYPE, MODULATION, TX_DIR, BANDWIDTH, POWER, STEP,
     DD_HEADERS, POWER_NAMES, MODULATION_NAMES, DD_DIR_NAMES,
     crc16, crc8,
