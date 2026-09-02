@@ -606,7 +606,8 @@ s.parentNode.insertBefore(el, s);
   .ws-thumb-btn:hover { border-color: #2f6fdc; color: #2f6fdc; background: #eef4ff; }
   .ws-thumb-hint { font-size: 12px; color: #a3aab6; margin-top: 4px; }
   .ws-thumb-required { color: #c62828; font-weight: 600; }
-  .ws-author { display: inline-flex; align-items: center; gap: 4px; }
+  .ws-author { display: inline-flex; align-items: center; gap: 4px; text-decoration: none; color: inherit; }
+  a.ws-author:hover { color: #2f6fdc; }
   .ws-author-avatar { width: 17px; height: 17px; border-radius: 50%; object-fit: cover; vertical-align: middle; flex-shrink: 0; }
   .ws-author-txt { display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #2f6fdc, #5b8def); color: #fff; font-size: 9px; font-weight: 600; width: 17px; height: 17px; border-radius: 50%; }
   .ws-avatar-wrap { display: inline-flex; }
@@ -785,6 +786,8 @@ s.parentNode.insertBefore(el, s);
     font-weight: 500;
     color: #333;
   }
+  .comment-author-link { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: inherit; }
+  a.comment-author-link:hover .comment-author { color: #2f6fdc; }
   .comment-time {
     font-size: 11px;
     color: #999;
@@ -830,6 +833,17 @@ s.parentNode.insertBefore(el, s);
     font-size: 13px;
     color: #888;
     text-align: center;
+    padding: 12px 0;
+  }
+  .comment-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid #eef1f5;
+  }
     padding: 12px 0;
   }
 

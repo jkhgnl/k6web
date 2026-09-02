@@ -1,5 +1,5 @@
 // 创意工坊/反馈区 - 评论列表（公开）
-// GET ?item_id=xxx&item_type=workshop
+// GET ?item_id=xxx&item_type=workshop&page=1&page_size=10
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, handleOptions, getUser } from "../_shared/cors.ts";
 
@@ -11,6 +11,8 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const itemId = url.searchParams.get("item_id");
     const itemType = url.searchParams.get("item_type") || "workshop";
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+    const pageSize = Math.min(50, Math.max(1, parseInt(url.searchParams.get("page_size") || "10", 10)));
 
     if (!itemId) {
       return jsonResponse({ error: "item_id is required" }, 400);
@@ -25,7 +27,15 @@ Deno.serve(async (req) => {
     const user = await getUser(req, supabase);
     const userId = user?.id || null;
 
-    // 获取评论列表（顶级评论）
+    // 获取总数
+    const { count: total } = await supabase
+      .from("comments")
+      .select("id", { count: "exact", head: true })
+      .eq("item_id", itemId)
+      .eq("item_type", itemType)
+      .is("parent_id", null);
+
+    // 获取评论列表（顶级评论，分页）
     const { data: comments, error } = await supabase
       .from("comments")
       .select("id, content, user_id, parent_id, created_at, profiles(username, avatar_url)")
@@ -33,7 +43,7 @@ Deno.serve(async (req) => {
       .eq("item_type", itemType)
       .is("parent_id", null)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .range((page - 1) * pageSize, page * pageSize - 1);
 
     if (error) throw error;
 
@@ -75,16 +85,11 @@ Deno.serve(async (req) => {
       })
     );
 
-    // 获取总数
-    const { count: total } = await supabase
-      .from("comments")
-      .select("id", { count: "exact", head: true })
-      .eq("item_id", itemId)
-      .eq("item_type", itemType);
-
     return jsonResponse({
       comments: commentsWithReplies,
       total: total || 0,
+      page,
+      page_size: pageSize,
     });
   } catch (e) {
     return jsonResponse({ error: (e as Error).message || "Internal Error" }, 500);

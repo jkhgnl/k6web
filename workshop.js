@@ -49,13 +49,14 @@
   function safeAvatarUrl(u) {
     return /^https?:\/\//i.test(u || "") ? u : "";
   }
-  function authorHtml(profiles) {
+  function authorHtml(profiles, userId) {
     const name = escapeHtml((profiles && profiles.username) || "匿名");
     const avatar = safeAvatarUrl(profiles && profiles.avatar_url);
     const head = avatar
       ? `<img class="ws-author-avatar" src="${avatar}" alt="" loading="lazy">`
       : `<span class="ws-author-avatar ws-author-txt">${escapeHtml((profiles && profiles.username || "匿").charAt(0).toUpperCase())}</span>`;
-    return `<span class="ws-author"><span class="ws-avatar-wrap">${head}</span>${name}</span>`;
+    const link = userId ? `href="public-profile.html?id=${encodeURIComponent(userId)}"` : "";
+    return `<a class="ws-author" ${link} onclick="event.stopPropagation()"><span class="ws-avatar-wrap">${head}</span>${name}</a>`;
   }
 
   // ---------- 公共请求头：Supabase Edge Function 网关要求带 key ----------
@@ -115,7 +116,7 @@
             <div class="ws-item-desc">${escapeHtml(it.description || "")}</div>
             <div class="ws-item-foot">
               <span class="ws-item-meta">
-                <span title="作者">${authorHtml(it.profiles)}</span>
+                <span title="作者">${authorHtml(it.profiles, it.user_id)}</span>
                 <span title="下载次数">⬇️ ${it.download_count || 0}</span>
                 <span title="文件大小">${fmtSize(it.file_size)}</span>
               </span>
@@ -176,7 +177,7 @@
           ${thumbHtml}
           <div style="font-size:34px">${cat.icon}</div>
           <h3 style="margin:6px 0 2px">${escapeHtml(it.title)}</h3>
-          <div style="font-size:12px;color:#888;margin-bottom:8px">${cat.label.replace(/^[^\s]*\s/, "")} · ${fmtDate(it.created_at)} · ${authorHtml(it.profiles)}</div>
+          <div style="font-size:12px;color:#888;margin-bottom:8px">${cat.label.replace(/^[^\s]*\s/, "")} · ${fmtDate(it.created_at)} · ${authorHtml(it.profiles, it.user_id)}</div>
           <div style="font-size:13px;color:#555;white-space:pre-wrap;margin-bottom:10px">${escapeHtml(it.description || "（无描述）")}</div>
           <div style="font-size:12px;color:#999">文件名：${escapeHtml(it.file_name)}（${fmtSize(it.file_size)}）· 下载 ${it.download_count || 0} 次</div>`;
         dlBtn.disabled = false;

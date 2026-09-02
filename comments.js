@@ -67,6 +67,7 @@
     const isOwner = currentUserId === comment.user_id;
 
     let avatarHtml;
+    const profileLink = comment.user_id ? `href="public-profile.html?id=${encodeURIComponent(comment.user_id)}"` : "";
     if (avatar) {
       avatarHtml = `<img class="comment-avatar" src="${avatar}" alt="" loading="lazy">`;
     } else {
@@ -90,8 +91,7 @@
     const html = `
       <div class="comment-item" data-id="${comment.id}">
         <div class="comment-header">
-          ${avatarHtml}
-          <span class="comment-author">${name}</span>
+          <a class="comment-author-link" ${profileLink}>${avatarHtml}<span class="comment-author">${name}</span></a>
           <span class="comment-time">${time}</span>
         </div>
         <div class="comment-content">${content}</div>
@@ -130,15 +130,33 @@
     container.innerHTML = html;
   }
 
+  // ---------- 渲染评论分页 ----------
+  function renderPagination(container, total, page, pageSize, itemId, itemType, listContainerId) {
+    const pages = Math.ceil(total / pageSize);
+    if (pages <= 1) return;
+    const pagHtml = `
+      <div class="comment-pagination">
+        <button class="ws-page-btn" data-cpage="${page - 1}" ${page <= 1 ? "disabled" : ""}>‹ 上一页</button>
+        <span class="ws-page-info">${page} / ${pages}</span>
+        <button class="ws-page-btn" data-cpage="${page + 1}" ${page >= pages ? "disabled" : ""}>下一页 ›</button>
+      </div>`;
+    container.insertAdjacentHTML("beforeend", pagHtml);
+    container.querySelectorAll(".comment-pagination .ws-page-btn:not([disabled])").forEach((b) => {
+      b.addEventListener("click", () => {
+        loadComments(itemId, itemType, listContainerId, parseInt(b.dataset.cpage, 10));
+      });
+    });
+  }
+
   // ---------- 加载评论 ----------
-  async function loadComments(itemId, itemType, listContainerId) {
+  async function loadComments(itemId, itemType, listContainerId, page = 1) {
     const container = $(listContainerId);
     if (!container) return;
 
     container.innerHTML = `<div class="comment-loading">加载中...</div>`;
 
     try {
-      const params = new URLSearchParams({ item_id: itemId, item_type: itemType });
+      const params = new URLSearchParams({ item_id: itemId, item_type: itemType, page: String(page), page_size: "10" });
       // 如果已登录，带上用户 token 以便后端判断点赞状态和删除权限
       const headers = anonHeaders();
       if (window.K5AUTH && window.K5AUTH.isLoggedIn()) {
@@ -151,6 +169,7 @@
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       const data = await resp.json();
       renderCommentList(container, data.comments || [], itemType);
+      renderPagination(container, data.total || 0, data.page || 1, data.page_size || 10, itemId, itemType, listContainerId);
     } catch (e) {
       container.innerHTML = `<div class="comment-empty">评论加载失败：${escapeHtml(e.message)}</div>`;
     }

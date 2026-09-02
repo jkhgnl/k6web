@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
 
     let query = supabase
       .from("workshop_items")
-      .select("id, title, description, category, file_name, file_size, thumbnail_url, download_count, created_at, profiles(username, avatar_url)")
+      .select("id, user_id, title, description, category, file_name, file_size, thumbnail_url, download_count, created_at, profiles(username, avatar_url)")
       .order("created_at", { ascending: false })
       .range((page - 1) * pageSize, page * pageSize - 1);
     let countQuery = supabase
