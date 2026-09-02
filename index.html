@@ -479,6 +479,10 @@ s.parentNode.insertBefore(el, s);
   .auth-field.match:focus-within { box-shadow: 0 0 0 4px rgba(46, 164, 79, .14); }
   .auth-field.mismatch { border-color: #e26d5c; background: #fef6f5; }
   .auth-field.mismatch:focus-within { box-shadow: 0 0 0 4px rgba(226, 109, 92, .12); }
+  .auth-field.valid { border-color: #2ea44f; background: #f4fbf7; }
+  .auth-field.valid:focus-within { box-shadow: 0 0 0 4px rgba(46, 164, 79, .14); }
+  .auth-field.invalid { border-color: #e26d5c; background: #fef6f5; }
+  .auth-field.invalid:focus-within { box-shadow: 0 0 0 4px rgba(226, 109, 92, .12); }
   .auth-field-icon { font-size: 15px; opacity: .55; flex-shrink: 0; }
   .auth-field input {
     flex: 1; min-width: 0; height: 100%; padding: 0;
@@ -1632,7 +1636,7 @@ s.parentNode.insertBefore(el, s);
       <span class="auth-field-icon">🙋</span>
       <input id="authUsername" type="text" placeholder="用户名（2-20 字符，字母/数字/下划线）" maxlength="20" autocomplete="username">
     </div>
-    <div class="auth-field">
+    <div class="auth-field" id="authEmailRow">
       <span class="auth-field-icon">✉️</span>
       <input id="authEmail" type="email" placeholder="邮箱" autocomplete="email">
     </div>
@@ -1645,6 +1649,9 @@ s.parentNode.insertBefore(el, s);
       <span class="auth-field-icon">🔐</span>
       <input id="authConfirmPassword" type="password" placeholder="确认密码" autocomplete="new-password">
       <button type="button" class="auth-eye" id="btnAuthEyeConfirm" aria-label="显示或隐藏密码">👁️</button>
+    </div>
+    <div class="auth-forgot-row" id="authForgotRow">
+      <button type="button" class="auth-forgot-btn" id="btnForgotOpen">忘记密码？</button>
     </div>
     <div id="authError" class="auth-error" role="status"></div>
     <button id="btnAuthSubmit" type="button" class="auth-submit">登录</button>

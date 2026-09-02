@@ -211,6 +211,7 @@
     const email = document.getElementById("authEmail");
     const usernameRow = document.getElementById("authUsernameRow");
     const confirmRow = document.getElementById("authConfirmRow");
+    const emailRow = document.getElementById("authEmailRow");
     if (submit) submit.textContent = isLogin ? "登录" : "注册";
     document.querySelectorAll(".auth-tab").forEach((t) => {
       t.classList.toggle("active", t.dataset.mode === mode);
@@ -221,6 +222,7 @@
       confirmRow.style.display = isLogin ? "none" : "";
       confirmRow.classList.remove("match", "mismatch");
     }
+    if (emailRow) emailRow.classList.remove("valid", "invalid");
     const title = document.getElementById("authTitle");
     const sub = document.getElementById("authSub");
     if (title) title.textContent = isLogin ? "欢迎回来" : "创建你的账号";
@@ -247,6 +249,12 @@
     return /^[a-zA-Z0-9_]{2,20}$/.test(s);
   }
 
+  function isValidEmail(s) {
+    if (!s || s.length > 254) return false;
+    if (s.includes("..")) return false;
+    return /^[A-Za-z0-9](?:[A-Za-z0-9._%+-]*[A-Za-z0-9])?@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}$/.test(s);
+  }
+
   async function submitPassword() {
     clearAuthError();
     const email = document.getElementById("authEmail").value.trim();
@@ -254,6 +262,7 @@
     const username = (document.getElementById("authUsername")?.value || "").trim();
     const confirmPass = (document.getElementById("authConfirmPassword")?.value || "").trim();
     if (!email || !pass) { setAuthError("请填写邮箱和密码"); return; }
+    if (!isValidEmail(email)) { setAuthError("请输入有效的邮箱地址"); return; }
     const mode = getMode();
     if (mode === "register") {
       if (!isValidUsername(username)) { setAuthError("用户名需 2-20 字符，仅字母/数字/下划线"); return; }
@@ -483,6 +492,20 @@
       };
       confirmInput.addEventListener("input", syncConfirm);
       if (passInput) passInput.addEventListener("input", syncConfirm);
+    }
+
+    // 邮箱格式实时校验
+    const emailInput = document.getElementById("authEmail");
+    const emailRow = document.getElementById("authEmailRow");
+    if (emailInput && emailRow) {
+      const syncEmail = () => {
+        const val = emailInput.value.trim();
+        if (!val) { emailRow.classList.remove("valid", "invalid"); return; }
+        emailRow.classList.toggle("valid", isValidEmail(val));
+        emailRow.classList.toggle("invalid", !isValidEmail(val));
+      };
+      emailInput.addEventListener("input", syncEmail);
+      emailInput.addEventListener("blur", syncEmail);
     }
 
     // 点遮罩关闭
