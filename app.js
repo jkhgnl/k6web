@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.5.6";
+  const K5WEB_VERSION = "1.6.0";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -660,7 +660,7 @@
 
   // ---------- 地址搜索 ----------
   async function searchAddress(q) {
-    // 优先高德 Web 服务 API（localStorage 存 key）
+    // 优先高德 Web 服务 API（在关于页设置 Key 后生效）
     const amapKey = localStorage.getItem("amap_web_key") || "";
     if (amapKey) {
       try {
@@ -728,7 +728,11 @@
   function loadAmapKey() {
     const key = localStorage.getItem("amap_web_key") || "";
     $("amapKeyInput").value = key;
-    $("amapKeyStatus").textContent = key ? "✅ 高德地图搜索已启用" : "💡 未设置高德 Key，搜索将使用免费 OSM 服务";
+    if (key) {
+      $("amapKeyStatus").textContent = "✅ 高德地图搜索已启用";
+    } else {
+      $("amapKeyStatus").textContent = "💡 未设置高德 Key，搜索将使用免费 OSM 服务";
+    }
   }
   $("btnAmapKeySave").addEventListener("click", () => {
     const key = $("amapKeyInput").value.trim();
