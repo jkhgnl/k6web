@@ -1,1 +1,3 @@
 supabase/.temp/
+node_modules/
+.wrangler/
