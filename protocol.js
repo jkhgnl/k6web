@@ -50,12 +50,13 @@ const CMD = {
   REPLY_CN_FONT_READ: 0x05ef,
   DOPPLER_READ_SAT: 0x05ed, // payload {u8 slot, u8 pad} -> reply 0x05f0
   REPLY_READ_SAT: 0x05f0,   // {u8 status, u8 slot, u8 pad[2], 32B satellite}
-  BOOT_AUDIO_ERASE: 0x05f2,  // payload {u16 sectorIndex} -> reply 0x05f3 {u8 status}
-  REPLY_BOOT_AUDIO_ERASE: 0x05f3,
-  BOOT_AUDIO_WRITE: 0x05f4,  // payload {u32 offset, bytes data} -> reply 0x05f5 {u8 status}
-  REPLY_BOOT_AUDIO_WRITE: 0x05f5,
-  BOOT_AUDIO_READ: 0x05f6,   // payload {u32 offset} -> reply 0x05f7 {u32 offset, u8 data[128]}
-  REPLY_BOOT_AUDIO_READ: 0x05f7,
+  // Boot audio（外部 SPI 0x1F8000，见 App/app/uart.c）；Web 端 sendCommand 按 id+3 筛回复，所以写入/读取用 +3 布局
+  BOOT_AUDIO_ERASE: 0x05f2,  // payload {u16 sectorIndex} -> reply 0x05f5 {u8 status}
+  REPLY_BOOT_AUDIO_ERASE: 0x05f5,
+  BOOT_AUDIO_WRITE: 0x05f6,  // payload {u32 offset, bytes data} -> reply 0x05f9 {u8 status}
+  REPLY_BOOT_AUDIO_WRITE: 0x05f9,
+  BOOT_AUDIO_READ: 0x05fa,   // payload {u32 offset} -> reply 0x05fd {u32 offset, u8 data[128]}
+  REPLY_BOOT_AUDIO_READ: 0x05fd,
 };
 
 // 校准区（EEPROM 仿真地址，见 App/driver/eeprom_compat.c：0xB000..0xB200 -> SPI 0x10000）
