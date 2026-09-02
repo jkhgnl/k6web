@@ -824,6 +824,43 @@
     <p class="gps-qr-tip">邮箱注册需验证邮件。第三方登录授权后自动创建账号。</p>
   </div>
 </div>
+<!-- 找回密码弹窗 -->
+<div id="forgotModal" class="modal-overlay auth-overlay">
+  <div class="modal-panel auth-modal">
+    <button type="button" class="auth-close" id="btnForgotClose" aria-label="关闭">&times;</button>
+    <div class="auth-head">
+      <div class="auth-logo">🔑</div>
+      <h3 class="auth-title" id="forgotTitle">找回密码</h3>
+      <p class="auth-sub" id="forgotSub">输入注册邮箱，我们将发送重置链接</p>
+    </div>
+    <div id="forgotStep1">
+      <div class="auth-field" id="forgotEmailRow">
+        <span class="auth-field-icon">✉️</span>
+        <input id="forgotEmail" type="email" placeholder="注册邮箱" autocomplete="email">
+      </div>
+      <div id="forgotError" class="auth-error" role="status"></div>
+      <button id="btnForgotSend" type="button" class="auth-submit">发送重置邮件</button>
+      <div class="forgot-back-row">
+        <button type="button" class="forgot-back-btn" id="btnForgotBack">← 返回登录</button>
+      </div>
+    </div>
+    <div id="forgotStep2" style="display:none">
+      <p class="forgot-hint">为你的账号设置一个新密码。</p>
+      <div class="auth-field">
+        <span class="auth-field-icon">🔒</span>
+        <input id="forgotNewPassword" type="password" placeholder="新密码（至少 6 位）" autocomplete="new-password">
+        <button type="button" class="auth-eye" id="btnForgotPwEye">👁️</button>
+      </div>
+      <div class="auth-field" id="forgotConfirmRow2">
+        <span class="auth-field-icon">🔐</span>
+        <input id="forgotConfirmPassword2" type="password" placeholder="确认新密码" autocomplete="new-password">
+      </div>
+      <div id="forgotError2" class="auth-error" role="status"></div>
+      <button id="btnForgotSubmit" type="button" class="auth-submit">重置密码</button>
+    </div>
+  </div>
+</div>
+
 <div id="profileModal" class="modal-overlay">
   <div class="modal-panel" style="max-width:380px">
     <h3>个人中心</h3>
