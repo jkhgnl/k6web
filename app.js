@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.6.2";
+  const K5WEB_VERSION = "1.6.3";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -714,19 +714,19 @@
   function showTipList(items) {
     const box = $("mapTipList");
     box.innerHTML = "";
-    if (!items.length) { box.classList.remove("show"); return; }
+    if (!items.length) { box.style.display = "none"; return; }
     items.slice(0, 8).forEach(it => {
       const div = document.createElement("div");
       div.className = "map-tip-item";
       div.innerHTML = "<b>" + it.name + "</b><span>" + it.addr + "</span>";
       div.addEventListener("click", () => {
-        box.classList.remove("show");
+        box.style.display = "none";
         $("mapSearch").value = it.name;
         placeSearchPoint(it);
       });
       box.appendChild(div);
     });
-    box.classList.add("show");
+    box.style.display = "block";
   }
 
   // 把搜索结果定位到地图并填表
@@ -762,7 +762,7 @@
     await placeSearchPoint(results[0]);
   }
 
-  function hideTipList() { const b = $("mapTipList"); if (b) b.classList.remove("show"); }
+  function hideTipList() { const b = $("mapTipList"); if (b) b.style.display = "none"; }
 
   $("btnMapSearch").addEventListener("click", onMapSearch);
   $("mapSearch").addEventListener("keydown", (e) => {
