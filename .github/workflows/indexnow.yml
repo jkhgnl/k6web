@@ -1,0 +1,45 @@
+name: Notify IndexNow
+
+on:
+  push:
+    branches: [gh-pages]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Submit updated URLs
+        env:
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${INDEXNOW_KEY:-}" ]; then
+            echo "INDEXNOW_KEY is not configured"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json, os, urllib.request
+          key = os.environ['INDEXNOW_KEY']
+          payload = {
+              'host': 'jkhgnl.top',
+              'key': key,
+              'keyLocation': f'https://jkhgnl.top/{key}.txt',
+              'urlList': [
+                  'https://jkhgnl.top/',
+                  'https://jkhgnl.top/sitemap.xml',
+              ],
+          }
+          request = urllib.request.Request(
+              'https://api.indexnow.org/indexnow',
+              data=json.dumps(payload).encode(),
+              headers={'Content-Type': 'application/json'},
+              method='POST',
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              if response.status not in (200, 202):
+                  raise SystemExit(f'IndexNow returned HTTP {response.status}')
+              print(f'IndexNow accepted: HTTP {response.status}')
+          PY
