@@ -1083,6 +1083,7 @@ window.addEventListener("load", function () {
     <div class="nav-group">
       <div class="nav-items">
         <div class="nav-item" data-tab="tabWorkshop" type="button">创意工坊</div>
+        <div class="nav-item" data-external="https://doc.jkhgnl.top" type="button">新手教程</div>
       </div>
     </div>
     <div class="nav-group">
@@ -1161,6 +1162,11 @@ window.addEventListener("load", function () {
       <div class="tool-icon">🛠️</div>
       <div class="tool-label">创意工坊</div>
       <div class="tool-desc">社区模板、主题与扩展</div>
+    </div>
+    <div class="tool-card" data-external="https://doc.jkhgnl.top">
+      <div class="tool-icon">📘</div>
+      <div class="tool-label">新手教程</div>
+      <div class="tool-desc">快速上手与使用文档</div>
     </div>
     <div class="tool-card" data-goto="tabAbout">
       <div class="tool-icon">ℹ️</div>
@@ -2200,10 +2206,19 @@ window.addEventListener("load", function () {
     document.getElementById('overlay').classList.remove('show');
   }
   document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', () => window.switchTab(item.dataset.tab));
+    item.addEventListener('click', () => {
+      if (item.dataset.external) {
+        window.open(item.dataset.external, '_blank', 'noopener');
+        return;
+      }
+      window.switchTab(item.dataset.tab);
+    });
   });
   document.querySelectorAll('.tool-card[data-goto]').forEach(card => {
     card.addEventListener('click', () => window.switchTab(card.dataset.goto));
+  });
+  document.querySelectorAll('.tool-card[data-external]').forEach(card => {
+    card.addEventListener('click', () => window.open(card.dataset.external, '_blank', 'noopener'));
   });
   // 汉堡菜单
   document.getElementById('menuToggle').addEventListener('click', () => {
