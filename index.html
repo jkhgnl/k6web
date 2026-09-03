@@ -405,6 +405,14 @@ window.addEventListener("load", function () {
   .user-avatar-btn { cursor: pointer; position: relative; transition: opacity .15s; }
   .user-avatar-btn:hover { opacity: .8; }
   #avatarInput { display: none; }
+  .avatar-crop-modal { max-width: 430px; width: 92%; text-align: center; }
+  .avatar-crop-canvas-wrap { width: min(320px, 78vw); height: min(320px, 78vw); margin: 12px auto 16px; border-radius: 50%; overflow: hidden; background: #101828; box-shadow: 0 0 0 2px #2f6fdc, 0 0 0 5px rgba(47,111,220,.15); touch-action: none; }
+  #avatarCropCanvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  #avatarCropCanvas:active { cursor: grabbing; }
+  .avatar-crop-zoom { display: flex; align-items: center; gap: 10px; margin: 0 auto 10px; max-width: 320px; color: #687386; font-size: 13px; }
+  .avatar-crop-zoom input { flex: 1; accent-color: #2f6fdc; }
+  .avatar-crop-status { min-height: 20px; color: #c62828; font-size: 13px; margin: 4px 0 10px; }
+  .avatar-crop-actions { display: flex; justify-content: center; gap: 8px; }
   .user-name { font-size: 13px; color: #333; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* ===== 登录 / 注册（modern） ===== */
   .auth-overlay { background: rgba(15, 23, 42, .5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
@@ -1987,6 +1995,21 @@ window.addEventListener("load", function () {
   </div>
 </div>
 
+<!-- 头像裁剪弹窗 -->
+<div id="avatarCropModal" class="modal-overlay">
+  <div class="modal-panel avatar-crop-modal">
+    <h3>调整头像</h3>
+    <p class="hint">拖动图片选择区域，使用滑块缩放</p>
+    <div class="avatar-crop-canvas-wrap"><canvas id="avatarCropCanvas" width="512" height="512"></canvas></div>
+    <div class="avatar-crop-zoom"><span>−</span><input id="avatarCropZoom" type="range" min="1" max="3" step="0.01" value="1"><span>＋</span></div>
+    <div id="avatarCropStatus" class="avatar-crop-status"></div>
+    <div class="avatar-crop-actions">
+      <button id="avatarCropCancel" type="button" class="secondary">取消</button>
+      <button id="avatarCropApply" type="button">使用此头像</button>
+    </div>
+  </div>
+</div>
+
 <!-- 登录 / 注册弹窗 -->
 <div id="authModal" class="modal-overlay auth-overlay">
   <div class="modal-panel auth-modal">
@@ -2140,7 +2163,7 @@ window.addEventListener("load", function () {
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
 </script>
-<script src="auth.js?v=1.11.0" defer></script>
+<script src="auth.js?v=1.12.0" defer></script>
 <script src="workshop.js?v=1.11.0" defer></script>
 <script src="comments.js?v=1.11.0" defer></script>
 <script src="notifications.js?v=1.11.0" defer></script>

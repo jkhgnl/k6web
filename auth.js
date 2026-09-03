@@ -155,38 +155,165 @@
     if (modal) modal.classList.remove("show");
   }
 
+  let cropState = null;
+
+  function closeAvatarCrop(resetInput = true) {
+    const modal = document.getElementById("avatarCropModal");
+    if (modal) modal.classList.remove("show");
+    if (cropState?.objectUrl) URL.revokeObjectURL(cropState.objectUrl);
+    cropState = null;
+    if (resetInput) {
+      const input = document.getElementById("avatarInput");
+      if (input) input.value = "";
+    }
+  }
+
+  function clampCropPosition() {
+    if (!cropState) return;
+    const { image, canvas, scale } = cropState;
+    const w = image.naturalWidth * scale;
+    const h = image.naturalHeight * scale;
+    cropState.x = Math.min(0, Math.max(canvas.width - w, cropState.x));
+    cropState.y = Math.min(0, Math.max(canvas.height - h, cropState.y));
+  }
+
+  function drawAvatarCrop() {
+    if (!cropState) return;
+    const { image, canvas, ctx } = cropState;
+    clampCropPosition();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#101828";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, cropState.x, cropState.y, image.naturalWidth * cropState.scale, image.naturalHeight * cropState.scale);
+  }
+
+  function updateCropZoom(value) {
+    if (!cropState) return;
+    const oldScale = cropState.scale;
+    const nextScale = cropState.baseScale * Number(value);
+    const center = cropState.canvas.width / 2;
+    cropState.x = center - (center - cropState.x) * nextScale / oldScale;
+    cropState.y = center - (center - cropState.y) * nextScale / oldScale;
+    cropState.scale = nextScale;
+    drawAvatarCrop();
+  }
+
+  function openAvatarCrop(file) {
+    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    const status = document.getElementById("avatarCropStatus");
+    if (!file || !allowed.includes(file.type)) {
+      if (status) status.textContent = "仅支持 JPG、PNG、GIF、WebP 格式";
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      if (status) status.textContent = "原图不能超过 20MB";
+      return;
+    }
+
+    const modal = document.getElementById("avatarCropModal");
+    const canvas = document.getElementById("avatarCropCanvas");
+    const zoom = document.getElementById("avatarCropZoom");
+    const apply = document.getElementById("avatarCropApply");
+    if (!modal || !canvas || !zoom || !apply) return;
+
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    cropState = { image, canvas, ctx: canvas.getContext("2d"), objectUrl, baseScale: 1, scale: 1, x: 0, y: 0, dragging: false };
+    if (status) status.textContent = "图片加载中…";
+    apply.disabled = true;
+    modal.classList.add("show");
+
+    image.onload = () => {
+      const baseScale = Math.max(canvas.width / image.naturalWidth, canvas.height / image.naturalHeight);
+      cropState.baseScale = baseScale;
+      cropState.scale = baseScale;
+      cropState.x = (canvas.width - image.naturalWidth * baseScale) / 2;
+      cropState.y = (canvas.height - image.naturalHeight * baseScale) / 2;
+      zoom.value = "1";
+      apply.disabled = false;
+      if (status) status.textContent = "";
+      drawAvatarCrop();
+    };
+    image.onerror = () => {
+      if (status) status.textContent = "图片读取失败，请换一张图片";
+      apply.disabled = true;
+    };
+    image.src = objectUrl;
+  }
+
+  function initAvatarCrop() {
+    const canvas = document.getElementById("avatarCropCanvas");
+    const zoom = document.getElementById("avatarCropZoom");
+    const apply = document.getElementById("avatarCropApply");
+    const cancel = document.getElementById("avatarCropCancel");
+    const input = document.getElementById("avatarInput");
+    if (!canvas || !zoom || !apply || !cancel || !input) return;
+
+    input.addEventListener("change", (e) => {
+      const file = e.target.files?.[0];
+      if (file) openAvatarCrop(file);
+    });
+    zoom.addEventListener("input", () => updateCropZoom(zoom.value));
+    cancel.addEventListener("click", () => closeAvatarCrop());
+
+    let pointer = null;
+    canvas.addEventListener("pointerdown", (e) => {
+      if (!cropState || apply.disabled) return;
+      canvas.setPointerCapture(e.pointerId);
+      pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!cropState || !pointer || pointer.id !== e.pointerId) return;
+      const rect = canvas.getBoundingClientRect();
+      cropState.x += (e.clientX - pointer.x) * canvas.width / rect.width;
+      cropState.y += (e.clientY - pointer.y) * canvas.height / rect.height;
+      pointer.x = e.clientX; pointer.y = e.clientY;
+      drawAvatarCrop();
+    });
+    ["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
+      canvas.addEventListener(eventName, () => { pointer = null; });
+    });
+
+    apply.addEventListener("click", async () => {
+      if (!cropState || apply.disabled) return;
+      const status = document.getElementById("avatarCropStatus");
+      apply.disabled = true;
+      if (status) status.textContent = "正在生成并上传…";
+      try {
+        const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("无法生成图片")), "image/jpeg", 0.9));
+        if (blob.size > 2 * 1024 * 1024) throw new Error("裁剪后的头像不能超过 2MB");
+        const cropped = new File([blob], "avatar.jpg", { type: "image/jpeg" });
+        await uploadAvatar(cropped);
+        closeAvatarCrop();
+      } catch (e) {
+        apply.disabled = false;
+        if (status) status.textContent = e.message || "上传失败，请重试";
+      }
+    });
+  }
+
   async function uploadAvatar(file) {
-    const ALLOWED = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-    if (!file || !ALLOWED.includes(file.type)) {
-      setAuthError("仅支持 JPG/PNG/GIF/WebP 格式"); openModal(); return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      setAuthError("头像图片不能超过 2MB"); openModal(); return;
-    }
+    if (!file || file.size > 2 * 1024 * 1024) throw new Error("头像图片不能超过 2MB");
     const token = await getToken();
-    if (!token) { setAuthError("登录状态已失效，请重新登录"); openModal(); return; }
+    if (!token) throw new Error("登录状态已失效，请重新登录");
 
     const fd = new FormData();
     fd.append("file", file);
+    const resp = await fetch(URL + "/functions/v1/upload-avatar", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token },
+      body: fd,
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "HTTP " + resp.status);
 
-    try {
-      const resp = await fetch(URL + "/functions/v1/upload-avatar", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + token },
-        body: fd,
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || "HTTP " + resp.status);
+    const { error: upErr } = await supabase.auth.updateUser({ data: { avatar_url: data.avatar_url } });
+    if (upErr) throw upErr;
+  }
 
-      // 同步到 auth user_metadata，触发 onAuthStateChange 自动刷新 UI
-      const { error: upErr } = await supabase.auth.updateUser({
-        data: { avatar_url: data.avatar_url },
-      });
-      if (upErr) throw upErr;
-    } catch (e) {
-      setAuthError("头像上传失败：" + (e.message || "请重试"));
-      openModal();
-    }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
   function escapeHtml(s) {
@@ -534,13 +661,8 @@
     const ghBtn = document.getElementById("btnAuthGithub");
     if (ghBtn) ghBtn.addEventListener("click", () => oauth("github"));
 
-    // 头像上传：隐藏的 file input
-    const avatarInput = document.getElementById("avatarInput");
-    if (avatarInput) avatarInput.addEventListener("change", (e) => {
-      const f = e.target.files?.[0];
-      if (f) uploadAvatar(f);
-      e.target.value = "";
-    });
+    // 头像上传：先打开裁剪编辑器
+    initAvatarCrop();
 
     // Enter 提交
     const passInput = document.getElementById("authPassword");
