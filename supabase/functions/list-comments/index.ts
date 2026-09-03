@@ -1,5 +1,5 @@
 // 创意工坊/反馈区 - 评论列表（公开）
-// GET ?item_id=xxx&item_type=workshop&page=1&page_size=10
+// GET ?item_id=xxx&item_type=workshop&page=1&page_size=5
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, handleOptions, getUser } from "../_shared/cors.ts";
 
@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
     const itemId = url.searchParams.get("item_id");
     const itemType = url.searchParams.get("item_type") || "workshop";
     const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
-    const pageSize = Math.min(50, Math.max(1, parseInt(url.searchParams.get("page_size") || "10", 10)));
+    const pageSize = Math.min(50, Math.max(1, parseInt(url.searchParams.get("page_size") || "5", 10)));
 
     if (!itemId) {
       return jsonResponse({ error: "item_id is required" }, 400);

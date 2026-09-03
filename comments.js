@@ -156,7 +156,7 @@
     container.innerHTML = `<div class="comment-loading">加载中...</div>`;
 
     try {
-      const params = new URLSearchParams({ item_id: itemId, item_type: itemType, page: String(page), page_size: "10" });
+      const params = new URLSearchParams({ item_id: itemId, item_type: itemType, page: String(page), page_size: "5" });
       // 如果已登录，带上用户 token 以便后端判断点赞状态和删除权限
       const headers = anonHeaders();
       if (window.K5AUTH && window.K5AUTH.isLoggedIn()) {
@@ -169,7 +169,7 @@
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       const data = await resp.json();
       renderCommentList(container, data.comments || [], itemType);
-      renderPagination(container, data.total || 0, data.page || 1, data.page_size || 10, itemId, itemType, listContainerId);
+      renderPagination(container, data.total || 0, data.page || 1, data.page_size || 5, itemId, itemType, listContainerId);
     } catch (e) {
       container.innerHTML = `<div class="comment-empty">评论加载失败：${escapeHtml(e.message)}</div>`;
     }
