@@ -500,6 +500,16 @@
         }
       };
     }
+
+    // 处理公开主页作品的深链接：index.html#ws-<作品ID>
+    const hash = window.location.hash || "";
+    if (hash.startsWith("#ws-")) {
+      const workId = hash.slice(4).trim();
+      if (workId && typeof window.switchTab === "function") {
+        window.switchTab("tabWorkshop");
+        openDetail(workId);
+      }
+    }
   }
 
   window.K5WORKSHOP = { init, loadList };
