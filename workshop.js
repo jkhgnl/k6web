@@ -17,7 +17,7 @@
   };
   const CATEGORY_KEYS = ["logo", "channel", "firmware", "theme", "other"];
 
-  let currentCategory = "all";
+  let currentCategory = "logo"; // 创意工坊默认展示开机图片分类
   let currentPage = 1;
   let currentQuery = "";
   let total = 0;
@@ -649,7 +649,7 @@
   function init() {
     initCategoryTabs();
     initPublishForm();
-    loadList(1, "all");
+    loadList(1, "logo");
 
     const closeBtn = $("btnWsDetailClose");
     if (closeBtn) closeBtn.addEventListener("click", closeDetail);
