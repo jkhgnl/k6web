@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.22.1";
+  const K5WEB_VERSION = "1.22.2";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -3764,17 +3764,65 @@
     requestAnimationFrame(tick);
   }).catch(() => {});
 
-  // 动态获取 APP 最新版本下载链接
-  fetch("https://gitee.com/api/v5/repos/jkhgnl/uvk6-tools-android/releases/latest").then(r => r.json()).then(d => {
-    const apk = (d.assets || []).find(a => a.name && a.name.endsWith(".apk"));
-    const btn = $("appDownloadBtn");
-    if (apk && btn) {
-      btn.href = apk.browser_download_url;
-    } else if (d.tag_name && btn) {
-      // fallback: 即使 assets 为空，也能根据 tag_name 构造出下载链接
-      btn.href = `https://gitee.com/jkhgnl/uvk6-tools-android/releases/download/${d.tag_name}/uvk6tools-${d.tag_name}.apk`;
+  // 动态获取 APP 最新版本下载链接（永远跟随 Gitee 最新 Release，不硬编码版本号）
+  const APP_REPO_API = "https://gitee.com/api/v5/repos/jkhgnl/uvk6-tools-android/releases/latest";
+
+  async function fetchLatestAppRelease() {
+    // 优先走站点 CORS 代理（浏览器直连 gitee.com API 常被网络/CORS 拦截）
+    if (WORKER_PROXY_URL) {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 10000);
+        const resp = await fetch(WORKER_PROXY_URL + "/?url=" + encodeURIComponent(APP_REPO_API), { signal: ctrl.signal });
+        clearTimeout(timer);
+        if (resp.ok) {
+          const d = await resp.json();
+          if (d && d.tag_name) return d;
+        }
+      } catch (e) {
+        log("APP 版本经代理获取失败：" + e.message, "info");
+      }
     }
-  }).catch(() => {
-    // 网络请求失败时保留 HTML 中硬编码的直接下载链接（手机浏览器兼容）
-  });
+    // 直连兜底
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 10000);
+      const resp = await fetch(APP_REPO_API, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (resp.ok) {
+        const d = await resp.json();
+        if (d && d.tag_name) return d;
+      }
+    } catch (e) {
+      log("APP 版本直连获取失败：" + e.message, "info");
+    }
+    return null;
+  }
+
+  function buildAppDownloadUrl(d) {
+    if (!d || !d.tag_name) return "";
+    const apk = (d.assets || []).find((a) => a.name && /\.apk$/i.test(a.name));
+    if (apk && apk.browser_download_url) return apk.browser_download_url;
+    // assets 为空时按 Gitee 下载规则构造
+    return `https://gitee.com/jkhgnl/uvk6-tools-android/releases/download/${d.tag_name}/uvk6tools-${d.tag_name}.apk`;
+  }
+
+  async function refreshAppDownloadBtn() {
+    const btn = $("appDownloadBtn");
+    if (!btn) return;
+    btn.textContent = "📱 正在获取最新 APP…";
+    btn.href = "#";
+    const d = await fetchLatestAppRelease();
+    if (!d || !d.tag_name) {
+      btn.textContent = "📱 获取 APP 失败，点击重试";
+      btn.onclick = (e) => { e.preventDefault(); refreshAppDownloadBtn(); };
+      return;
+    }
+    const url = buildAppDownloadUrl(d);
+    const ver = String(d.tag_name).replace(/^v/i, "");
+    btn.href = url;
+    btn.textContent = `📱 下载配套 APP（Android v${ver}）`;
+    btn.onclick = null;
+  }
+  refreshAppDownloadBtn();
 })();
