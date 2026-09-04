@@ -1,7 +1,8 @@
-// 创意工坊/反馈区 - 删除评论（需登录，仅限作者）
+// 创意工坊/反馈区 - 删除评论（需登录，仅限作者或管理员）
 // POST body: { comment_id }
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, handleOptions, getUser } from "../_shared/cors.ts";
+import { isAdminUser } from "../_shared/admin.ts";
 
 Deno.serve(async (req) => {
   const pre = handleOptions(req);
@@ -38,7 +39,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "评论不存在" }, 404);
     }
 
-    if (comment.user_id !== user.id) {
+    if (comment.user_id !== user.id && !isAdminUser(user)) {
       return jsonResponse({ error: "只能删除自己的评论" }, 403);
     }
 

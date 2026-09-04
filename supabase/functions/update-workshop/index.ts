@@ -1,8 +1,9 @@
-// 创意工坊 - 编辑作品（仅限本人）
+// 创意工坊 - 编辑作品（仅限本人或管理员）
 // POST multipart/form-data: id, title, description, category, [file], [thumbnail]
 // 不传 file / thumbnail 时保留原文件；传了则替换并删除旧文件
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, getUser, handleOptions } from "../_shared/cors.ts";
+import { isAdminUser } from "../_shared/admin.ts";
 import { r2Enabled, r2PutObject, r2PublicUrl, r2DeleteObject } from "../_shared/r2.ts";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -57,7 +58,7 @@ Deno.serve(async (req) => {
       .eq("id", id)
       .single();
     if (getErr || !item) return jsonResponse({ error: "作品不存在" }, 404);
-    if (item.user_id !== user.id) return jsonResponse({ error: "无权编辑他人作品" }, 403);
+    if (item.user_id !== user.id && !isAdminUser(user)) return jsonResponse({ error: "无权编辑他人作品" }, 403);
 
     // 校验可选的新文件
     if (file) {

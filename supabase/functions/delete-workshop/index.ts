@@ -1,8 +1,9 @@
-// 创意工坊 - 删除作品（仅限本人）
+// 创意工坊 - 删除作品（仅限本人或管理员）
 // DELETE ?id=<uuid>
 // 文件删除：R2 与 Supabase Storage 双端尽力清理（迁移期间新旧文件可能分散在两处）
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, getUser, handleOptions } from "../_shared/cors.ts";
+import { isAdminUser } from "../_shared/admin.ts";
 import { r2DeleteObject } from "../_shared/r2.ts";
 
 Deno.serve(async (req) => {
@@ -32,7 +33,7 @@ Deno.serve(async (req) => {
       .eq("id", id)
       .single();
     if (getErr || !item) return jsonResponse({ error: "作品不存在" }, 404);
-    if (item.user_id !== user.id) return jsonResponse({ error: "无权删除他人作品" }, 403);
+    if (item.user_id !== user.id && !isAdminUser(user)) return jsonResponse({ error: "无权删除他人作品" }, 403);
 
     // 删数据库记录
     const { error: delErr } = await supabase
