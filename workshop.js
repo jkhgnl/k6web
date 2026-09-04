@@ -617,7 +617,7 @@
 
   // 供其他页面（如开机图片）上传单个作品文件：标题/描述/分类/文件
   // 成功返回 { id, title }，失败抛异常
-  async function uploadFile({ title, description = "", category = "other", file }) {
+  async function uploadFile({ title, description = "", category = "other", file, thumbnail = null }) {
     if (!title || !file) throw new Error("标题和文件必填");
     const token = await window.K5AUTH.getToken();
     if (!token) { alert("登录状态已失效，请重新登录"); window.K5AUTH.openModal(); return null; }
@@ -627,6 +627,7 @@
     form.append("description", description);
     form.append("category", category);
     form.append("file", file);
+    if (thumbnail) form.append("thumbnail", thumbnail);
 
     const resp = await fetch(`${FUNC_BASE}/upload-workshop`, {
       method: "POST",

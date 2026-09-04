@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.17.0";
+  const K5WEB_VERSION = "1.18.0";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -2042,6 +2042,7 @@
           description: "128×64 单色开机图片，可直接在「开机图片」页下载并写入对讲机。",
           category: "logo",
           file,
+          thumbnail: file, // 最终生成的黑白图同时作为作品展示图
         });
         setStatus("✅ 已上传至创意工坊（开机图片分类）", "ok");
         log(`开机图片已上传：${title}`, "开机图片");
