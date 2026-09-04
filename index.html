@@ -633,6 +633,14 @@ window.addEventListener("load", function () {
   #workshopStatus { font-size: 12px; color: #a3aab6; text-align: center; margin-top: 10px; }
 
   /* 发布按钮 */
+  .ws-browse-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; margin-top: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  .ws-search-input {
+    width: 200px; padding: 9px 12px; font-size: 13px; color: #1c2433;
+    border: 1px solid #e3e8ef; border-radius: 10px; background: #fbfcfe;
+    outline: none; transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .ws-search-input:focus { border-color: #2f6fdc; box-shadow: 0 0 0 3px rgba(47, 111, 220, .14); background: #fff; }
+  .ws-search-input::placeholder { color: #9aa3b0; }
   .ws-publish-btn {
     flex-shrink: 0; margin-top: 4px; padding: 10px 20px; font-size: 14px; font-weight: 600;
     border: none; border-radius: 12px; color: #fff; cursor: pointer;
@@ -1593,7 +1601,10 @@ window.addEventListener("load", function () {
         <h2>社区创意内容</h2>
         <p class="hint">浏览用户分享的射频频段配置、信道模板、功能扩展、固件和创意方案。上传自己的作品或下载他人分享的内容。</p>
       </div>
-      <button id="btnWsPublish" type="button" class="ws-publish-btn">📤 发布作品</button>
+      <div class="ws-browse-actions">
+        <input id="wsSearchInput" type="search" class="ws-search-input" placeholder="🔍 搜索标题 / 描述..." autocomplete="off">
+        <button id="btnWsPublish" type="button" class="ws-publish-btn">📤 发布作品</button>
+      </div>
     </div>
     <div class="ws-categories" id="workshopCategories"></div>
     <div id="workshopGrid" class="ws-grid"></div>
@@ -2199,10 +2210,10 @@ window.addEventListener("load", function () {
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
 </script>
-<script src="auth.js?v=1.19.0" defer></script>
-<script src="workshop.js?v=1.19.0" defer></script>
+<script src="auth.js?v=1.20.0" defer></script>
+<script src="workshop.js?v=1.20.0" defer></script>
 <script src="comments.js?v=1.12.1" defer></script>
-<script src="notifications.js?v=1.19.0" defer></script>
+<script src="notifications.js?v=1.20.0" defer></script>
 <script src="vendor/satellite.min.js" defer></script>
 <script src="gb2312_table.js?v=csv1" defer></script>
 <script src="freqdb.js" defer></script>
@@ -2210,7 +2221,7 @@ window.addEventListener("load", function () {
 <script src="protocol.js?v=16x16" defer></script>
 <script src="coord.js" defer></script>
 <script src="calc.js" defer></script>
-<script src="app.js?v=1.19.0" defer></script>
+<script src="app.js?v=1.20.0" defer></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
   // 侧边栏展开/折叠

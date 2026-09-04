@@ -20,6 +20,7 @@
 
   let currentCategory = "all";
   let currentPage = 1;
+  let currentQuery = "";
   let total = 0;
   const PAGE_SIZE = 12;
 
@@ -70,17 +71,19 @@
   }
 
   // ---------- 列表 ----------
-  async function loadList(page = currentPage, category = currentCategory) {
+  async function loadList(page = currentPage, category = currentCategory, q = currentQuery) {
     const grid = $("workshopGrid");
     const status = $("workshopStatus");
     if (!grid) return;
     currentPage = page;
     currentCategory = category;
+    currentQuery = q;
     grid.innerHTML = `<div class="ws-loading">加载中…</div>`;
     if (status) status.textContent = "";
 
     const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
     if (category && category !== "all") params.set("category", category);
+    if (q) params.set("q", q);
 
     try {
       const resp = await fetch(`${FUNC_BASE}/list-workshop?${params}`, { headers: anonHeaders() });
@@ -148,7 +151,7 @@
                 <button class="ws-page-btn" data-page="${currentPage + 1}" ${currentPage >= pages ? "disabled" : ""}>下一页 ›</button>`;
     wrap.innerHTML = html;
     wrap.querySelectorAll(".ws-page-btn:not([disabled])").forEach((b) => {
-      b.addEventListener("click", () => loadList(parseInt(b.dataset.page, 10), currentCategory));
+      b.addEventListener("click", () => loadList(parseInt(b.dataset.page, 10), currentCategory, currentQuery));
     });
   }
 
@@ -257,7 +260,7 @@
       b.addEventListener("click", () => {
         wrap.querySelectorAll(".ws-cat-btn").forEach((x) => x.classList.remove("active"));
         b.classList.add("active");
-        loadList(1, b.dataset.cat);
+        loadList(1, b.dataset.cat, currentQuery);
       });
     });
   }
@@ -666,6 +669,25 @@
           return;
         }
         openPublishModal("create", null);
+      });
+    }
+    // 搜索框：回车立即搜索，输入停顿 400ms 防抖
+    const searchInput = $("wsSearchInput");
+    if (searchInput) {
+      const doSearch = () => {
+        const q = searchInput.value.trim();
+        if (q !== currentQuery) loadList(1, currentCategory, q);
+      };
+      searchInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          doSearch();
+        }
+      });
+      let searchTimer = null;
+      searchInput.addEventListener("input", () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(doSearch, 400);
       });
     }
     // 发布弹窗：取消 / 点遮罩关闭
