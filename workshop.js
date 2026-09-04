@@ -681,21 +681,27 @@
     const delBtn = $("btnWsDelete");
     if (delBtn) delBtn.addEventListener("click", deleteDetailItem);
 
-    // 开机图片：下载&使用此图片（跳转开机图片页并载入预览）
+    // 开机图片：应用此图片（服务端取图转 base64 避开 CORS，跳转开机图片页并载入预览）
     const useLogoBtn = $("btnWsUseLogo");
     if (useLogoBtn) {
       useLogoBtn.addEventListener("click", async () => {
-        const url = $("btnWsDownload")?.dataset.path;
-        if (!url) { alert("暂无可下载地址"); return; }
+        if (!detailId) return;
         useLogoBtn.disabled = true;
         const oldText = useLogoBtn.textContent;
-        useLogoBtn.textContent = "⏳ 下载中...";
+        useLogoBtn.textContent = "⏳ 获取中...";
         try {
-          const resp = await fetch(url);
-          if (!resp.ok) throw new Error("HTTP " + resp.status);
-          const blob = await resp.blob();
-          const fileName = detailItem?.file_name || "logo.png";
-          const file = new File([blob], fileName, { type: blob.type || "image/png" });
+          const resp = await fetch(`${FUNC_BASE}/get-workshop-item?id=${encodeURIComponent(detailId)}&include_file=1`, {
+            headers: anonHeaders(),
+          });
+          const data = await resp.json();
+          if (!data.item) throw new Error(data.error || "加载失败");
+          if (!data.file_b64) throw new Error("无法获取图片内容");
+          // base64 → File（开机图片为 PNG）
+          const binary = atob(data.file_b64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const fileName = data.item.file_name || "logo.png";
+          const file = new File([bytes], fileName, { type: "image/png" });
           closeDetail();
           if (typeof window.switchTab === "function") window.switchTab("tabLogo");
           // 等页面切换完成后再载入图片
@@ -708,7 +714,7 @@
             }
           }, 100);
         } catch (e) {
-          alert("下载失败：" + e.message);
+          alert("应用失败：" + e.message);
         } finally {
           useLogoBtn.disabled = false;
           useLogoBtn.textContent = oldText;
