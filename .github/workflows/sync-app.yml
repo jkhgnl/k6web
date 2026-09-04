@@ -82,9 +82,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.gitee.outputs.tag }}"
+          REPO="jkhgnl/k6web"
           # 删除旧的 app-latest release（固定 tag，始终作为 latest）
-          gh release delete app-latest --yes --cleanup-tag || true
+          gh release delete app-latest --repo "$REPO" --yes --cleanup-tag || true
           gh release create app-latest /tmp/uvk6tools-latest.apk \
+            --repo "$REPO" \
             --title "UvK6Tools ${TAG}" \
             --notes "从 Gitee 自动同步的最新版本：${TAG}（点击上方 Download 或直接下载 uvk6tools-latest.apk）"
           echo "已发布 app-latest: https://github.com/jkhgnl/k6web/releases/latest/download/uvk6tools-latest.apk"
