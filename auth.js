@@ -123,7 +123,7 @@
         body.innerHTML = `<div class="ws-empty">你还没有上传过作品，去创意工坊发布第一个吧 🚀</div>`;
         return;
       }
-      const CAT_ICON = { theme: "🎨", channel: "📋", extension: "⚙️", firmware: "💾", other: "📦" };
+      const CAT_ICON = { theme: "🎨", channel: "📋", extension: "⚙️", firmware: "💾", logo: "🖼️", other: "📦" };
       const rows = items.map((it) => `
         <div class="my-work-item">
           <span class="my-work-icon">${CAT_ICON[it.category] || "📦"}</span>

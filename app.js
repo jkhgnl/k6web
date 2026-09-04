@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.16.0";
+  const K5WEB_VERSION = "1.17.0";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -1793,6 +1793,8 @@
     logoData = null;
     logoImg = null;
     $("btnLogoWrite").disabled = true;
+    const uploadBtn = $("btnLogoUpload");
+    if (uploadBtn) uploadBtn.disabled = true;
     if (!f) return;
 
     try {
@@ -1810,6 +1812,7 @@
       logoData = imageToLogoBitmap(img, threshold);
       renderLogoPreview(getLogoDataForDisplay(), "logoPreview");
       $("btnLogoWrite").disabled = false;
+      if (uploadBtn) uploadBtn.disabled = false;
       updateLogoDropZone(f.name);
       log(`图片已加载：${f.name}（${img.width}×${img.height} → 128×64 单色）`);
     } catch (err) {
@@ -1996,6 +1999,68 @@
       $("btnLogoRead").disabled = false;
     }
   });
+
+  // 上传当前调好的开机图片到创意工坊（分类：开机图片）
+  const logoUploadBtn = $("btnLogoUpload");
+  if (logoUploadBtn) {
+    logoUploadBtn.addEventListener("click", async () => {
+      if (!window.K5AUTH.isLoggedIn()) { window.K5AUTH.openModal(); return; }
+      if (!logoData) { setStatus("请先选择图片文件", "err"); return; }
+      // 用当前预览对应的位图（含反色）生成 PNG
+      const bitmap = getLogoDataForDisplay();
+      const canvas = document.createElement("canvas");
+      canvas.width = 128; canvas.height = 64;
+      const ctx = canvas.getContext("2d");
+      const imageData = ctx.createImageData(128, 64);
+      for (let page = 0; page < 8; page++) {
+        for (let col = 0; col < 128; col++) {
+          const byte = bitmap[page * 128 + col];
+          for (let bit = 0; bit < 8; bit++) {
+            const row = page * 8 + bit;
+            if (row >= 64) continue;
+            const idx = (row * 128 + col) * 4;
+            const black = (byte & (1 << bit)) !== 0;
+            imageData.data[idx] = black ? 0 : 255;
+            imageData.data[idx + 1] = black ? 0 : 255;
+            imageData.data[idx + 2] = black ? 0 : 255;
+            imageData.data[idx + 3] = 255;
+          }
+        }
+      }
+      ctx.putImageData(imageData, 0, 0);
+      const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+      if (!blob) { setStatus("生成图片失败", "err"); return; }
+      const file = new File([blob], `logo_${Date.now()}.png`, { type: "image/png" });
+      const title = (window.prompt("作品标题（不超过 60 字）：", `开机图片 ${new Date().toLocaleDateString("zh-CN")}`) || "").trim();
+      if (!title) return;
+      logoUploadBtn.disabled = true;
+      const oldText = logoUploadBtn.textContent;
+      logoUploadBtn.textContent = "⏳ 上传中...";
+      try {
+        await window.K5WORKSHOP.uploadFile({
+          title,
+          description: "128×64 单色开机图片，可直接在「开机图片」页下载并写入对讲机。",
+          category: "logo",
+          file,
+        });
+        setStatus("✅ 已上传至创意工坊（开机图片分类）", "ok");
+        log(`开机图片已上传：${title}`, "开机图片");
+      } catch (err) {
+        setStatus("上传失败：" + err.message, "err");
+        log("上传异常：" + err.message, "err");
+      } finally {
+        logoUploadBtn.disabled = false;
+        logoUploadBtn.textContent = oldText;
+      }
+    });
+  }
+
+  // 供创意工坊详情页"下载&使用此图片"调用：把下载的开机图片载入预览
+  window.K5LOGO = {
+    loadLogoFile(file) {
+      return handleLogoFile(file);
+    },
+  };
 
   // ---------- 开机音效刷写（外部 SPI Flash 0x1F8000，12 KB） ----------
   // VOICE_SAMPLES 与固件 App/driver/startup_voice.c s_VoiceSamples[256] 完全一致

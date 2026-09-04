@@ -13,9 +13,10 @@
     channel:   { label: "📋 信道模板",    icon: "📋" },
     extension: { label: "⚙️ 功能扩展",    icon: "⚙️" },
     firmware:  { label: "💾 固件",        icon: "💾" },
+    logo:      { label: "🖼️ 开机图片",    icon: "🖼️" },
     other:     { label: "📦 其他作品",    icon: "📦" },
   };
-  const CATEGORY_KEYS = ["theme", "channel", "extension", "firmware", "other"];
+  const CATEGORY_KEYS = ["theme", "channel", "extension", "firmware", "logo", "other"];
 
   let currentCategory = "all";
   let currentPage = 1;
@@ -196,6 +197,10 @@
         const isOwner = window.K5AUTH.isLoggedIn() && window.K5AUTH.getUserId() === it.user_id;
         if (editBtn) editBtn.style.display = isOwner ? "inline-flex" : "none";
         if (delBtn) delBtn.style.display = isOwner ? "inline-flex" : "none";
+
+        // 开机图片分类 → 显示"下载&使用此图片"
+        const useLogoBtn = $("btnWsUseLogo");
+        if (useLogoBtn) useLogoBtn.style.display = it.category === "logo" ? "inline-flex" : "none";
 
         // 加载评论
         if (commentsSection && window.K5COMMENTS) {
@@ -610,6 +615,32 @@
     if (btn) { btn.disabled = false; btn.textContent = oldText; }
   }
 
+  // 供其他页面（如开机图片）上传单个作品文件：标题/描述/分类/文件
+  // 成功返回 { id, title }，失败抛异常
+  async function uploadFile({ title, description = "", category = "other", file }) {
+    if (!title || !file) throw new Error("标题和文件必填");
+    const token = await window.K5AUTH.getToken();
+    if (!token) { alert("登录状态已失效，请重新登录"); window.K5AUTH.openModal(); return null; }
+
+    const form = new FormData();
+    form.append("title", title);
+    form.append("description", description);
+    form.append("category", category);
+    form.append("file", file);
+
+    const resp = await fetch(`${FUNC_BASE}/upload-workshop`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + token,
+        apikey: window.SUPABASE_PUBLISHABLE_KEY || "",
+      },
+      body: form,
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "HTTP " + resp.status);
+    return data.item || data;
+  }
+
   // ---------- 初始化 ----------
   function init() {
     initCategoryTabs();
@@ -648,6 +679,41 @@
     if (editBtn) editBtn.addEventListener("click", () => openPublishModal("edit", detailItem));
     const delBtn = $("btnWsDelete");
     if (delBtn) delBtn.addEventListener("click", deleteDetailItem);
+
+    // 开机图片：下载&使用此图片（跳转开机图片页并载入预览）
+    const useLogoBtn = $("btnWsUseLogo");
+    if (useLogoBtn) {
+      useLogoBtn.addEventListener("click", async () => {
+        const url = $("btnWsDownload")?.dataset.path;
+        if (!url) { alert("暂无可下载地址"); return; }
+        useLogoBtn.disabled = true;
+        const oldText = useLogoBtn.textContent;
+        useLogoBtn.textContent = "⏳ 下载中...";
+        try {
+          const resp = await fetch(url);
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          const blob = await resp.blob();
+          const fileName = detailItem?.file_name || "logo.png";
+          const file = new File([blob], fileName, { type: blob.type || "image/png" });
+          closeDetail();
+          if (typeof window.switchTab === "function") window.switchTab("tabLogo");
+          // 等页面切换完成后再载入图片
+          setTimeout(() => {
+            if (window.K5LOGO && window.K5LOGO.loadLogoFile) {
+              window.K5LOGO.loadLogoFile(file);
+              alert("✅ 已载入开机图片预览，可在下方调整反色/阈值后写入对讲机");
+            } else {
+              alert("开机图片模块未就绪，请稍后重试");
+            }
+          }, 100);
+        } catch (e) {
+          alert("下载失败：" + e.message);
+        } finally {
+          useLogoBtn.disabled = false;
+          useLogoBtn.textContent = oldText;
+        }
+      });
+    }
 
     // 登录状态变化时，若详情弹窗开着，重刷作者按钮显隐
     window.K5AUTH.onAuth(() => {
@@ -692,5 +758,5 @@
     }
   }
 
-  window.K5WORKSHOP = { init, loadList };
+  window.K5WORKSHOP = { init, loadList, uploadFile };
 })();
