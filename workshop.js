@@ -158,8 +158,14 @@
     modal.classList.add("show");
     const body = $("wsDetailBody");
     const dlBtn = $("btnWsDownload");
+    const editBtn = $("btnWsEdit");
+    const delBtn = $("btnWsDelete");
+    detailId = id;
+    detailItem = null;
     body.innerHTML = `<div class="ws-loading">加载中…</div>`;
     dlBtn.disabled = true;
+    if (editBtn) editBtn.style.display = "none";
+    if (delBtn) delBtn.style.display = "none";
 
     // 隐藏评论区
     const commentsSection = $("wsComments");
@@ -170,6 +176,7 @@
       .then((data) => {
         if (!data.item) throw new Error(data.error || "加载失败");
         const it = data.item;
+        detailItem = it;
         const cat = CATEGORIES[it.category] || CATEGORIES.other;
         const thumbHtml = it.thumbnail_url
           ? `<img class="ws-detail-thumb" src="${escapeHtml(it.thumbnail_url)}" alt="" loading="lazy">`
@@ -184,6 +191,11 @@
         dlBtn.disabled = false;
         dlBtn.dataset.id = it.id;
         dlBtn.dataset.path = data.download_url || "";
+
+        // 作者本人 → 显示编辑/删除按钮
+        const isOwner = window.K5AUTH.isLoggedIn() && window.K5AUTH.getUserId() === it.user_id;
+        if (editBtn) editBtn.style.display = isOwner ? "inline-flex" : "none";
+        if (delBtn) delBtn.style.display = isOwner ? "inline-flex" : "none";
 
         // 加载评论
         if (commentsSection && window.K5COMMENTS) {
@@ -200,6 +212,12 @@
   function closeDetail() {
     const modal = $("wsDetailModal");
     if (modal) modal.classList.remove("show");
+    detailId = null;
+    detailItem = null;
+    const editBtn = $("btnWsEdit");
+    const delBtn = $("btnWsDelete");
+    if (editBtn) editBtn.style.display = "none";
+    if (delBtn) delBtn.style.display = "none";
   }
 
   function download() {
@@ -239,10 +257,76 @@
     });
   }
 
-  // ---------- 上传 ----------
-  let refreshUploadBtn = null; // initUploadForm 内注册，供 doUpload 结束后刷新按钮
+  // ---------- 发布 / 编辑 / 删除 ----------
+  let selectedCat = "theme";   // 发布/编辑弹窗当前分类
+  let editingId = null;        // null = 发布新作品；非空 = 编辑该作品 id
+  let detailId = null;         // 详情弹窗当前作品 id
+  let detailItem = null;       // 详情弹窗当前作品数据
+  let refreshUploadBtn = null; // initPublishForm 内注册，供 doPublish 结束后刷新按钮
 
-  function initUploadForm() {
+  function showFiles(files) {
+    const fileInfo = $("wsFileInfo");
+    const fileNameEl = $("wsFileName");
+    const fileSizeEl = $("wsFileSize");
+    if (!fileInfo) return;
+    if (!files || files.length === 0) { fileInfo.hidden = true; return; }
+    let totalSize = 0;
+    const names = [];
+    for (const f of files) {
+      totalSize += f.size;
+      names.push(escapeHtml(f.name) + " (" + fmtSize(f.size) + ")");
+    }
+    fileNameEl.innerHTML = names.join("<br>");
+    const warn = totalSize > 1.5 * 1024 * 1024 ? ' · <span style="color:#c62828">⚠️ 单个文件不能超过 1.5MB</span>' : "";
+    fileSizeEl.innerHTML = "共 " + files.length + " 个文件，" + fmtSize(totalSize) + warn;
+    fileInfo.hidden = false;
+  }
+
+  function openPublishModal(mode, item) {
+    const modal = $("wsPublishModal");
+    if (!modal) return;
+    editingId = mode === "edit" && item ? item.id : null;
+
+    const titleEl = $("workshopTitle");
+    const descEl = $("workshopDesc");
+    const fileEl = $("workshopFile");
+    const thumbEl = $("workshopThumb");
+    const thumbEnabled = $("wsThumbEnabled");
+    const thumbPicker = $("wsThumbPicker");
+    const thumbPreview = $("wsThumbPreview");
+
+    // 标题与副标题
+    $("wsPublishTitle").textContent = editingId ? "编辑作品" : "发布作品";
+    $("wsPublishSub").textContent = editingId
+      ? `保留当前文件《${item.file_name}》· 不选新文件则不改动文件，其余修改即时生效。`
+      : "分享你的信道模板、配置方案、固件或脚本扩展。支持 .bin / .csv / .txt / .json / .py / .zip 等格式，文件 ≤ 1.5MB。";
+
+    // 预填 / 清空表单
+    titleEl.value = editingId ? item.title : "";
+    descEl.value = editingId ? (item.description || "") : "";
+    fileEl.value = "";
+    thumbEl.value = "";
+    thumbEnabled.checked = false;
+    if (thumbPicker) thumbPicker.hidden = true;
+    if (thumbPreview) thumbPreview.innerHTML = "🖼️";
+    showFiles(null);
+
+    // 分类：编辑时选中当前分类
+    selectedCat = editingId ? (item.category || "theme") : "theme";
+    document.querySelectorAll("#workshopCategoryBtns .ws-cat-btn").forEach((b) => {
+      b.classList.toggle("active", b.dataset.cat === selectedCat);
+    });
+
+    modal.classList.add("show");
+    if (refreshUploadBtn) refreshUploadBtn();
+  }
+
+  function closePublishModal() {
+    const modal = $("wsPublishModal");
+    if (modal) modal.classList.remove("show");
+  }
+
+  function initPublishForm() {
     const titleEl = $("workshopTitle");
     const descEl = $("workshopDesc");
     const fileEl = $("workshopFile");
@@ -250,16 +334,12 @@
     const btn = $("btnWorkshopUpload");
     const dz = $("wsDropzone");
     const fileInfo = $("wsFileInfo");
-    const fileNameEl = $("wsFileName");
-    const fileSizeEl = $("wsFileSize");
     const fileRemove = $("wsFileRemove");
     const thumbEl = $("workshopThumb");
     const thumbBtn = $("wsThumbBtn");
     const thumbPreview = $("wsThumbPreview");
     const thumbEnabled = $("wsThumbEnabled");
     const thumbPicker = $("wsThumbPicker");
-    let selectedCat = "theme";
-    let selectedThumb = null;
 
     if (!catWrap || !btn) return;
 
@@ -268,7 +348,6 @@
       thumbEnabled.addEventListener("change", () => {
         thumbPicker.hidden = !thumbEnabled.checked;
         if (!thumbEnabled.checked) {
-          selectedThumb = null;
           if (thumbEl) thumbEl.value = "";
           if (thumbPreview) thumbPreview.innerHTML = "🖼️";
         }
@@ -281,10 +360,9 @@
       thumbBtn.addEventListener("click", () => thumbEl.click());
       thumbEl.addEventListener("change", () => {
         const f = thumbEl.files[0];
-        if (!f) { selectedThumb = null; thumbPreview.innerHTML = "🖼️"; return; }
+        if (!f) { thumbPreview.innerHTML = "🖼️"; return; }
         if (f.size > 500 * 1024) { alert("展示图不能超过 500KB"); thumbEl.value = ""; return; }
         if (!/\.(jpe?g|png|gif|webp)$/i.test(f.name)) { alert("仅支持 jpg/png/gif/webp"); thumbEl.value = ""; return; }
-        selectedThumb = f;
         const reader = new FileReader();
         reader.onload = () => { thumbPreview.innerHTML = `<img src="${reader.result}" alt="预览">`; };
         reader.readAsDataURL(f);
@@ -292,7 +370,7 @@
       });
     }
 
-    // 分类按钮组（替代原下拉框）
+    // 分类按钮组
     catWrap.innerHTML = CATEGORY_KEYS.map((k) =>
       `<button type="button" class="ws-cat-btn ${k === selectedCat ? "active" : ""}" data-cat="${k}">${CATEGORIES[k].label}</button>`
     ).join("");
@@ -304,21 +382,6 @@
         refresh();
       });
     });
-
-    // 显示已选文件
-    function showFiles(files) {
-      if (!files || files.length === 0) { fileInfo.hidden = true; return; }
-      let totalSize = 0;
-      const names = [];
-      for (const f of files) {
-        totalSize += f.size;
-        names.push(escapeHtml(f.name) + " (" + fmtSize(f.size) + ")");
-      }
-      fileNameEl.innerHTML = names.join("<br>");
-      const warn = totalSize > 1.5 * 1024 * 1024 ? ' · <span style="color:#c62828">⚠️ 单个文件不能超过 1.5MB</span>' : "";
-      fileSizeEl.innerHTML = "共 " + files.length + " 个文件，" + fmtSize(totalSize) + warn;
-      fileInfo.hidden = false;
-    }
 
     // 拖拽上传
     if (dz) {
@@ -350,9 +413,12 @@
       const title = titleEl.value.trim();
       const hasFile = fileEl.files && fileEl.files.length > 0;
       const logged = window.K5AUTH.isLoggedIn();
-      btn.disabled = !(logged && title && hasFile);
+      // 编辑时可不换文件；发布时必须选文件
+      btn.disabled = !(logged && title && (editingId || hasFile));
       if (!logged) {
         btn.textContent = "🔒 登录后上传";
+      } else if (editingId) {
+        btn.textContent = "💾 保存修改";
       } else if (title && hasFile) {
         btn.textContent = "🚀 提交作品";
       } else {
@@ -365,13 +431,13 @@
       if (el) { el.addEventListener("input", refresh); el.addEventListener("change", refresh); }
     });
 
-    // 未登录点击上传按钮 → 提示登录
+    // 提交按钮：未登录先提示登录
     btn.addEventListener("click", async () => {
       if (!window.K5AUTH.isLoggedIn()) {
         window.K5AUTH.openModal();
         return;
       }
-      await doUpload(titleEl, descEl, fileEl, selectedCat, btn);
+      await doPublish(titleEl, descEl, fileEl, btn);
     });
 
     // 登录状态变化时刷新按钮
@@ -379,11 +445,10 @@
     refresh();
   }
 
-  async function doUpload(titleEl, descEl, fileEl, cat, btn) {
+  async function doPublish(titleEl, descEl, fileEl, btn) {
     const title = titleEl.value.trim();
     const desc = descEl.value.trim();
     const files = fileEl.files;
-    if (!files || files.length === 0) return;
 
     // 获取缩略图（可选）
     const thumbEl = $("workshopThumb");
@@ -391,16 +456,64 @@
     const thumbFile = (thumbEnabled && thumbEnabled.checked && thumbEl) ? thumbEl.files[0] : null;
     if (thumbEnabled && thumbEnabled.checked && !thumbFile) { alert("已勾选展示图但未选择文件"); return; }
 
-    // 检查单个文件大小
+    const token = await window.K5AUTH.getToken();
+    if (!token) { alert("登录状态已失效，请重新登录"); window.K5AUTH.openModal(); return; }
+
+    // ===== 编辑：单作品提交到 update-workshop =====
+    if (editingId) {
+      const newFile = files && files.length > 0 ? files[0] : null;
+      if (newFile && newFile.size > 1.5 * 1024 * 1024) {
+        alert(`文件 "${newFile.name}" 超过 1.5MB 限制`);
+        return;
+      }
+
+      btn.disabled = true;
+      const oldText = btn.textContent;
+      btn.textContent = "⏳ 保存中...";
+      try {
+        const form = new FormData();
+        form.append("id", editingId);
+        form.append("title", title);
+        form.append("description", desc);
+        form.append("category", selectedCat);
+        if (newFile) form.append("file", newFile);
+        if (thumbFile) form.append("thumbnail", thumbFile);
+
+        const resp = await fetch(`${FUNC_BASE}/update-workshop`, {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + token,
+            apikey: window.SUPABASE_PUBLISHABLE_KEY || "",
+          },
+          body: form,
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || "HTTP " + resp.status);
+
+        alert("✅ 修改已保存！");
+        closePublishModal();
+        loadList(currentPage, currentCategory);
+        // 若详情弹窗正开着同一作品，刷新详情
+        if (detailId === editingId && $("wsDetailModal").classList.contains("show")) {
+          openDetail(editingId);
+        }
+      } catch (e) {
+        log(`❌ 保存失败：${e.message}`, "工坊");
+        alert(`保存失败：${e.message}`);
+      }
+      btn.textContent = oldText;
+      if (refreshUploadBtn) refreshUploadBtn();
+      return;
+    }
+
+    // ===== 发布：多文件逐个提交到 upload-workshop =====
+    if (!files || files.length === 0) return;
     for (const f of files) {
       if (f.size > 1.5 * 1024 * 1024) {
         alert(`文件 "${f.name}" 超过 1.5MB 限制`);
         return;
       }
     }
-
-    const token = await window.K5AUTH.getToken();
-    if (!token) { alert("登录状态已失效，请重新登录"); window.K5AUTH.openModal(); return; }
 
     btn.disabled = true;
     const oldText = btn.textContent;
@@ -416,7 +529,7 @@
         const form = new FormData();
         form.append("title", total > 1 ? `${title} - ${f.name.replace(/\.[^.]+$/, "")}` : title);
         form.append("description", desc);
-        form.append("category", cat);
+        form.append("category", selectedCat);
         form.append("file", f);
         if (thumbFile) form.append("thumbnail", thumbFile);
 
@@ -440,9 +553,11 @@
 
     // 清空表单
     titleEl.value = ""; descEl.value = ""; fileEl.value = "";
-    const fileInfo = $("wsFileInfo");
-    if (fileInfo) fileInfo.hidden = true;
+    showFiles(null);
     if (thumbEl) { thumbEl.value = ""; }
+    if (thumbEnabled) thumbEnabled.checked = false;
+    const thumbPicker = $("wsThumbPicker");
+    if (thumbPicker) thumbPicker.hidden = true;
     const thumbPreview = $("wsThumbPreview");
     if (thumbPreview) thumbPreview.innerHTML = "🖼️";
 
@@ -452,6 +567,7 @@
       alert(`上传完成：${successCount} 个成功，${failCount} 个失败`);
     }
 
+    closePublishModal();
     loadList(1, "all");
     // 切回全部分类
     document.querySelectorAll("#workshopCategories .ws-cat-btn").forEach((b) => {
@@ -462,10 +578,42 @@
     if (refreshUploadBtn) refreshUploadBtn();
   }
 
+  // 删除当前详情作品（仅作者可见入口）
+  async function deleteDetailItem() {
+    const id = detailId;
+    if (!id) return;
+    if (!confirm("确定删除这个作品吗？删除后不可恢复。")) return;
+
+    const token = await window.K5AUTH.getToken();
+    if (!token) { alert("登录状态已失效，请重新登录"); window.K5AUTH.openModal(); return; }
+
+    const btn = $("btnWsDelete");
+    const oldText = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "⏳ 删除中..."; }
+    try {
+      const resp = await fetch(`${FUNC_BASE}/delete-workshop?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: "Bearer " + token,
+          apikey: window.SUPABASE_PUBLISHABLE_KEY || "",
+        },
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "HTTP " + resp.status);
+
+      alert("🗑️ 作品已删除");
+      closeDetail();
+      loadList(currentPage, currentCategory);
+    } catch (e) {
+      alert(`删除失败：${e.message}`);
+    }
+    if (btn) { btn.disabled = false; btn.textContent = oldText; }
+  }
+
   // ---------- 初始化 ----------
   function init() {
     initCategoryTabs();
-    initUploadForm();
+    initPublishForm();
     loadList(1, "all");
 
     const closeBtn = $("btnWsDetailClose");
@@ -475,6 +623,37 @@
     const modal = $("wsDetailModal");
     if (modal) modal.addEventListener("click", (e) => {
       if (e.target === modal) closeDetail();
+    });
+
+    // 发布按钮（顶部）
+    const publishBtn = $("btnWsPublish");
+    if (publishBtn) {
+      publishBtn.addEventListener("click", () => {
+        if (!window.K5AUTH.isLoggedIn()) {
+          window.K5AUTH.openModal();
+          return;
+        }
+        openPublishModal("create", null);
+      });
+    }
+    // 发布弹窗：取消 / 点遮罩关闭
+    const publishCancel = $("btnWsPublishCancel");
+    if (publishCancel) publishCancel.addEventListener("click", closePublishModal);
+    const publishModal = $("wsPublishModal");
+    if (publishModal) publishModal.addEventListener("click", (e) => {
+      if (e.target === publishModal) closePublishModal();
+    });
+    // 编辑 / 删除（仅作者可见，详情弹窗内）
+    const editBtn = $("btnWsEdit");
+    if (editBtn) editBtn.addEventListener("click", () => openPublishModal("edit", detailItem));
+    const delBtn = $("btnWsDelete");
+    if (delBtn) delBtn.addEventListener("click", deleteDetailItem);
+
+    // 登录状态变化时，若详情弹窗开着，重刷作者按钮显隐
+    window.K5AUTH.onAuth(() => {
+      if (detailId && $("wsDetailModal").classList.contains("show")) {
+        openDetail(detailId);
+      }
     });
 
     // 初始化工坊评论区

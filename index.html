@@ -632,6 +632,24 @@ window.addEventListener("load", function () {
   .ws-page-info { font-size: 13px; color: #8892a0; }
   #workshopStatus { font-size: 12px; color: #a3aab6; text-align: center; margin-top: 10px; }
 
+  /* 发布按钮 */
+  .ws-publish-btn {
+    flex-shrink: 0; margin-top: 4px; padding: 10px 20px; font-size: 14px; font-weight: 600;
+    border: none; border-radius: 12px; color: #fff; cursor: pointer;
+    background: linear-gradient(135deg, #2f6fdc, #5b8def);
+    box-shadow: 0 4px 14px rgba(47, 111, 220, .28);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .ws-publish-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(47, 111, 220, .34); }
+
+  /* 删除按钮 */
+  .ws-delete-btn {
+    padding: 9px 16px; font-size: 13px; font-weight: 500; cursor: pointer;
+    border: 1px solid #f3c7c7; border-radius: 10px; background: #fff5f5; color: #c62828;
+    transition: all .15s ease; white-space: nowrap;
+  }
+  .ws-delete-btn:hover { background: #c62828; color: #fff; border-color: #c62828; }
+
   /* ===== 上传区 ===== */
   .ws-upload-card { margin-top: 20px; }
   .ws-upload-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
@@ -1572,70 +1590,12 @@ window.addEventListener("load", function () {
         <h2>社区创意内容</h2>
         <p class="hint">浏览用户分享的射频频段配置、信道模板、功能扩展、固件和创意方案。上传自己的作品或下载他人分享的内容。</p>
       </div>
+      <button id="btnWsPublish" type="button" class="ws-publish-btn">📤 发布作品</button>
     </div>
     <div class="ws-categories" id="workshopCategories"></div>
     <div id="workshopGrid" class="ws-grid"></div>
     <div id="workshopPagination"></div>
     <div id="workshopStatus"></div>
-  </div>
-
-  <div class="card ws-upload-card">
-    <div class="ws-upload-head">
-      <span class="ws-upload-icon">📤</span>
-      <div>
-        <h2>上传你的作品</h2>
-        <p class="hint">分享你的信道模板、配置方案、固件或脚本扩展。支持 .bin / .csv / .txt / .json / .py / .zip 等格式，<b>文件 ≤ 1.5MB</b>。</p>
-      </div>
-    </div>
-
-    <div class="ws-upload-form">
-      <div class="ws-form-row">
-        <label for="workshopTitle">作品标题</label>
-        <input id="workshopTitle" type="text" maxlength="60" placeholder="给你的作品起个名字">
-      </div>
-      <div class="ws-form-row">
-        <label for="workshopDesc">作品描述</label>
-        <textarea id="workshopDesc" maxlength="1000" placeholder="简单描述作品内容、适用场景和使用方法"></textarea>
-      </div>
-      <div class="ws-form-row">
-        <label>分类</label>
-        <div class="ws-cat-select" id="workshopCategoryBtns"></div>
-      </div>
-      <div class="ws-form-row">
-        <label>选择文件</label>
-        <div class="ws-dropzone" id="wsDropzone" tabindex="0">
-          <input id="workshopFile" type="file" multiple hidden>
-          <div class="ws-dropzone-inner">
-            <span class="ws-dz-icon">📁</span>
-            <span class="ws-dz-text">点击选择或拖拽文件到这里（支持多选）</span>
-            <span class="ws-dz-sub">.bin / .csv / .txt / .json / .py / .zip · 单文件 ≤ 1.5MB</span>
-          </div>
-        </div>
-        <div class="ws-file-info" id="wsFileInfo" hidden>
-          <span class="ws-file-icon">📎</span>
-          <div class="ws-file-meta">
-            <div class="ws-file-name" id="wsFileName"></div>
-            <div class="ws-file-size" id="wsFileSize"></div>
-          </div>
-          <button type="button" class="ws-file-remove" id="wsFileRemove" title="移除文件">✕</button>
-        </div>
-      </div>
-      <div class="ws-form-row">
-        <label style="display:flex;align-items:center;gap:8px">
-          <input id="wsThumbEnabled" type="checkbox" style="accent-color:#2f6fdc">
-          上传效果展示图（可选）
-        </label>
-        <div class="ws-thumb-picker" id="wsThumbPicker" hidden>
-          <div class="ws-thumb-preview" id="wsThumbPreview">🖼️</div>
-          <div>
-            <button type="button" class="ws-thumb-btn" id="wsThumbBtn">选择图片</button>
-            <input id="workshopThumb" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
-            <div class="ws-thumb-hint">jpg / png / gif / webp · ≤ 500KB</div>
-          </div>
-        </div>
-      </div>
-      <button id="btnWorkshopUpload" class="ws-upload-btn" disabled>🔒 登录后上传</button>
-    </div>
   </div>
 </div>
 
@@ -2164,7 +2124,68 @@ window.addEventListener("load", function () {
     </div>
     <div class="ws-detail-actions">
       <button id="btnWsDetailClose" type="button" class="secondary">关闭</button>
+      <button id="btnWsEdit" type="button" class="secondary" style="display:none">✏️ 编辑</button>
+      <button id="btnWsDelete" type="button" class="ws-delete-btn" style="display:none">🗑️ 删除</button>
       <button id="btnWsDownload" type="button" disabled>⬇️ 下载</button>
+    </div>
+  </div>
+</div>
+
+<!-- 创意工坊发布/编辑弹窗 -->
+<div id="wsPublishModal" class="modal-overlay">
+  <div class="modal-panel" style="max-width:520px">
+    <h3 id="wsPublishTitle">发布作品</h3>
+    <p class="sub" id="wsPublishSub">分享你的信道模板、配置方案、固件或脚本扩展。</p>
+    <div class="ws-upload-form">
+      <div class="ws-form-row">
+        <label for="workshopTitle">作品标题</label>
+        <input id="workshopTitle" type="text" maxlength="60" placeholder="给你的作品起个名字">
+      </div>
+      <div class="ws-form-row">
+        <label for="workshopDesc">作品描述</label>
+        <textarea id="workshopDesc" maxlength="1000" placeholder="简单描述作品内容、适用场景和使用方法"></textarea>
+      </div>
+      <div class="ws-form-row">
+        <label>分类</label>
+        <div class="ws-cat-select" id="workshopCategoryBtns"></div>
+      </div>
+      <div class="ws-form-row">
+        <label>选择文件</label>
+        <div class="ws-dropzone" id="wsDropzone" tabindex="0">
+          <input id="workshopFile" type="file" multiple hidden>
+          <div class="ws-dropzone-inner">
+            <span class="ws-dz-icon">📁</span>
+            <span class="ws-dz-text">点击选择或拖拽文件到这里（支持多选）</span>
+            <span class="ws-dz-sub">.bin / .csv / .txt / .json / .py / .zip · 单文件 ≤ 1.5MB</span>
+          </div>
+        </div>
+        <div class="ws-file-info" id="wsFileInfo" hidden>
+          <span class="ws-file-icon">📎</span>
+          <div class="ws-file-meta">
+            <div class="ws-file-name" id="wsFileName"></div>
+            <div class="ws-file-size" id="wsFileSize"></div>
+          </div>
+          <button type="button" class="ws-file-remove" id="wsFileRemove" title="移除文件">✕</button>
+        </div>
+      </div>
+      <div class="ws-form-row">
+        <label style="display:flex;align-items:center;gap:8px">
+          <input id="wsThumbEnabled" type="checkbox" style="accent-color:#2f6fdc">
+          上传效果展示图（可选）
+        </label>
+        <div class="ws-thumb-picker" id="wsThumbPicker" hidden>
+          <div class="ws-thumb-preview" id="wsThumbPreview">🖼️</div>
+          <div>
+            <button type="button" class="ws-thumb-btn" id="wsThumbBtn">选择图片</button>
+            <input id="workshopThumb" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
+            <div class="ws-thumb-hint">jpg / png / gif / webp · ≤ 500KB</div>
+          </div>
+        </div>
+      </div>
+      <div class="ws-detail-actions">
+        <button id="btnWsPublishCancel" type="button" class="secondary">取消</button>
+        <button id="btnWorkshopUpload" class="ws-upload-btn" disabled>🔒 登录后上传</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2174,10 +2195,10 @@ window.addEventListener("load", function () {
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
 </script>
-<script src="auth.js?v=1.14.0" defer></script>
-<script src="workshop.js?v=1.14.0" defer></script>
+<script src="auth.js?v=1.15.0" defer></script>
+<script src="workshop.js?v=1.15.0" defer></script>
 <script src="comments.js?v=1.12.1" defer></script>
-<script src="notifications.js?v=1.14.0" defer></script>
+<script src="notifications.js?v=1.15.0" defer></script>
 <script src="vendor/satellite.min.js" defer></script>
 <script src="gb2312_table.js?v=csv1" defer></script>
 <script src="freqdb.js" defer></script>
@@ -2185,7 +2206,7 @@ window.addEventListener("load", function () {
 <script src="protocol.js?v=16x16" defer></script>
 <script src="coord.js" defer></script>
 <script src="calc.js" defer></script>
-<script src="app.js?v=1.14.0" defer></script>
+<script src="app.js?v=1.15.0" defer></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
   // 侧边栏展开/折叠

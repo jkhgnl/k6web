@@ -1,3 +1,5 @@
 supabase/.temp/
+supabase/supabase/.temp/
 node_modules/
 .wrangler/
+.zcode/
