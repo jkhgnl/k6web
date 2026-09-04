@@ -1,8 +1,10 @@
 // 创意工坊 - 上传作品（需登录）
 // POST multipart/form-data: title, description, category, file, thumbnail?
 // 文件大小限制 1.5MB，缩略图限制 500KB
+// 存储：优先 Cloudflare R2（方案 A 公开桶）；未配置 R2 时回退 Supabase Storage
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, getUser, handleOptions } from "../_shared/cors.ts";
+import { r2Enabled, r2PutObject, r2PublicUrl } from "../_shared/r2.ts";
 
 const MAX_FILE_SIZE = 1.5 * 1024 * 1024; // 1.5MB
 const MAX_THUMB_SIZE = 500 * 1024; // 500KB
@@ -37,10 +39,13 @@ Deno.serve(async (req) => {
     const user = await getUser(req, supabase);
     if (!user) return jsonResponse({ error: "请先登录" }, 401);
 
-    // 确保 workshop 存储桶存在
-    const { data: bucket } = await supabase.storage.getBucket("workshop");
-    if (!bucket) {
-      await supabase.storage.createBucket("workshop", { public: false });
+    // 确保 workshop 存储桶存在（仅在回退 Supabase Storage 时需要）
+    const useR2 = r2Enabled();
+    if (!useR2) {
+      const { data: bucket } = await supabase.storage.getBucket("workshop");
+      if (!bucket) {
+        await supabase.storage.createBucket("workshop", { public: false });
+      }
     }
 
     const form = await req.formData();
@@ -68,28 +73,42 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 上传主文件
     const ext = file.name.toLowerCase().slice(file.name.toLowerCase().lastIndexOf("."));
     const filePath = `${user.id}/${Date.now()}_${crypto.randomUUID()}${ext}`;
-    const { error: upErr } = await supabase.storage
-      .from("workshop")
-      .upload(filePath, file, { contentType: file.type || "application/octet-stream" });
-    if (upErr) throw upErr;
+
+    // 上传主文件
+    let downloadUrl = "";
+    if (useR2) {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      await r2PutObject(filePath, bytes, file.type || "application/octet-stream");
+      downloadUrl = r2PublicUrl(filePath);
+    } else {
+      const { error: upErr } = await supabase.storage
+        .from("workshop")
+        .upload(filePath, file, { contentType: file.type || "application/octet-stream" });
+      if (upErr) throw upErr;
+    }
 
     // 上传缩略图（可选）
     let thumbnailUrl = "";
     if (thumbnail) {
       const thumbExt = thumbnail.name.toLowerCase().slice(thumbnail.name.toLowerCase().lastIndexOf("."));
       const thumbPath = `${user.id}/${Date.now()}_thumb_${crypto.randomUUID()}${thumbExt}`;
-      const { error: thumbErr } = await supabase.storage
-        .from("workshop")
-        .upload(thumbPath, thumbnail, { contentType: thumbnail.type || "image/jpeg" });
-      if (thumbErr) throw thumbErr;
+      if (useR2) {
+        const bytes = new Uint8Array(await thumbnail.arrayBuffer());
+        await r2PutObject(thumbPath, bytes, thumbnail.type || "image/jpeg");
+        thumbnailUrl = r2PublicUrl(thumbPath);
+      } else {
+        const { error: thumbErr } = await supabase.storage
+          .from("workshop")
+          .upload(thumbPath, thumbnail, { contentType: thumbnail.type || "image/jpeg" });
+        if (thumbErr) throw thumbErr;
 
-      const { data: thumbUrlData } = await supabase.storage
-        .from("workshop")
-        .createSignedUrl(thumbPath, 3600 * 24 * 365);
-      thumbnailUrl = thumbUrlData?.signedUrl || "";
+        const { data: thumbUrlData } = await supabase.storage
+          .from("workshop")
+          .createSignedUrl(thumbPath, 3600 * 24 * 365);
+        thumbnailUrl = thumbUrlData?.signedUrl || "";
+      }
     }
 
     // 写入数据库
@@ -109,7 +128,7 @@ Deno.serve(async (req) => {
       .single();
     if (error) throw error;
 
-    return jsonResponse({ item: data }, 201);
+    return jsonResponse({ item: data, download_url: downloadUrl }, 201);
   } catch (e) {
     return jsonResponse({ error: (e as Error).message || "Internal Error" }, 500);
   }

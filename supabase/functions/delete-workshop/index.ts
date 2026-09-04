@@ -1,7 +1,9 @@
 // 创意工坊 - 删除作品（仅限本人）
 // DELETE ?id=<uuid>
+// 文件删除：R2 与 Supabase Storage 双端尽力清理（迁移期间新旧文件可能分散在两处）
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, getUser, handleOptions } from "../_shared/cors.ts";
+import { r2DeleteObject } from "../_shared/r2.ts";
 
 Deno.serve(async (req) => {
   const pre = handleOptions(req);
@@ -39,8 +41,11 @@ Deno.serve(async (req) => {
       .eq("id", id);
     if (delErr) throw delErr;
 
-    // 删 Storage 文件（尽力而为，失败不影响返回）
-    await supabase.storage.from("workshop").remove([item.file_path]);
+    // 删文件（尽力而为，失败不影响返回；双端都尝试以覆盖迁移过渡期）
+    if (item.file_path) {
+      await r2DeleteObject(item.file_path).catch(() => {});
+      await supabase.storage.from("workshop").remove([item.file_path]).catch(() => {});
+    }
 
     return jsonResponse({ ok: true });
   } catch (e) {

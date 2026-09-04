@@ -3,6 +3,7 @@
 // 不传 file / thumbnail 时保留原文件；传了则替换并删除旧文件
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, getUser, handleOptions } from "../_shared/cors.ts";
+import { r2Enabled, r2PutObject, r2PublicUrl, r2DeleteObject } from "../_shared/r2.ts";
 
 const MAX_FILE_SIZE = 1.5 * 1024 * 1024; // 1.5MB
 const MAX_THUMB_SIZE = 500 * 1024; // 500KB
@@ -73,37 +74,52 @@ Deno.serve(async (req) => {
 
     // 需要更新的字段
     const updates: Record<string, unknown> = { title, description, category };
+    const useR2 = r2Enabled();
 
     // 替换主文件（可选）
     if (file) {
       const ext = file.name.toLowerCase().slice(file.name.toLowerCase().lastIndexOf("."));
       const filePath = `${user.id}/${Date.now()}_${crypto.randomUUID()}${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from("workshop")
-        .upload(filePath, file, { contentType: file.type || "application/octet-stream" });
-      if (upErr) throw upErr;
+      if (useR2) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        await r2PutObject(filePath, bytes, file.type || "application/octet-stream");
+      } else {
+        const { error: upErr } = await supabase.storage
+          .from("workshop")
+          .upload(filePath, file, { contentType: file.type || "application/octet-stream" });
+        if (upErr) throw upErr;
+      }
 
       updates.file_path = filePath;
       updates.file_name = file.name;
       updates.file_size = file.size;
 
-      // 删除旧文件（尽力而为）
-      await supabase.storage.from("workshop").remove([item.file_path]);
+      // 删除旧文件（尽力而为，双端都尝试）
+      if (item.file_path) {
+        await r2DeleteObject(item.file_path).catch(() => {});
+        await supabase.storage.from("workshop").remove([item.file_path]).catch(() => {});
+      }
     }
 
     // 替换缩略图（可选）
     if (thumbnail) {
       const thumbExt = thumbnail.name.toLowerCase().slice(thumbnail.name.toLowerCase().lastIndexOf("."));
       const thumbPath = `${user.id}/${Date.now()}_thumb_${crypto.randomUUID()}${thumbExt}`;
-      const { error: thumbErr } = await supabase.storage
-        .from("workshop")
-        .upload(thumbPath, thumbnail, { contentType: thumbnail.type || "image/jpeg" });
-      if (thumbErr) throw thumbErr;
+      if (useR2) {
+        const bytes = new Uint8Array(await thumbnail.arrayBuffer());
+        await r2PutObject(thumbPath, bytes, thumbnail.type || "image/jpeg");
+        updates.thumbnail_url = r2PublicUrl(thumbPath);
+      } else {
+        const { error: thumbErr } = await supabase.storage
+          .from("workshop")
+          .upload(thumbPath, thumbnail, { contentType: thumbnail.type || "image/jpeg" });
+        if (thumbErr) throw thumbErr;
 
-      const { data: thumbUrlData } = await supabase.storage
-        .from("workshop")
-        .createSignedUrl(thumbPath, 3600 * 24 * 365);
-      updates.thumbnail_url = thumbUrlData?.signedUrl || "";
+        const { data: thumbUrlData } = await supabase.storage
+          .from("workshop")
+          .createSignedUrl(thumbPath, 3600 * 24 * 365);
+        updates.thumbnail_url = thumbUrlData?.signedUrl || "";
+      }
     }
 
     const { data, error } = await supabase
