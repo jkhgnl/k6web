@@ -277,7 +277,7 @@
       names.push(escapeHtml(f.name) + " (" + fmtSize(f.size) + ")");
     }
     fileNameEl.innerHTML = names.join("<br>");
-    const warn = totalSize > 1.5 * 1024 * 1024 ? ' · <span style="color:#c62828">⚠️ 单个文件不能超过 1.5MB</span>' : "";
+    const warn = totalSize > 50 * 1024 * 1024 ? ' · <span style="color:#c62828">⚠️ 单个文件不能超过 50MB</span>' : "";
     fileSizeEl.innerHTML = "共 " + files.length + " 个文件，" + fmtSize(totalSize) + warn;
     fileInfo.hidden = false;
   }
@@ -299,7 +299,7 @@
     $("wsPublishTitle").textContent = editingId ? "编辑作品" : "发布作品";
     $("wsPublishSub").textContent = editingId
       ? `保留当前文件《${item.file_name}》· 不选新文件则不改动文件，其余修改即时生效。`
-      : "分享你的信道模板、配置方案、固件或脚本扩展。支持 .bin / .csv / .txt / .json / .py / .zip 等格式，文件 ≤ 1.5MB。";
+      : "分享你的信道模板、配置方案、固件或脚本扩展。支持 .bin / .csv / .txt / .json / .py / .zip 等格式，文件 ≤ 50MB。";
 
     // 预填 / 清空表单
     titleEl.value = editingId ? item.title : "";
@@ -361,7 +361,7 @@
       thumbEl.addEventListener("change", () => {
         const f = thumbEl.files[0];
         if (!f) { thumbPreview.innerHTML = "🖼️"; return; }
-        if (f.size > 500 * 1024) { alert("展示图不能超过 500KB"); thumbEl.value = ""; return; }
+        if (f.size > 20 * 1024 * 1024) { alert("展示图不能超过 20MB"); thumbEl.value = ""; return; }
         if (!/\.(jpe?g|png|gif|webp)$/i.test(f.name)) { alert("仅支持 jpg/png/gif/webp"); thumbEl.value = ""; return; }
         const reader = new FileReader();
         reader.onload = () => { thumbPreview.innerHTML = `<img src="${reader.result}" alt="预览">`; };
@@ -462,8 +462,8 @@
     // ===== 编辑：单作品提交到 update-workshop =====
     if (editingId) {
       const newFile = files && files.length > 0 ? files[0] : null;
-      if (newFile && newFile.size > 1.5 * 1024 * 1024) {
-        alert(`文件 "${newFile.name}" 超过 1.5MB 限制`);
+      if (newFile && newFile.size > 50 * 1024 * 1024) {
+        alert(`文件 "${newFile.name}" 超过 50MB 限制`);
         return;
       }
 
@@ -509,8 +509,8 @@
     // ===== 发布：多文件逐个提交到 upload-workshop =====
     if (!files || files.length === 0) return;
     for (const f of files) {
-      if (f.size > 1.5 * 1024 * 1024) {
-        alert(`文件 "${f.name}" 超过 1.5MB 限制`);
+      if (f.size > 50 * 1024 * 1024) {
+        alert(`文件 "${f.name}" 超过 50MB 限制`);
         return;
       }
     }

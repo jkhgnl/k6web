@@ -1,13 +1,13 @@
 // 创意工坊 - 上传作品（需登录）
 // POST multipart/form-data: title, description, category, file, thumbnail?
-// 文件大小限制 1.5MB，缩略图限制 500KB
+// 文件大小限制 50MB，缩略图限制 20MB
 // 存储：优先 Cloudflare R2（方案 A 公开桶）；未配置 R2 时回退 Supabase Storage
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, getUser, handleOptions } from "../_shared/cors.ts";
 import { r2Enabled, r2PutObject, r2PublicUrl } from "../_shared/r2.ts";
 
-const MAX_FILE_SIZE = 1.5 * 1024 * 1024; // 1.5MB
-const MAX_THUMB_SIZE = 500 * 1024; // 500KB
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_THUMB_SIZE = 20 * 1024 * 1024; // 20MB
 const ALLOWED_EXT = [".bin", ".bxt", ".csv", ".txt", ".json", ".py", ".js", ".html", ".zip", ".dat"];
 const ALLOWED_CATEGORIES = new Set(["theme", "channel", "extension", "firmware", "other"]);
 const ALLOWED_IMG_EXT = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
     if (description.length > 1000) return jsonResponse({ error: "描述不超过 1000 字符" }, 400);
     if (!ALLOWED_CATEGORIES.has(category)) return jsonResponse({ error: "分类不合法" }, 400);
     if (!file) return jsonResponse({ error: "请选择文件" }, 400);
-    if (file.size > MAX_FILE_SIZE) return jsonResponse({ error: "文件超过 1.5MB 限制" }, 413);
+    if (file.size > MAX_FILE_SIZE) return jsonResponse({ error: "文件超过 50MB 限制" }, 413);
     if (file.size === 0) return jsonResponse({ error: "文件为空" }, 400);
     if (!isAllowedExt(file.name)) {
       return jsonResponse({ error: "不支持的文件类型" }, 400);
@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
 
     // 验证缩略图（可选）
     if (thumbnail) {
-      if (thumbnail.size > MAX_THUMB_SIZE) return jsonResponse({ error: "展示图不能超过 500KB" }, 413);
+      if (thumbnail.size > MAX_THUMB_SIZE) return jsonResponse({ error: "展示图不能超过 20MB" }, 413);
       if (!isAllowedImgExt(thumbnail.name)) {
         return jsonResponse({ error: "展示图仅支持 jpg/png/gif/webp" }, 400);
       }
