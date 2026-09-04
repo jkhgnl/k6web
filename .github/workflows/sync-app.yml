@@ -65,17 +65,18 @@ jobs:
       - name: Update app-version.json on gh-pages
         run: |
           cd site
+          # 仅当版本号发生变化时才回写（避免时间戳导致的空提交）
+          if [ -f app-version.json ] && [ "$(jq -r '.version // empty' app-version.json)" = "${{ steps.gitee.outputs.tag }}" ]; then
+            echo "版本无变化，跳过提交"
+            exit 0
+          fi
           printf '{"version":"%s","updated_at":"%s"}\n' \
             "${{ steps.gitee.outputs.tag }}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > app-version.json
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add app-version.json
-          if git diff --cached --quiet; then
-            echo "版本无变化，跳过提交"
-          else
-            git commit -m "chore: 同步 APP 最新版本 ${{ steps.gitee.outputs.tag }}"
-            git push origin gh-pages
-          fi
+          git commit -m "chore: 同步 APP 最新版本 ${{ steps.gitee.outputs.tag }}"
+          git push origin gh-pages
 
       - name: Publish GitHub Release (fixed asset)
         env:
