@@ -212,7 +212,7 @@ window.addEventListener("load", function () {
     width: min(96vw, 760px);
     max-width: 760px;
     max-height: 92vh;
-    overflow: hidden;
+    overflow-y: auto;
     text-align: center;
   }
   .coffee-qr-list {
@@ -242,6 +242,37 @@ window.addEventListener("load", function () {
     object-fit: cover;
     object-position: center;
   }
+  .coffee-thanks { margin-top: 20px; border-top: 1px solid #eef1f5; padding-top: 16px; text-align: left; }
+  .coffee-thanks-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .coffee-thanks-title { font-size: 15px; font-weight: 700; color: #1c2433; display: flex; align-items: center; gap: 6px; }
+  .coffee-thanks-sub { font-size: 12px; color: #8892a0; }
+  .coffee-thanks-list { display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; padding-right: 2px; }
+  .coffee-thanks-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #f8fafc; border: 1px solid #eef1f5; border-radius: 10px; }
+  .coffee-thanks-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #f5a623, #f7c948); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .coffee-thanks-main { flex: 1; min-width: 0; }
+  .coffee-thanks-name { font-size: 13px; font-weight: 600; color: #1c2433; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .coffee-callsign { font-size: 11px; font-weight: 600; color: #2f6fdc; background: #eef4ff; border: 1px solid #dbe4f5; padding: 1px 6px; border-radius: 999px; font-family: Consolas, monospace; letter-spacing: .3px; }
+  .coffee-thanks-msg { font-size: 12px; color: #5b6472; margin-top: 3px; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+  .coffee-thanks-meta { font-size: 11px; color: #a3aab6; margin-top: 2px; }
+  .coffee-thanks-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .coffee-thanks-actions button { padding: 5px 9px; font-size: 12px; border-radius: 7px; border: 1px solid #e3e8ef; background: #fff; cursor: pointer; transition: all .15s; }
+  .coffee-thanks-actions button:hover { border-color: #2f6fdc; color: #2f6fdc; }
+  .coffee-thanks-actions .danger { color: #c62828; border-color: #f3c7c7; background: #fff5f5; }
+  .coffee-thanks-actions .danger:hover { background: #c62828; color: #fff; border-color: #c62828; }
+  .coffee-thanks-empty { text-align: center; color: #97a0ad; font-size: 13px; padding: 18px; background: #fafbfe; border: 1px dashed #e3e8ef; border-radius: 10px; }
+  .coffee-thanks-loading { text-align: center; color: #8892a0; font-size: 13px; padding: 12px; }
+  .coffee-thanks-admin-hint { font-size: 12px; color: #b26a00; background: #fff4e5; border: 1px solid #ffe2b8; padding: 6px 10px; border-radius: 8px; margin-bottom: 10px; }
+  .coffee-thanks-form { margin-top: 12px; padding: 14px; background: #fff; border: 1px solid #eef1f5; border-radius: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .coffee-thanks-form-title { font-size: 13px; font-weight: 700; color: #1c2433; margin: 0; }
+  .coffee-thanks-form-row { display: flex; gap: 8px; }
+  .coffee-thanks-form-row label { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #555; font-weight: 500; }
+  .coffee-thanks-form input, .coffee-thanks-form textarea { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; font-family: inherit; }
+  .coffee-thanks-form input:focus, .coffee-thanks-form textarea:focus { outline: none; border-color: #2f6fdc; box-shadow: 0 0 0 3px rgba(47,111,220,.12); }
+  .coffee-thanks-form textarea { resize: vertical; min-height: 48px; }
+  .coffee-thanks-form-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+  .coffee-thanks-form-status { font-size: 12px; flex: 1; text-align: left; }
+  .coffee-thanks-form-status.err { color: #c62828; }
+  .coffee-thanks-form-status.ok { color: #1a7f37; }
 
   .visit-bar {
     display: flex; align-items: baseline; justify-content: center; gap: 6px;
@@ -580,7 +611,7 @@ window.addEventListener("load", function () {
   .ws-empty { text-align: center; padding: 48px 20px; color: #97a0ad; font-size: 14px; }
 
   /* 作品卡片 */
-  .ws-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)); gap: 16px; }
+  .ws-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(491px, 1fr)); gap: 16px; }
   .ws-item {
     cursor: pointer; border: 1px solid #eef1f5; border-radius: 14px; padding: 16px;
     background: #fff; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
@@ -605,8 +636,8 @@ window.addEventListener("load", function () {
   .ws-item-meta { display: flex; gap: 12px; font-size: 11px; color: #97a0ad; align-items: center; flex-wrap: wrap; }
   .ws-item-meta span { display: inline-flex; align-items: center; gap: 3px; }
   .ws-item-date { font-size: 11px; color: #b0b8c4; }
-  .ws-item-thumb { width: calc(100% + 64px); aspect-ratio: 16/9; object-fit: cover; border-radius: 10px; margin: 0 -32px 10px; background: #f4f6fa; }
-  .ws-item-nothumb { width: calc(100% + 64px); aspect-ratio: 16/9; border-radius: 10px; margin: 0 -32px 10px; background: linear-gradient(135deg, #eef4ff, #e6ecf9); display: flex; align-items: center; justify-content: center; font-size: 32px; }
+  .ws-item-thumb { width: calc(100% + 192px); aspect-ratio: 16/9; object-fit: cover; border-radius: 10px; margin: 0 -96px 10px; background: #f4f6fa; }
+  .ws-item-nothumb { width: calc(100% + 192px); aspect-ratio: 16/9; border-radius: 10px; margin: 0 -96px 10px; background: linear-gradient(135deg, #eef4ff, #e6ecf9); display: flex; align-items: center; justify-content: center; font-size: 32px; }
   .ws-detail-thumb { width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; }
   .ws-thumb-picker { display: flex; align-items: center; gap: 12px; }
   .ws-thumb-preview { width: 100px; height: 64px; border-radius: 8px; object-fit: cover; border: 2px dashed #cdd6e3; background: #f8fafc; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #a3aab6; }
@@ -1958,6 +1989,44 @@ window.addEventListener("load", function () {
         </div>
       </div>
     </div>
+
+    <!-- 鸣谢榜 -->
+    <div class="coffee-thanks">
+      <div class="coffee-thanks-head">
+        <div>
+          <div class="coffee-thanks-title">🙏 鸣谢榜</div>
+          <div class="coffee-thanks-sub">感谢每一位支持过这个工具的朋友</div>
+        </div>
+        <button id="coffeeThanksAdd" type="button" class="secondary" style="display:none">＋ 添加</button>
+      </div>
+      <div id="coffeeThanksAdminHint" class="coffee-thanks-admin-hint" style="display:none">🛠️ 管理员模式：可添加、编辑、删除鸣谢记录</div>
+      <div id="coffeeThanksList" class="coffee-thanks-list">
+        <div class="coffee-thanks-loading">加载中…</div>
+      </div>
+      <div id="coffeeThanksForm" class="coffee-thanks-form" style="display:none">
+        <p class="coffee-thanks-form-title" id="coffeeThanksFormTitle">新增鸣谢</p>
+        <div class="coffee-thanks-form-row">
+          <label>姓名 / 昵称
+            <input id="thName" type="text" maxlength="40" placeholder="赞助者姓名或昵称" autocomplete="off">
+          </label>
+          <label>呼号
+            <input id="thCallsign" type="text" maxlength="12" placeholder="如 BG2XXX（可选）" autocomplete="off">
+          </label>
+          <label>金额（元）
+            <input id="thAmount" type="number" min="0" step="0.01" placeholder="可选">
+          </label>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#555;font-weight:500">留言
+          <textarea id="thMessage" maxlength="200" rows="2" placeholder="想说的话（可选）"></textarea>
+        </label>
+        <div class="coffee-thanks-form-actions">
+          <span id="coffeeThanksFormStatus" class="coffee-thanks-form-status"></span>
+          <button id="coffeeThanksFormCancel" type="button" class="secondary">取消</button>
+          <button id="coffeeThanksFormSave" type="button">保存</button>
+        </div>
+      </div>
+    </div>
+
     <button id="coffeeClose" type="button" class="secondary" style="margin-top:12px">关闭</button>
   </div>
 </div>
@@ -2209,12 +2278,13 @@ window.addEventListener("load", function () {
 <script>
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
-  window.K5WEB_VERSION = "1.21.6";
+  window.K5WEB_VERSION = "1.22.0";
 </script>
-<script src="auth.js?v=1.21.6" defer></script>
-<script src="workshop.js?v=1.21.6" defer></script>
+<script src="auth.js?v=1.22.0" defer></script>
+<script src="thanks.js?v=1.22.0" defer></script>
+<script src="workshop.js?v=1.22.0" defer></script>
 <script src="comments.js?v=1.12.1" defer></script>
-<script src="notifications.js?v=1.21.6" defer></script>
+<script src="notifications.js?v=1.22.0" defer></script>
 <script src="vendor/satellite.min.js" defer></script>
 <script src="gb2312_table.js?v=csv1" defer></script>
 <script src="freqdb.js" defer></script>
@@ -2222,7 +2292,7 @@ window.addEventListener("load", function () {
 <script src="protocol.js?v=16x16" defer></script>
 <script src="coord.js" defer></script>
 <script src="calc.js" defer></script>
-<script src="app.js?v=1.21.6" defer></script>
+<script src="app.js?v=1.22.0" defer></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
   // 侧边栏展开/折叠
@@ -2291,6 +2361,8 @@ window.addEventListener("load", function () {
   })();
   // 初始化认证模块
   if (window.K5AUTH) K5AUTH.init();
+  // 初始化鸣谢榜
+  if (window.K5THANKS) K5THANKS.init();
   // 初始化创意工坊
   if (window.K5WORKSHOP) K5WORKSHOP.init();
   // 初始化首页反馈评论区
