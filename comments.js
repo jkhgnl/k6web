@@ -65,6 +65,7 @@
     const isLoggedIn = window.K5AUTH.isLoggedIn();
     const currentUserId = window.K5AUTH.getUserId ? window.K5AUTH.getUserId() : null;
     const isOwner = currentUserId === comment.user_id;
+    const isAdmin = window.K5AUTH.isAdmin && window.K5AUTH.isAdmin();
 
     let avatarHtml;
     const profileLink = comment.user_id ? `href="public-profile.html?id=${encodeURIComponent(comment.user_id)}"` : "";
@@ -74,8 +75,8 @@
       avatarHtml = `<span class="comment-avatar-txt">${escapeHtml((profiles.username || "匿").charAt(0).toUpperCase())}</span>`;
     }
 
-    // 删除按钮（仅作者可见）
-    const deleteBtn = isOwner
+    // 删除按钮（作者或管理员可见）
+    const deleteBtn = (isOwner || isAdmin)
       ? `<button class="comment-action" data-action="delete" data-comment-id="${comment.id}" title="删除">🗑️ 删除</button>`
       : "";
 

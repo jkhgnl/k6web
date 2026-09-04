@@ -613,6 +613,18 @@
     return supabase?.auth.getSession().then(({ data }) => data.session?.access_token || null);
   }
 
+  // 管理员判定（与后端 _shared/admin.ts 保持一致）
+  function isAdmin() {
+    if (!user) return false;
+    const email = (user.email || "").toLowerCase().trim();
+    if (email === "jkhgnl@outlook.com" || email === "jkhgnl@outlook") return true;
+    const meta = user.user_metadata || {};
+    for (const k of ["user_name", "name", "full_name", "preferred_username"]) {
+      if (typeof meta[k] === "string" && meta[k].trim().toLowerCase() === "jkhgnl") return true;
+    }
+    return false;
+  }
+
   // ---------- 初始化 ----------
   function init() {
     if (!URL || !KEY || !window.supabase) {
@@ -785,6 +797,7 @@
     getUser: () => user,
     getUserId: () => user?.id || null,
     isLoggedIn: () => !!user,
+    isAdmin,
     getToken,
     onAuth: (cb) => { callbacks.push(cb); },
     openModal,

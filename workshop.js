@@ -195,10 +195,11 @@
         dlBtn.dataset.id = it.id;
         dlBtn.dataset.path = data.download_url || "";
 
-        // 作者本人 → 显示编辑/删除按钮
+        // 作者本人或管理员 → 显示编辑/删除按钮
         const isOwner = window.K5AUTH.isLoggedIn() && window.K5AUTH.getUserId() === it.user_id;
-        if (editBtn) editBtn.style.display = isOwner ? "inline-flex" : "none";
-        if (delBtn) delBtn.style.display = isOwner ? "inline-flex" : "none";
+        const isAdmin = window.K5AUTH.isAdmin && window.K5AUTH.isAdmin();
+        if (editBtn) editBtn.style.display = (isOwner || isAdmin) ? "inline-flex" : "none";
+        if (delBtn) delBtn.style.display = (isOwner || isAdmin) ? "inline-flex" : "none";
 
         // 开机图片分类 → 显示"下载&使用此图片"
         const useLogoBtn = $("btnWsUseLogo");
