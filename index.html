@@ -1173,8 +1173,8 @@ window.addEventListener("load", function () {
   <h1 class="page-title">多普勒固件手台工具</h1>
   <p class="hint" style="margin-bottom:18px">适用于 UV-K1 / UV-K5 V3 / UV-K6 V3（PY32F071）F4HWN 固件。选择下方功能开始使用。</p>
 
-  <!-- 下载按钮：href 由 app.js 自动获取 Gitee 最新 Release 后填充，永不硬编码版本号 -->
-  <a id="appDownloadBtn" href="javascript:void(0)" target="_blank" rel="noopener" class="app-download-btn">📱 正在获取最新 APP…</a>
+  <!-- 下载按钮：点击直接弹出下载对话框（app.js 经代理拉取最新 APK 触发下载，不跳转页面） -->
+  <a id="appDownloadBtn" href="javascript:void(0)" class="app-download-btn">📱 正在获取最新 APP…</a>
 
   <div class="tool-grid">
     <div class="tool-card" data-goto="tabWriteFreq">
@@ -2276,13 +2276,13 @@ window.addEventListener("load", function () {
 <script>
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
-  window.K5WEB_VERSION = "1.22.2";
+  window.K5WEB_VERSION = "1.22.3";
 </script>
-<script src="auth.js?v=1.22.2" defer></script>
-<script src="thanks.js?v=1.22.2" defer></script>
-<script src="workshop.js?v=1.22.2" defer></script>
+<script src="auth.js?v=1.22.3" defer></script>
+<script src="thanks.js?v=1.22.3" defer></script>
+<script src="workshop.js?v=1.22.3" defer></script>
 <script src="comments.js?v=1.13.0" defer></script>
-<script src="notifications.js?v=1.22.2" defer></script>
+<script src="notifications.js?v=1.22.3" defer></script>
 <script src="vendor/satellite.min.js" defer></script>
 <script src="gb2312_table.js?v=csv1" defer></script>
 <script src="freqdb.js" defer></script>
@@ -2290,7 +2290,7 @@ window.addEventListener("load", function () {
 <script src="protocol.js?v=16x16" defer></script>
 <script src="coord.js" defer></script>
 <script src="calc.js" defer></script>
-<script src="app.js?v=1.22.2" defer></script>
+<script src="app.js?v=1.22.3" defer></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
   // 侧边栏展开/折叠
