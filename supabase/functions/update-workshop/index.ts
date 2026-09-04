@@ -7,7 +7,7 @@ import { r2Enabled, r2PutObject, r2PublicUrl, r2DeleteObject } from "../_shared/
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const MAX_THUMB_SIZE = 20 * 1024 * 1024; // 20MB
-const ALLOWED_EXT = [".bin", ".bxt", ".csv", ".txt", ".json", ".py", ".js", ".html", ".zip", ".dat"];
+const ALLOWED_EXT = [".bin", ".bxt", ".csv", ".txt", ".json", ".py", ".js", ".html", ".zip", ".dat", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"];
 const ALLOWED_CATEGORIES = new Set(["theme", "channel", "extension", "firmware", "logo", "other"]);
 const ALLOWED_IMG_EXT = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
 
