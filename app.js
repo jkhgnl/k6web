@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "1.22.3";
+  const K5WEB_VERSION = "1.22.4";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -3764,102 +3764,26 @@
     requestAnimationFrame(tick);
   }).catch(() => {});
 
-  // 动态获取 APP 最新版本下载链接（永远跟随 Gitee 最新 Release，不硬编码版本号）
-  const APP_REPO_API = "https://gitee.com/api/v5/repos/jkhgnl/uvk6-tools-android/releases/latest";
-
-  async function fetchLatestAppRelease() {
-    // 优先走站点 CORS 代理（浏览器直连 gitee.com API 常被网络/CORS 拦截）
-    if (WORKER_PROXY_URL) {
-      try {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 10000);
-        const resp = await fetch(WORKER_PROXY_URL + "/?url=" + encodeURIComponent(APP_REPO_API), { signal: ctrl.signal });
-        clearTimeout(timer);
-        if (resp.ok) {
-          const d = await resp.json();
-          if (d && d.tag_name) return d;
-        }
-      } catch (e) {
-        log("APP 版本经代理获取失败：" + e.message, "info");
-      }
-    }
-    // 直连兜底
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 10000);
-      const resp = await fetch(APP_REPO_API, { signal: ctrl.signal });
-      clearTimeout(timer);
-      if (resp.ok) {
-        const d = await resp.json();
-        if (d && d.tag_name) return d;
-      }
-    } catch (e) {
-      log("APP 版本直连获取失败：" + e.message, "info");
-    }
-    return null;
-  }
-
-  function buildAppDownloadUrl(d) {
-    if (!d || !d.tag_name) return "";
-    const apk = (d.assets || []).find((a) => a.name && /\.apk$/i.test(a.name));
-    if (apk && apk.browser_download_url) return apk.browser_download_url;
-    // assets 为空时按 Gitee 下载规则构造
-    return `https://gitee.com/jkhgnl/uvk6-tools-android/releases/download/${d.tag_name}/uvk6tools-${d.tag_name}.apk`;
-  }
-
-  // 已解析到的最新 APK 下载地址（供点击时直接拉取文件）
-  let latestAppUrl = "";
-  let latestAppVer = "";
-
-  // 点击按钮：经代理拉取 APK 为 Blob，用 download 属性直接弹出下载对话框（不跳转页面）
-  async function downloadAppFile() {
-    const btn = $("appDownloadBtn");
-    if (!latestAppUrl) { refreshAppDownloadBtn(); return; }
-    if (!WORKER_PROXY_URL) {
-      // 无代理时回退为新标签页打开（老逻辑，正常情况下不会走到）
-      window.open(latestAppUrl, "_blank", "noopener");
-      return;
-    }
-    const oldText = btn.textContent;
-    btn.textContent = "⏳ 正在下载…";
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 120000);
-      const resp = await fetch(WORKER_PROXY_URL + "/?url=" + encodeURIComponent(latestAppUrl), { signal: ctrl.signal });
-      clearTimeout(timer);
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
-      const blob = await resp.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = `uvk6tools-v${latestAppVer}.apk`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
-    } catch (e) {
-      log("APP 下载失败：" + e.message, "err");
-      btn.textContent = "📱 下载失败，点击重试";
-      btn.onclick = (ev) => { ev.preventDefault(); downloadAppFile(); };
-      return;
-    }
-    btn.textContent = oldText;
-  }
-
+  // APP 下载按钮：href 固定指向 GitHub Release（由 Actions 自动同步 Gitee 最新版）
+  // 此处仅读取 app-version.json 更新按钮文案，显示当前版本号
   async function refreshAppDownloadBtn() {
     const btn = $("appDownloadBtn");
     if (!btn) return;
-    btn.textContent = "📱 正在获取最新 APP…";
-    const d = await fetchLatestAppRelease();
-    if (!d || !d.tag_name) {
-      btn.textContent = "📱 获取 APP 失败，点击重试";
-      btn.onclick = (e) => { e.preventDefault(); refreshAppDownloadBtn(); };
-      return;
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const resp = await fetch("app-version.json", { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (resp.ok) {
+        const d = await resp.json();
+        if (d && d.version) {
+          const ver = String(d.version).replace(/^v/i, "");
+          btn.textContent = `📱 下载配套 APP（Android v${ver}）`;
+        }
+      }
+    } catch (e) {
+      // 读取失败保留默认文案（Android 最新版），不影响下载
     }
-    latestAppUrl = buildAppDownloadUrl(d);
-    latestAppVer = String(d.tag_name).replace(/^v/i, "");
-    btn.textContent = `📱 下载配套 APP（Android v${latestAppVer}）`;
-    btn.onclick = (e) => { e.preventDefault(); downloadAppFile(); };
   }
   refreshAppDownloadBtn();
 })();

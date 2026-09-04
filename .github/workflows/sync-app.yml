@@ -1,0 +1,90 @@
+# 同步 APP 最新版：从 Gitee Release 拉取 APK，发布为 GitHub Release 固定资产
+# 下载按钮永远指向 https://github.com/jkhgnl/k6web/releases/latest/download/uvk6tools-latest.apk
+# 点击直接弹出下载对话框（GitHub 返回 attachment），不跳转、无代理、无 Blob
+name: Sync App Latest
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # 每 6 小时检查一次
+  workflow_dispatch:         # 支持手动触发
+
+permissions:
+  contents: write            # 允许创建 Release、回写 app-version.json
+
+concurrency:
+  group: sync-app
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+
+      - name: Fetch latest release info from Gitee
+        id: gitee
+        run: |
+          API="https://gitee.com/api/v5/repos/jkhgnl/uvk6-tools-android/releases/latest"
+          # 直连优先；失败则经站点 CORS 代理兜底
+          if curl -fsS --connect-timeout 15 -m 30 -o /tmp/latest.json "$API"; then
+            :
+          elif curl -fsS --connect-timeout 15 -m 30 -o /tmp/latest.json \
+              "https://cors.jkhgnl.top/?url=$(python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=""))' "$API")"; then
+            :
+          else
+            echo "::error::Gitee API 获取失败"
+            exit 1
+          fi
+          TAG=$(jq -r '.tag_name // empty' /tmp/latest.json)
+          URL=$(jq -r '[.assets[] | select(.name | test("\\.apk$"; "i"))][0].browser_download_url // empty' /tmp/latest.json)
+          if [ -z "$TAG" ]; then echo "::error::未解析到 tag_name"; exit 1; fi
+          if [ -z "$URL" ]; then
+            # assets 为空时按 Gitee 下载规则构造
+            URL="https://gitee.com/jkhgnl/uvk6-tools-android/releases/download/${TAG}/uvk6tools-${TAG}.apk"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "解析到版本: $TAG"
+
+      - name: Download APK
+        run: |
+          for i in 1 2 3; do
+            if curl -fL --connect-timeout 15 -m 300 -o /tmp/uvk6tools-latest.apk "${{ steps.gitee.outputs.url }}"; then
+              break
+            fi
+            echo "第 $i 次下载失败，重试…"
+            sleep 5
+          done
+          ls -lh /tmp/uvk6tools-latest.apk
+          test -s /tmp/uvk6tools-latest.apk || { echo "::error::APK 下载为空"; exit 1; }
+
+      - name: Update app-version.json on gh-pages
+        run: |
+          cd site
+          printf '{"version":"%s","updated_at":"%s"}\n' \
+            "${{ steps.gitee.outputs.tag }}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > app-version.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app-version.json
+          if git diff --cached --quiet; then
+            echo "版本无变化，跳过提交"
+          else
+            git commit -m "chore: 同步 APP 最新版本 ${{ steps.gitee.outputs.tag }}"
+            git push origin gh-pages
+          fi
+
+      - name: Publish GitHub Release (fixed asset)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.gitee.outputs.tag }}"
+          # 删除旧的 app-latest release（固定 tag，始终作为 latest）
+          gh release delete app-latest --yes --cleanup-tag || true
+          gh release create app-latest /tmp/uvk6tools-latest.apk \
+            --title "UvK6Tools ${TAG}" \
+            --notes "从 Gitee 自动同步的最新版本：${TAG}（点击上方 Download 或直接下载 uvk6tools-latest.apk）"
+          echo "已发布 app-latest: https://github.com/jkhgnl/k6web/releases/latest/download/uvk6tools-latest.apk"
