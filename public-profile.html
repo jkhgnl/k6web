@@ -60,10 +60,10 @@ window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJ
 
   const FUNC_BASE = window.SUPABASE_URL + "/functions/v1";
   const CATEGORIES = {
-    theme: "🎨 自定义主题", channel: "📋 信道模板",
-    extension: "⚙️ 功能扩展", other: "📦 其他作品",
+    logo: "🖼️ 开机图片", channel: "📋 信道模板",
+    firmware: "💾 固件", theme: "🎨 自定义主题", other: "📦 其他作品",
   };
-  const CATEGORY_ICONS = { theme: "🎨", channel: "📋", extension: "⚙️", other: "📦" };
+  const CATEGORY_ICONS = { logo: "🖼️", channel: "📋", firmware: "💾", theme: "🎨", other: "📦" };
 
   function escapeHtml(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>

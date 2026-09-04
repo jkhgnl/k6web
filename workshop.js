@@ -9,14 +9,13 @@
 
   const FUNC_BASE = (window.SUPABASE_URL || "").replace(/\/$/, "") + "/functions/v1";
   const CATEGORIES = {
-    theme:     { label: "🎨 自定义主题",  icon: "🎨" },
-    channel:   { label: "📋 信道模板",    icon: "📋" },
-    extension: { label: "⚙️ 功能扩展",    icon: "⚙️" },
-    firmware:  { label: "💾 固件",        icon: "💾" },
     logo:      { label: "🖼️ 开机图片",    icon: "🖼️" },
+    channel:   { label: "📋 信道模板",    icon: "📋" },
+    firmware:  { label: "💾 固件",        icon: "💾" },
+    theme:     { label: "🎨 自定义主题",  icon: "🎨" },
     other:     { label: "📦 其他作品",    icon: "📦" },
   };
-  const CATEGORY_KEYS = ["theme", "channel", "extension", "firmware", "logo", "other"];
+  const CATEGORY_KEYS = ["logo", "channel", "firmware", "theme", "other"];
 
   let currentCategory = "all";
   let currentPage = 1;
@@ -251,7 +250,7 @@
   function initCategoryTabs() {
     const wrap = $("workshopCategories");
     if (!wrap) return;
-    const keys = ["all", ...CATEGORY_KEYS];
+    const keys = [...CATEGORY_KEYS, "all"];
     wrap.innerHTML = keys.map((k) => {
       const label = k === "all" ? "全部" : CATEGORIES[k].label;
       return `<button class="ws-cat-btn ${k === currentCategory ? "active" : ""}" data-cat="${k}">${label}</button>`;
@@ -266,7 +265,7 @@
   }
 
   // ---------- 发布 / 编辑 / 删除 ----------
-  let selectedCat = "theme";   // 发布/编辑弹窗当前分类
+  let selectedCat = "logo";    // 发布/编辑弹窗当前分类（首项）
   let editingId = null;        // null = 发布新作品；非空 = 编辑该作品 id
   let detailId = null;         // 详情弹窗当前作品 id
   let detailItem = null;       // 详情弹窗当前作品数据
@@ -307,7 +306,7 @@
     $("wsPublishTitle").textContent = editingId ? "编辑作品" : "发布作品";
     $("wsPublishSub").textContent = editingId
       ? `保留当前文件《${item.file_name}》· 不选新文件则不改动文件，其余修改即时生效。`
-      : "分享你的信道模板、配置方案、固件或脚本扩展。支持 .bin / .csv / .txt / .json / .py / .zip 等格式，文件 ≤ 50MB。";
+      : "分享你的开机图片、信道模板、固件或自定义主题。支持 .bin / .csv / .txt / .json / .py / .zip 等格式，文件 ≤ 50MB。";
 
     // 预填 / 清空表单
     titleEl.value = editingId ? item.title : "";
@@ -320,7 +319,8 @@
     showFiles(null);
 
     // 分类：编辑时选中当前分类
-    selectedCat = editingId ? (item.category || "theme") : "theme";
+    const catOk = item && item.category && CATEGORIES[item.category];
+    selectedCat = editingId ? (catOk ? item.category : "other") : "logo";
     document.querySelectorAll("#workshopCategoryBtns .ws-cat-btn").forEach((b) => {
       b.classList.toggle("active", b.dataset.cat === selectedCat);
     });
