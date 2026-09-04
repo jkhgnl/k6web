@@ -12,9 +12,10 @@
     theme:     { label: "🎨 自定义主题",  icon: "🎨" },
     channel:   { label: "📋 信道模板",    icon: "📋" },
     extension: { label: "⚙️ 功能扩展",    icon: "⚙️" },
+    firmware:  { label: "💾 固件",        icon: "💾" },
     other:     { label: "📦 其他作品",    icon: "📦" },
   };
-  const CATEGORY_KEYS = ["theme", "channel", "extension", "other"];
+  const CATEGORY_KEYS = ["theme", "channel", "extension", "firmware", "other"];
 
   let currentCategory = "all";
   let currentPage = 1;

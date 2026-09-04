@@ -7,7 +7,7 @@ import { jsonResponse, getUser, handleOptions } from "../_shared/cors.ts";
 const MAX_FILE_SIZE = 1.5 * 1024 * 1024; // 1.5MB
 const MAX_THUMB_SIZE = 500 * 1024; // 500KB
 const ALLOWED_EXT = [".bin", ".bxt", ".csv", ".txt", ".json", ".py", ".js", ".html", ".zip", ".dat"];
-const ALLOWED_CATEGORIES = new Set(["theme", "channel", "extension", "other"]);
+const ALLOWED_CATEGORIES = new Set(["theme", "channel", "extension", "firmware", "other"]);
 const ALLOWED_IMG_EXT = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
 
 function isAllowedExt(name: string): boolean {

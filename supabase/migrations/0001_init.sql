@@ -58,7 +58,7 @@ create table if not exists public.workshop_items (
   user_id uuid not null references public.profiles(id) on delete cascade,
   title text not null,
   description text,
-  category text not null default 'other', -- theme / channel / extension / other
+  category text not null default 'other', -- theme / channel / extension / firmware / other
   file_path text not null,               -- Supabase Storage 路径
   file_name text not null,               -- 原始文件名
   file_size bigint not null default 0,
