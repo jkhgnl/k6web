@@ -1224,7 +1224,17 @@
   async function unbindGh(identity) {
     if (!confirm("确定解绑 GitHub 账号？解绑后将不能用 GitHub 登录。")) return;
     try {
-      const { error } = await supabase.auth.unlinkIdentity(identity);
+      // 先拉服务端最新身份：本地会话缓存的身份列表可能是旧数据
+      const { data: fresh } = await supabase.auth.getUser();
+      const cur = (fresh.user?.identities || []).find((i) => i.provider === "github");
+      if (!cur) {
+        if (fresh.user) renderWithProfile(fresh.user);
+        showGhResult("提示", "当前账号实际已是未绑定状态（此前页面显示的是浏览器缓存的旧数据，已为你刷新）。", [
+          { text: "知道了", primary: true, onclick: closeGhResult },
+        ]);
+        return;
+      }
+      const { error } = await supabase.auth.unlinkIdentity(cur);
       if (error) throw error;
       const { data } = await supabase.auth.getUser();
       if (data.user) renderWithProfile(data.user);
@@ -1363,12 +1373,11 @@
     }
   });
 
-  // 初始化：恢复会话后渲染
+  // 初始化：先用 getUser 拉服务端实时数据渲染（getSession 读的是本地缓存，身份列表可能过时）
   window.K5AUTH.init();
   window.K5AUTH.onAuth((u) => renderWithProfile(u));
-  // 立即尝试恢复
-  supabase.auth.getSession().then(({ data }) => {
-    if (data.session?.user) renderWithProfile(data.session.user);
+  supabase.auth.getUser().then(({ data }) => {
+    if (data.user) renderWithProfile(data.user);
     handleGhLinkReturn();
   });
 })();
