@@ -2252,6 +2252,8 @@
       const speedSel = $("audioSpeed");
       let speed = speedSel ? parseFloat(speedSel.value) : 1;
       if (!(speed > 0)) speed = 1;
+      const speedValEl = $("audioSpeedVal");
+      if (speedValEl) speedValEl.textContent = speed + "x";
 
       const pcm16 = await renderAtSpeed(audioBuffer, speed);
       let encoded = encodePcm16ToVoice(pcm16);
