@@ -1105,10 +1105,17 @@
     const gh = identities.find((i) => i.provider === "github");
     const ghStatus = $("ppBindGhStatus");
     if (gh) {
+      const onlyIdentity = identities.length <= 1;
       ghStatus.innerHTML = `<span class="pp-bind-badge bound">已绑定</span>
-        <button class="pp-btn ghost small" id="ppUnbindGh">解绑</button>`;
+        <button class="pp-btn ghost small" id="ppUnbindGh" ${onlyIdentity ? "disabled" : ""}>解绑</button>`;
       $("ppBindGhSub").textContent = gh.identity_data?.user_name || gh.identity_data?.name || "已绑定 GitHub 账号";
-      $("ppUnbindGh").addEventListener("click", () => unbindGh(gh));
+      if (onlyIdentity) {
+        // GitHub 是该账号唯一登录方式，解绑后账号将无法登录，Supabase 会拒绝
+        $("ppUnbindGh").title = "GitHub 是该账号唯一的登录方式，不能解绑";
+        $("ppBindGhSub").textContent += "（唯一登录方式，不能解绑）";
+      } else {
+        $("ppUnbindGh").addEventListener("click", () => unbindGh(gh));
+      }
     } else {
       ghStatus.innerHTML = `<span class="pp-bind-badge unbound">未绑定</span>
         <button class="pp-btn primary small" id="ppBindGh">绑定 GitHub</button>`;
@@ -1222,7 +1229,13 @@
       const { data } = await supabase.auth.getUser();
       if (data.user) renderWithProfile(data.user);
     } catch (e) {
-      alert("解绑失败：" + (e.message || "请重试"));
+      const raw = e.message || "";
+      const msg = /at least 1 identity/i.test(raw)
+        ? "解绑失败：GitHub 是该账号唯一的登录方式，不能解绑。如需解绑，请先给账号设置邮箱和密码。"
+        : "解绑失败：" + (raw || "请重试");
+      showGhResult("解绑失败", esc(msg), [
+        { text: "知道了", primary: true, onclick: closeGhResult },
+      ]);
     }
   }
 
