@@ -1577,7 +1577,7 @@ window.addEventListener("load", function () {
 
   <div class="card">
     <h2>上传开机音效（8 kHz 单声道）</h2>
-    <p class="hint">上传音频文件（MP3/WAV/OGG/M4A），自动转码为 8 kHz 单声道 16-bit PCM，经 VOICE_SAMPLES 最近邻编码后写入外部 SPI Flash <code>0x1F8000</code>。<b>最大音频数据 28 KB（约 3.5 秒）</b>，建议控制在 3 秒（24 KB）以内。超长音频可用“倍速”加快以保留更完整内容；勾选“超限自动压缩”后，bin 超出上限时会自动截断到 28 KB。点“预览语音效果”可试听转码后的实际音色。</p>
+    <p class="hint">上传音频文件（MP3/WAV/OGG/M4A），自动转码为 8 kHz 单声道 16-bit PCM，经 VOICE_SAMPLES 最近邻编码后写入外部 SPI Flash <code>0x1F8000</code>。<b>最大音频数据 28 KB（约 3.5 秒）</b>，建议控制在 3 秒（24 KB）以内。超长音频可用“倍速”滑块加快以保留更完整内容；bin 超出 28 KB 时会自动截断到上限。点“预览语音效果”可试听转码后的实际音色。</p>
     <p class="hint" style="color:#c62828"><b>⚠ 刷写前建议备份！</b>此操作会覆盖外部 Flash 的 <code>0x1F8000</code>~<code>0x1FF000</code> 区域，不要与原 ENABLE_VOICE 语音包区域 <code>0x14C000</code> 混淆。</p>
 
     <div style="display:flex;gap:20px;margin-top:16px;flex-wrap:wrap;align-items:stretch">
@@ -1595,20 +1595,10 @@ window.addEventListener("load", function () {
           <label for="audioNormalize" style="margin:0;font-size:13px;color:#555">音量归一化</label>
         </div>
 
-        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap">
-          <label for="audioSpeed" style="margin:0;font-size:13px;color:#555">倍速</label>
-          <select id="audioSpeed" style="padding:4px 6px;border:1px solid #ccc;border-radius:6px;font-size:13px;background:#fff">
-            <option value="1">1.0x（原速）</option>
-            <option value="1.25">1.25x</option>
-            <option value="1.5">1.5x</option>
-            <option value="2">2x</option>
-            <option value="2.5">2.5x</option>
-            <option value="3">3x</option>
-            <option value="4">4x</option>
-          </select>
-          <label style="margin:0;font-size:13px;color:#555">
-            <input id="audioAutoCompress" type="checkbox" checked style="margin-right:2px">超限自动压缩
-          </label>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap">
+          <label for="audioSpeed" style="margin:0;font-size:13px;color:#555;white-space:nowrap">倍速</label>
+          <input id="audioSpeed" type="range" min="1" max="4" step="0.25" value="1" style="flex:1;min-width:140px;accent-color:#2f6fdc">
+          <span id="audioSpeedVal" style="font-size:13px;color:#2f6fdc;font-weight:600;min-width:44px;text-align:right">1x</span>
         </div>
 
         <p id="audioInfo" class="hint" style="min-height:18px;margin-top:8px"></p>
@@ -1625,16 +1615,16 @@ window.addEventListener("load", function () {
           <button id="btnBootAudioExport" class="secondary" style="flex:1" disabled>📤 导出 bin</button>
         </div>
         <button id="btnBootAudioPreview" class="secondary" disabled>🔊 预览语音效果</button>
-        <button id="btnBootAudioUpload" class="secondary" disabled>📤 上传至创意工坊</button>
         <button id="btnBootAudioDisable" class="secondary">🚫 关闭开机音效</button>
         <button id="btnBootAudioCheck" class="secondary">✅ 读取校验</button>
         <button id="btnBootAudioBackup" class="secondary">⬇️ 备份到电脑</button>
+        <button id="btnBootAudioUpload" class="secondary" disabled>📤 上传至创意工坊</button>
         <div id="bootAudioProgress" class="progress"><div id="bootAudioProgressBar"></div></div>
         <p id="bootAudioStatus" class="hint" style="min-height:18px"></p>
       </div>
     </div>
 
-    <p class="hint" style="margin-top:12px">刷写流程：擦除 7 个扇区（约 250~400 ms）→ 按 232 字节/帧写入（约 0.5~1 秒）→ 整体约 1~1.5 秒完成。写入后对讲机自动重启生效。关闭开机音效会把 <code>0x1F8000</code> 起 4 字节长度头擦为 <code>0xFF</code>。<br>Bin 格式：4 字节小端 uint32（音频数据长度）+ 编码数据，补齐到 4 KB 整数倍；开启“超限自动压缩”时，超出 28 KB 的部分会从尾部自动截断。</p>
+    <p class="hint" style="margin-top:12px">刷写流程：擦除 7 个扇区（约 250~400 ms）→ 按 232 字节/帧写入（约 0.5~1 秒）→ 整体约 1~1.5 秒完成。写入后对讲机自动重启生效。关闭开机音效会把 <code>0x1F8000</code> 起 4 字节长度头擦为 <code>0xFF</code>。<br>Bin 格式：4 字节小端 uint32（音频数据长度）+ 编码数据，补齐到 4 KB 整数倍；超出 28 KB 的音频会自动从尾部截断到上限。</p>
   </div>
 </div>
 

@@ -2252,7 +2252,6 @@
       const speedSel = $("audioSpeed");
       let speed = speedSel ? parseFloat(speedSel.value) : 1;
       if (!(speed > 0)) speed = 1;
-      const autoCompress = !($("audioAutoCompress") && !$("audioAutoCompress").checked);
 
       const pcm16 = await renderAtSpeed(audioBuffer, speed);
       let encoded = encodePcm16ToVoice(pcm16);
@@ -2260,10 +2259,7 @@
       let compressed = false;
 
       if (bin.length > BA.FLASH_SIZE) {
-        if (!autoCompress) {
-          throw new Error("音频过长：bin " + bin.length + " 字节超过 " + BA.FLASH_SIZE + " 字节（28 KB，约 3.5 秒）。请调高倍速，或勾选“超限自动压缩”由系统自动截断");
-        }
-        // 超限自动压缩：按文件大小（bin 字节数）从尾部截断到上限，不改变已保留内容的时长比例
+        // 超限自动压缩（始终开启）：按文件大小（bin 字节数）从尾部截断到上限，不改变已保留内容的时长比例
         const cutBytes = encoded.length - MAX_DATA;
         encoded = encoded.slice(0, MAX_DATA);
         bin = buildBootAudioBin(encoded);
@@ -2322,16 +2318,23 @@
     });
   }
 
-  // 倍速 / 自动压缩开关变化时，用已加载的音频重新处理
+  // 用已加载的音频重新处理（倍速滑块松手后调用）
   function reprocessCurrentAudio() {
     if (!bootAudioRawFileBuf) return;
     const f = new File([bootAudioRawFileBuf], bootAudioRawFileName || "audio", { type: bootAudioRawFileType });
     processAudioFile(f);
   }
+
+  // 倍速滑块：拖动时只更新数值显示，松手（change）后再重新处理
   const _speedSel = $("audioSpeed");
-  if (_speedSel) _speedSel.addEventListener("change", () => reprocessCurrentAudio());
-  const _acCb = $("audioAutoCompress");
-  if (_acCb) _acCb.addEventListener("change", () => reprocessCurrentAudio());
+  if (_speedSel) {
+    _speedSel.addEventListener("input", () => {
+      const v = parseFloat(_speedSel.value);
+      const valEl = $("audioSpeedVal");
+      if (valEl) valEl.textContent = (isFinite(v) && v > 0 ? v : 1) + "x";
+    });
+    _speedSel.addEventListener("change", () => reprocessCurrentAudio());
+  }
 
   // 开机音效：预览转码后的语音效果（编码索引 → VOICE_SAMPLES 量化值还原 PCM，按 8 kHz 播放）
   let _previewAudioCtx = null;
