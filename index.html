@@ -127,10 +127,19 @@ window.addEventListener("load", function () {
   textarea { font-family: Consolas, monospace; font-size: 12px; height: 52px; }
   .row { display: flex; gap: 10px; }
   .row > div { flex: 1; }
-  button { padding: 8px 16px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; background: #2f6fdc; color: #fff; }
-  button.secondary { background: #6c757d; }
-  button.danger { background: #c62828; }
-  button:disabled { background: #aab; cursor: not-allowed; }
+  button {
+    padding: 9px 18px; font-size: 14px; font-family: inherit; border: none; border-radius: 8px;
+    cursor: pointer; background: linear-gradient(135deg, #2f6fdc, #4a86e8); color: #fff;
+    box-shadow: 0 2px 6px rgba(47, 111, 220, .22);
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    transition: all .18s ease; user-select: none;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.07); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(47, 111, 220, .3); }
+  button:active:not(:disabled) { transform: translateY(0); filter: brightness(.95); }
+  button.secondary { background: #fff; color: #4a5568; border: 1px solid #d4dae3; box-shadow: none; }
+  button.secondary:hover:not(:disabled) { border-color: #2f6fdc; color: #2f6fdc; background: #f4f8ff; }
+  button.danger { background: linear-gradient(135deg, #d32f2f, #e05252); box-shadow: 0 2px 6px rgba(211, 47, 47, .22); }
+  button:disabled { background: #eef0f4; color: #a9b0bc; cursor: not-allowed; box-shadow: none; border-color: transparent; }
   #log {
     font-family: Consolas, monospace; font-size: 12px; background: #111; color: #9f9;
     padding: 8px; border-radius: 4px; height: 160px; overflow-y: auto; white-space: pre-wrap;
@@ -1614,10 +1623,14 @@ window.addEventListener("load", function () {
           <button id="btnBootAudioWrite" disabled style="flex:2">💾 写入开机音效</button>
           <button id="btnBootAudioExport" class="secondary" style="flex:1" disabled>📤 导出 bin</button>
         </div>
-        <button id="btnBootAudioPreview" class="secondary" disabled>🔊 预览语音效果</button>
-        <button id="btnBootAudioDisable" class="secondary">🚫 关闭开机音效</button>
-        <button id="btnBootAudioCheck" class="secondary">✅ 读取校验</button>
-        <button id="btnBootAudioBackup" class="secondary">⬇️ 备份到电脑</button>
+        <div style="display:flex;gap:8px">
+          <button id="btnBootAudioPreview" class="secondary" disabled style="flex:1">🔊 预览语音效果</button>
+          <button id="btnBootAudioDisable" class="secondary" style="flex:1">🚫 关闭开机音效</button>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button id="btnBootAudioCheck" class="secondary" style="flex:1">✅ 读取校验</button>
+          <button id="btnBootAudioBackup" class="secondary" style="flex:1">⬇️ 备份到电脑</button>
+        </div>
         <button id="btnBootAudioUpload" class="secondary" disabled>📤 上传至创意工坊</button>
         <div id="bootAudioProgress" class="progress"><div id="bootAudioProgressBar"></div></div>
         <p id="bootAudioStatus" class="hint" style="min-height:18px"></p>
