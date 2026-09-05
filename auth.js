@@ -13,6 +13,21 @@
   let supabase = null;
   let user = null;        // 当前登录用户（null = 未登录）
   let callbacks = [];     // 认证状态变化回调
+  let profileCache = null; // profiles 表资料（用户名/头像以此为准，GitHub 登录不覆盖）
+
+  // 读取 profiles 表资料并重绘顶栏；user_metadata 可能被 OAuth 提供商覆盖，仅作兜底
+  async function loadProfile() {
+    if (!user) { profileCache = null; return; }
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("username, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle();
+      profileCache = data || null;
+    } catch (_) { profileCache = null; }
+    renderAuthUI();
+  }
 
   function emit() {
     callbacks.forEach((cb) => { try { cb(user); } catch (e) { console.error(e); } });
@@ -32,8 +47,8 @@
 
     if (user) {
       const meta = user.user_metadata || {};
-      const name = meta.user_name || meta.name || meta.full_name || meta.preferred_username || user.email || "用户";
-      const avatar = safeAvatar(meta.avatar_url || meta.picture);
+      const name = profileCache?.username || meta.user_name || meta.name || meta.full_name || meta.preferred_username || user.email || "用户";
+      const avatar = safeAvatar(profileCache?.avatar_url || meta.avatar_url || meta.picture);
       if (badge) {
         const avatarHtml = avatar
           ? `<img class="user-avatar user-avatar-btn" src="${avatar}" alt="头像" title="点击更换头像" loading="lazy">`
@@ -80,8 +95,8 @@
     const body = document.getElementById("profileBody");
     if (!modal || !body || !user) return;
     const meta = user.user_metadata || {};
-    const name = meta.user_name || meta.name || meta.full_name || meta.preferred_username || user.email || "用户";
-    const avatar = safeAvatar(meta.avatar_url || meta.picture);
+    const name = profileCache?.username || meta.user_name || meta.name || meta.full_name || meta.preferred_username || user.email || "用户";
+    const avatar = safeAvatar(profileCache?.avatar_url || meta.avatar_url || meta.picture);
     const head = avatar
       ? `<img class="user-dropdown-avatar" src="${avatar}" alt="" loading="lazy">`
       : `<span class="user-dropdown-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</span>`;
@@ -309,6 +324,9 @@
 
     const { error: upErr } = await supabase.auth.updateUser({ data: { avatar_url: data.avatar_url } });
     if (upErr) throw upErr;
+    // profiles 表已由 Edge Function 写入，这里同步本地缓存（避免被 user_metadata 旧值覆盖显示）
+    profileCache = { ...(profileCache || {}), avatar_url: data.avatar_url };
+    renderAuthUI();
   }
 
   function escapeHtml(s) {
@@ -449,6 +467,9 @@
     // 仅 GitHub 登录且尚未完善资料时提示
     if (user.app_metadata?.provider !== "github") return;
     if (user.user_metadata?.profile_completed) return;
+    // 已有邮箱身份的账号（邮箱注册后绑定 GitHub）资料完整，不再打扰
+    if ((user.identities || []).some((i) => i.provider === "email")) return;
+    if (profileCache?.username) return;
     openCompleteProfile();
   }
 
@@ -516,7 +537,7 @@
       const { data: ud } = await supabase.auth.getUser();
       if (ud.user) user = ud.user;
       closeCompleteProfile();
-      renderAuthUI();
+      loadProfile();
       if (window.K5WORKSHOP && typeof window.K5WORKSHOP.loadList === "function") {
         window.K5WORKSHOP.loadList(1, "all");
       }
@@ -640,7 +661,7 @@
       user = data.session?.user || null;
       emit();
       renderAuthUI();
-      maybePromptCompleteProfile();
+      loadProfile().then(() => maybePromptCompleteProfile());
     });
 
     // 监听状态变化（登录/登出/token 刷新）
@@ -648,7 +669,7 @@
       user = session?.user || null;
       emit();
       renderAuthUI();
-      maybePromptCompleteProfile();
+      loadProfile().then(() => maybePromptCompleteProfile());
       // 密码重置回调：邮件链接带回 recovery token，自动进入设置新密码
       if (event === "PASSWORD_RECOVERY") {
         showForgotStep2();
