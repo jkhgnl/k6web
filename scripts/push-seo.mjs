@@ -73,7 +73,14 @@ async function pushBaidu(urls) {
   });
   const text = await resp.text().catch(() => "");
   console.log(`[百度] HTTP ${resp.status} 反馈：${text}`);
-  if (!resp.ok) return false;
+  if (!resp.ok) {
+    // 当日配额用完按天重置，下次运行会补推，不判失败
+    if (/"message"\s*:\s*"over quota"/.test(text)) {
+      console.log("[百度] 当日配额已用完，跳过（配额每日重置，不影响本次构建）");
+      return true;
+    }
+    return false;
+  }
   try {
     const data = JSON.parse(text);
     // 重复/已在库的 URL 百度会减少 success 数，属正常；仅对接口不可用判失败
