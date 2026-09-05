@@ -94,14 +94,15 @@ const CN_FONT = {
 };
 
 // 开机音效区参数（外部 SPI Flash 0x1F8000，见 App/app/uart.c BOOT_AUDIO 命令）
+// 区域 0x1F8000..0x1FF000（28 KB），RTC 保存块在 0x1FF000，勿再向外扩展
 const BOOT_AUDIO = {
   FLASH_ADDR: 0x1f8000,
-  FLASH_SIZE: 0x3000,        // 12 KB 最大可用
-  SECTOR_COUNT: 3,           // 12 KB / 4 KB = 3 个 sector
+  FLASH_SIZE: 0x7000,        // 28 KB 最大可用
+  SECTOR_COUNT: 7,           // 28 KB / 4 KB = 7 个 sector（sectorIndex 0..6）
   SECTOR_SIZE: 0x1000,       // 4 KB 每扇区
   CHUNK: 232,                // 每帧写入上限（256B 环形缓冲余量）
-  MAX_DATA_SIZE: 0x3000,     // 音频数据最大 12 KB
-  RECOMMENDED_MAX_SIZE: 8192, // 建议 ≤1 秒（8 KB）
+  MAX_DATA_SIZE: 0x7000,     // 音频数据最大 28 KB
+  RECOMMENDED_MAX_SIZE: 24576, // 建议 ≤3 秒（24 KB）
 };
 
 // MR 信道存储参数（EEPROM 仿真地址，经 eeprom_compat.c 1:1 映射到 SPI Flash）

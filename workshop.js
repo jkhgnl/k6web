@@ -12,10 +12,11 @@
     logo:      { label: "🖼️ 开机图片",    icon: "🖼️" },
     channel:   { label: "📋 信道模板",    icon: "📋" },
     firmware:  { label: "💾 固件",        icon: "💾" },
+    voice:     { label: "🔊 开机语音",    icon: "🔊" },
     theme:     { label: "🎨 自定义主题",  icon: "🎨" },
     other:     { label: "📦 其他作品",    icon: "📦" },
   };
-  const CATEGORY_KEYS = ["logo", "channel", "firmware", "theme", "other"];
+  const CATEGORY_KEYS = ["logo", "channel", "firmware", "voice", "theme", "other"];
 
   let currentCategory = "logo"; // 创意工坊默认展示开机图片分类
   let currentPage = 1;
@@ -205,6 +206,10 @@
         const useLogoBtn = $("btnWsUseLogo");
         if (useLogoBtn) useLogoBtn.style.display = it.category === "logo" ? "inline-flex" : "none";
 
+        // 开机语音分类 → 显示"下载&使用此音频"
+        const useVoiceBtn = $("btnWsUseVoice");
+        if (useVoiceBtn) useVoiceBtn.style.display = it.category === "voice" ? "inline-flex" : "none";
+
         // 加载评论
         if (commentsSection && window.K5COMMENTS) {
           commentsSection.style.display = "block";
@@ -307,7 +312,7 @@
     $("wsPublishTitle").textContent = editingId ? "编辑作品" : "发布作品";
     $("wsPublishSub").textContent = editingId
       ? `保留当前文件《${item.file_name}》· 不选新文件则不改动文件，其余修改即时生效。`
-      : "分享你的开机图片、信道模板、固件或自定义主题。支持 .bin / .csv / .txt / .json / .py / .zip 等格式，文件 ≤ 50MB。";
+      : "分享你的开机图片、信道模板、固件、开机语音或自定义主题。支持 .bin / .csv / .txt / .json / .py / .zip 等格式，文件 ≤ 50MB。";
 
     // 预填 / 清空表单
     titleEl.value = editingId ? item.title : "";
@@ -741,6 +746,48 @@
         } finally {
           useLogoBtn.disabled = false;
           useLogoBtn.textContent = oldText;
+        }
+      });
+    }
+
+    // 开机语音：应用此音频（服务端取文件转 base64，跳转开机音效页并载入 bin）
+    const useVoiceBtn = $("btnWsUseVoice");
+    if (useVoiceBtn) {
+      useVoiceBtn.addEventListener("click", async () => {
+        if (!detailId) return;
+        useVoiceBtn.disabled = true;
+        const oldText = useVoiceBtn.textContent;
+        useVoiceBtn.textContent = "⏳ 获取中...";
+        try {
+          const resp = await fetch(`${FUNC_BASE}/get-workshop-item?id=${encodeURIComponent(detailId)}&include_file=1`, {
+            headers: anonHeaders(),
+          });
+          const data = await resp.json();
+          if (!data.item) throw new Error(data.error || "加载失败");
+          if (!data.file_b64) throw new Error("无法获取音频内容");
+          // base64 → File（开机语音为 bin）
+          const binary = atob(data.file_b64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const fileName = data.item.file_name || "startup_voice.bin";
+          const file = new File([bytes], fileName, { type: "application/octet-stream" });
+          closeDetail();
+          if (typeof window.switchTab === "function") window.switchTab("tabBootAudio");
+          // 等页面切换完成后再载入 bin
+          setTimeout(() => {
+            if (window.K5BOOTAUDIO && window.K5BOOTAUDIO.loadBootAudioBin) {
+              window.K5BOOTAUDIO.loadBootAudioBin(file)
+                .then(() => alert("✅ 已载入开机语音 bin，可预览或直接写入对讲机"))
+                .catch((e) => alert("载入失败：" + e.message));
+            } else {
+              alert("开机音效模块未就绪，请稍后重试");
+            }
+          }, 100);
+        } catch (e) {
+          alert("应用失败：" + e.message);
+        } finally {
+          useVoiceBtn.disabled = false;
+          useVoiceBtn.textContent = oldText;
         }
       });
     }

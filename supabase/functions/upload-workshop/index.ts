@@ -9,7 +9,7 @@ import { r2Enabled, r2PutObject, r2PublicUrl } from "../_shared/r2.ts";
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const MAX_THUMB_SIZE = 20 * 1024 * 1024; // 20MB
 const ALLOWED_EXT = [".bin", ".bxt", ".csv", ".txt", ".json", ".py", ".js", ".html", ".zip", ".dat", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"];
-const ALLOWED_CATEGORIES = new Set(["logo", "channel", "firmware", "theme", "other"]);
+const ALLOWED_CATEGORIES = new Set(["logo", "channel", "firmware", "voice", "theme", "other"]);
 const ALLOWED_IMG_EXT = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
 
 function isAllowedExt(name: string): boolean {

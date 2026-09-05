@@ -2063,7 +2063,34 @@
     },
   };
 
-  // ---------- 开机音效刷写（外部 SPI Flash 0x1F8000，12 KB） ----------
+  // 供创意工坊详情页"应用此音频"调用：把下载的开机语音 bin 载入刷写页
+  window.K5BOOTAUDIO = {
+    async loadBootAudioBin(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      const BA = proto.BOOT_AUDIO;
+      if (bytes.length < 4) throw new Error("bin 数据不完整");
+      if (bytes.length > BA.FLASH_SIZE) throw new Error("bin 过大：" + bytes.length + " 字节，超过 28 KB 上限");
+      if (bytes.length % BA.SECTOR_SIZE !== 0) throw new Error("bin 未按 4 KB 对齐：" + bytes.length + " 字节");
+      bootAudioResetState();
+      bootAudioBin = bytes;
+      const len = new DataView(bytes.buffer, bytes.byteOffset, 4).getUint32(0, true);
+      const dataLen = Math.min(len, bytes.length - 4);
+      updateAudioInfo("已从创意工坊载入：" + file.name + "（数据 " + dataLen + " 字节，约 " + (dataLen / 8000).toFixed(2) + "s）  bin " + bytes.length + " 字节（" + (bytes.length / 1024).toFixed(1) + " KB）");
+      updateBootAudioStatus("已就绪，点“写入开机音效”刷入（需先连接串口）");
+      const wBtn = $("btnBootAudioWrite");
+      const eBtn = $("btnBootAudioExport");
+      const pBtn = $("btnBootAudioPreview");
+      const uBtn = $("btnBootAudioUpload");
+      if (wBtn) wBtn.disabled = false;
+      if (eBtn) eBtn.disabled = false;
+      if (pBtn) pBtn.disabled = false;
+      if (uBtn) uBtn.disabled = false;
+      log("开机音效 bin 已载入（创意工坊）：" + file.name + "（" + bytes.length + " 字节）");
+    },
+  };
+
+  // ---------- 开机音效刷写（外部 SPI Flash 0x1F8000，28 KB） ----------
   // VOICE_SAMPLES 与固件 App/driver/startup_voice.c s_VoiceSamples[256] 完全一致
   const VOICE_SAMPLES = [
     0x06a8, 0x06b8, 0x0688, 0x0698, 0x06e8, 0x06f8, 0x06c8, 0x06d8,
@@ -2133,6 +2160,8 @@
 
   let bootAudioBin = null;
   let bootAudioRawFileBuf = null;
+  let bootAudioRawFileName = "";
+  let bootAudioRawFileType = "audio/*";
   let bootAudioPreviewUrl = null;
 
   const audioDropZone = () => $("audioDropZone");
@@ -2157,13 +2186,51 @@
     if (preview) { preview.removeAttribute("src"); preview.style.display = "none"; }
     const wBtn = $("btnBootAudioWrite");
     const eBtn = $("btnBootAudioExport");
+    const pBtn = $("btnBootAudioPreview");
+    const uBtn = $("btnBootAudioUpload");
     if (wBtn) wBtn.disabled = true;
     if (eBtn) eBtn.disabled = true;
+    if (pBtn) pBtn.disabled = true;
+    if (uBtn) uBtn.disabled = true;
+  }
+
+  // 按倍速把源音频重采样为 8 kHz 单声道 16-bit PCM；playbackRate>1 会等比压缩时长（音调同步升高，适合开机提示音）
+  async function renderAtSpeed(audioBuffer, speed) {
+    const targetSamples = Math.ceil(audioBuffer.duration * 8000 / speed);
+    const offline = new OfflineAudioContext(1, targetSamples, 8000);
+    const src = offline.createBufferSource();
+    src.buffer = audioBuffer;
+    src.playbackRate.value = speed;
+    src.connect(offline.destination);
+    src.start(0);
+    const resampled = await offline.startRendering();
+    const floatData = resampled.getChannelData(0);
+    const pcm16 = new Int16Array(floatData.length);
+    for (let i = 0; i < floatData.length; i++) {
+      let v = floatData[i];
+      if (v > 1) v = 1; if (v < -1) v = -1;
+      pcm16[i] = Math.round(v * 32767);
+    }
+    if ($("audioNormalize") && $("audioNormalize").checked) {
+      let peak = 0;
+      for (let i = 0; i < pcm16.length; i++) { const a = Math.abs(pcm16[i]); if (a > peak) peak = a; }
+      if (peak > 0 && peak < 32767) {
+        const gain = (32767 * 0.95) / peak;
+        for (let i = 0; i < pcm16.length; i++) {
+          let v = Math.round(pcm16[i] * gain);
+          if (v > 32767) v = 32767; if (v < -32768) v = -32768;
+          pcm16[i] = v;
+        }
+      }
+    }
+    return pcm16;
   }
 
   async function processAudioFile(file) {
     bootAudioResetState();
     if (!file) return;
+    bootAudioRawFileName = file.name || "audio";
+    bootAudioRawFileType = file.type || "audio/*";
     updateAudioInfo("正在解码音频...");
     updateBootAudioStatus("");
     try {
@@ -2179,56 +2246,51 @@
         try { await audioCtx.close(); } catch (_) {}
       }
       const duration = audioBuffer.duration;
-      const targetSamples = Math.ceil(duration * 8000);
-      if (targetSamples === 0) throw new Error("音频时长为 0");
-      const offline = new OfflineAudioContext(1, targetSamples, 8000);
-      const src = offline.createBufferSource();
-      src.buffer = audioBuffer;
-      src.connect(offline.destination);
-      src.start(0);
-      const resampled = await offline.startRendering();
-      let floatData = resampled.getChannelData(0);
-      let floatLen = floatData.length;
-      let pcm16 = new Int16Array(floatLen);
-      for (let i = 0; i < floatLen; i++) {
-        let v = floatData[i];
-        if (v > 1) v = 1; if (v < -1) v = -1;
-        pcm16[i] = Math.round(v * 32767);
-      }
-      if ($("audioNormalize") && $("audioNormalize").checked) {
-        let peak = 0;
-        for (let i = 0; i < pcm16.length; i++) { const a = Math.abs(pcm16[i]); if (a > peak) peak = a; }
-        if (peak > 0 && peak < 32767) {
-          const gain = (32767 * 0.95) / peak;
-          for (let i = 0; i < pcm16.length; i++) {
-            let v = Math.round(pcm16[i] * gain);
-            if (v > 32767) v = 32767; if (v < -32768) v = -32768;
-            pcm16[i] = v;
-          }
-        }
-      }
-      const encoded = encodePcm16ToVoice(pcm16);
-      const bin = buildBootAudioBin(encoded);
+      if (duration === 0) throw new Error("音频时长为 0");
       const BA = proto.BOOT_AUDIO;
+      const MAX_DATA = BA.FLASH_SIZE - 4; // 28668：4 字节长度头 + 数据 ≤ 28 KB
+      const speedSel = $("audioSpeed");
+      let speed = speedSel ? parseFloat(speedSel.value) : 1;
+      if (!(speed > 0)) speed = 1;
+      const autoCompress = !($("audioAutoCompress") && !$("audioAutoCompress").checked);
+
+      const pcm16 = await renderAtSpeed(audioBuffer, speed);
+      let encoded = encodePcm16ToVoice(pcm16);
+      let bin = buildBootAudioBin(encoded);
+      let compressed = false;
+
       if (bin.length > BA.FLASH_SIZE) {
-        throw new Error("音频过长：bin " + bin.length + " 字节超过 " + BA.FLASH_SIZE + " 字节（12 KB），请缩短到 1.5 秒以内");
+        if (!autoCompress) {
+          throw new Error("音频过长：bin " + bin.length + " 字节超过 " + BA.FLASH_SIZE + " 字节（28 KB，约 3.5 秒）。请调高倍速，或勾选“超限自动压缩”由系统自动截断");
+        }
+        // 超限自动压缩：按文件大小（bin 字节数）从尾部截断到上限，不改变已保留内容的时长比例
+        const cutBytes = encoded.length - MAX_DATA;
+        encoded = encoded.slice(0, MAX_DATA);
+        bin = buildBootAudioBin(encoded);
+        compressed = true;
+        updateBootAudioStatus("已自动压缩：截断 " + cutBytes + " 字节以适配 28 KB 上限");
+        log("已自动压缩：音频数据 " + (MAX_DATA + cutBytes) + " 字节超过上限，截断到 " + MAX_DATA + " 字节（约 3.5 秒）。如需保留更完整内容，可调高倍速", "info");
       }
       if (encoded.length > BA.RECOMMENDED_MAX_SIZE) {
-        log("提示：音频数据 " + encoded.length + " 字节超过建议 8 KB（约 1 秒），可能接近上限", "info");
+        log("提示：音频数据 " + encoded.length + " 字节超过建议 24 KB（约 3 秒），可能接近上限", "info");
       }
       bootAudioBin = bin;
-      const durStr = duration.toFixed(2) + "s（转码后 " + (encoded.length / 8000).toFixed(2) + "s @" + "8kHz）";
-      updateAudioInfo("已加载：" + file.name + "  原时长 " + durStr + "  编码 " + encoded.length + " 字节  bin " + bin.length + " 字节（" + (bin.length / 1024).toFixed(1) + " KB）");
+      const effDur = (compressed ? MAX_DATA : encoded.length) / 8000;
+      updateAudioInfo("已加载：" + file.name + "  倍速 " + speed + "x  有效时长 " + effDur.toFixed(2) + "s（编码 " + encoded.length + " 字节）  bin " + bin.length + " 字节（" + (bin.length / 1024).toFixed(1) + " KB）" + (compressed ? "  ⚠已截断" : ""));
       updateBootAudioStatus("已就绪，点“写入开机音效”刷入（需先连接串口）");
       const wBtn = $("btnBootAudioWrite");
       const eBtn = $("btnBootAudioExport");
+      const pBtn = $("btnBootAudioPreview");
+      const uBtn = $("btnBootAudioUpload");
       if (wBtn) wBtn.disabled = false;
       if (eBtn) eBtn.disabled = false;
+      if (pBtn) pBtn.disabled = false;
+      if (uBtn) uBtn.disabled = false;
       const blob = new Blob([bootAudioRawFileBuf], { type: file.type || "audio/*" });
       bootAudioPreviewUrl = URL.createObjectURL(blob);
       const preview = $("audioPreview");
       if (preview) { preview.src = bootAudioPreviewUrl; preview.style.display = "block"; }
-      log("开机音效已处理：" + file.name + "（" + encoded.length + " 字节，bin " + bin.length + " 字节）");
+      log("开机音效已处理：" + file.name + "（倍速 " + speed + "x，编码 " + encoded.length + " 字节，bin " + bin.length + " 字节" + (compressed ? "，已截断" : "") + "）");
     } catch (err) {
       bootAudioBin = null;
       updateAudioInfo("处理失败：" + err.message);
@@ -2260,6 +2322,82 @@
     });
   }
 
+  // 倍速 / 自动压缩开关变化时，用已加载的音频重新处理
+  function reprocessCurrentAudio() {
+    if (!bootAudioRawFileBuf) return;
+    const f = new File([bootAudioRawFileBuf], bootAudioRawFileName || "audio", { type: bootAudioRawFileType });
+    processAudioFile(f);
+  }
+  const _speedSel = $("audioSpeed");
+  if (_speedSel) _speedSel.addEventListener("change", () => reprocessCurrentAudio());
+  const _acCb = $("audioAutoCompress");
+  if (_acCb) _acCb.addEventListener("change", () => reprocessCurrentAudio());
+
+  // 开机音效：预览转码后的语音效果（编码索引 → VOICE_SAMPLES 量化值还原 PCM，按 8 kHz 播放）
+  let _previewAudioCtx = null;
+  let _previewSrc = null;
+  async function previewBootAudioEncoded() {
+    if (!bootAudioBin) { setStatus("请先选择并处理音频文件", "err"); return; }
+    const len = new DataView(bootAudioBin.buffer, bootAudioBin.byteOffset, 4).getUint32(0, true);
+    const n = Math.max(0, Math.min(len, bootAudioBin.length - 4));
+    if (n === 0) { setStatus("开机音效数据为空，无法预览", "warn"); return; }
+    const pcm = new Int16Array(n);
+    for (let i = 0; i < n; i++) {
+      pcm[i] = (VOICE_SAMPLES[bootAudioBin[4 + i]] << 4) - 32768;
+    }
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) { setStatus("当前浏览器不支持音频播放", "err"); return; }
+    if (!_previewAudioCtx) _previewAudioCtx = new AudioCtx();
+    try { if (_previewAudioCtx.state === "suspended") await _previewAudioCtx.resume(); } catch (_) {}
+    if (_previewSrc) { try { _previewSrc.stop(); } catch (_) {} _previewSrc = null; }
+    const buf = _previewAudioCtx.createBuffer(1, n, 8000);
+    buf.getChannelData(0).set(pcm);
+    const src = _previewAudioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(_previewAudioCtx.destination);
+    src.onended = () => { _previewSrc = null; };
+    _previewSrc = src;
+    src.start();
+    setStatus("正在播放转码后的语音效果（约 " + (n / 8000).toFixed(2) + " 秒）", "info");
+    log("预览转码后语音效果：约 " + (n / 8000).toFixed(2) + " 秒");
+  }
+  const _btnPreview = $("btnBootAudioPreview");
+  if (_btnPreview) {
+    _btnPreview.addEventListener("click", () => { previewBootAudioEncoded(); });
+  }
+
+  // 开机音效：上传当前生成的 bin 到创意工坊（分类：开机语音）
+  const bootAudioUploadBtn = $("btnBootAudioUpload");
+  if (bootAudioUploadBtn) {
+    bootAudioUploadBtn.addEventListener("click", async () => {
+      if (!window.K5AUTH.isLoggedIn()) { window.K5AUTH.openModal(); return; }
+      if (!bootAudioBin) { setStatus("请先选择并处理音频文件", "err"); return; }
+      const len = new DataView(bootAudioBin.buffer, bootAudioBin.byteOffset, 4).getUint32(0, true);
+      const title = (window.prompt("作品标题（不超过 60 字）：", `开机语音 ${new Date().toLocaleDateString("zh-CN")}`) || "").trim();
+      if (!title) return;
+      const file = new File([bootAudioBin], "startup_voice.bin", { type: "application/octet-stream" });
+      bootAudioUploadBtn.disabled = true;
+      const oldText = bootAudioUploadBtn.textContent;
+      bootAudioUploadBtn.textContent = "⏳ 上传中...";
+      try {
+        await window.K5WORKSHOP.uploadFile({
+          title,
+          description: "8 kHz 单声道开机语音 bin（数据 " + len + " 字节，约 " + (len / 8000).toFixed(2) + " 秒；4 字节小端长度头 + VOICE_SAMPLES 编码数据，4 KB 对齐）。可在「开机音效」页点“应用此音频”直接载入并写入对讲机。",
+          category: "voice",
+          file,
+        });
+        setStatus("✅ 已上传至创意工坊（开机语音分类）", "ok");
+        log(`开机音效已上传：${title}`, "开机音效");
+      } catch (err) {
+        setStatus("上传失败：" + err.message, "err");
+        log("上传异常：" + err.message, "err");
+      } finally {
+        bootAudioUploadBtn.disabled = false;
+        bootAudioUploadBtn.textContent = oldText;
+      }
+    });
+  }
+
   // 开机音效：导出 bin
   const _btnExport = $("btnBootAudioExport");
   if (_btnExport) {
@@ -2281,7 +2419,7 @@
       if (!port) { setStatus("请先连接串口", "err"); return; }
       if (!bootAudioBin) { setStatus("请先选择音频文件", "err"); return; }
       const BA = proto.BOOT_AUDIO;
-      if (bootAudioBin.length > BA.FLASH_SIZE) { setStatus("bin 过大（" + bootAudioBin.length + " 字节），超过 12 KB 上限", "err"); return; }
+      if (bootAudioBin.length > BA.FLASH_SIZE) { setStatus("bin 过大（" + bootAudioBin.length + " 字节），超过 28 KB 上限", "err"); return; }
       if (bootAudioBin.length % BA.SECTOR_SIZE !== 0) { setStatus("bin 未按 4 KB 对齐（" + bootAudioBin.length + " 字节）", "err"); return; }
       _btnWrite.disabled = true;
       const progress = $("bootAudioProgress");
@@ -2430,9 +2568,9 @@
           log("开机音效备份完成：为空（全 FF）");
         } else {
           const dataLen = out[0] | (out[1] << 8) | (out[2] << 16) | (out[3] << 24);
-          setStatus("✅ 已备份到电脑：startup_voice_backup.bin（12 KB，数据 " + dataLen + " 字节）", "ok");
-          updateBootAudioStatus("✅ 已备份 12 KB");
-          log("开机音效备份完成：12 KB（数据 " + dataLen + " 字节）");
+          setStatus("✅ 已备份到电脑：startup_voice_backup.bin（28 KB，数据 " + dataLen + " 字节）", "ok");
+          updateBootAudioStatus("✅ 已备份 28 KB");
+          log("开机音效备份完成：28 KB（数据 " + dataLen + " 字节）");
         }
       } catch (err) {
         setStatus("备份失败：" + err.message, "err");
