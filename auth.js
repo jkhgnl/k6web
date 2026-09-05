@@ -13,9 +13,10 @@
   let supabase = null;
   let user = null;        // 当前登录用户（null = 未登录）
   let callbacks = [];     // 认证状态变化回调
-  let profileCache = null; // profiles 表资料（用户名/头像以此为准，GitHub 登录不覆盖）
+  let profileCache;       // profiles 表资料；undefined=未加载，null=已加载但无记录（用户名/头像以此为准，GitHub 登录不覆盖）
 
   // 读取 profiles 表资料并重绘顶栏；user_metadata 可能被 OAuth 提供商覆盖，仅作兜底
+  const AVATAR_T = Date.now(); // 会话级时间戳，给自托管头像加缓存戳（每页加载刷新一次）
   async function loadProfile() {
     if (!user) { profileCache = null; return; }
     try {
@@ -25,6 +26,9 @@
         .eq("id", user.id)
         .maybeSingle();
       profileCache = data || null;
+      if (profileCache?.avatar_url && profileCache.avatar_url.includes("/storage/")) {
+        profileCache.avatar_url += "?t=" + AVATAR_T;
+      }
     } catch (_) { profileCache = null; }
     renderAuthUI();
   }
@@ -48,7 +52,8 @@
     if (user) {
       const meta = user.user_metadata || {};
       const name = profileCache?.username || meta.user_name || meta.name || meta.full_name || meta.preferred_username || user.email || "用户";
-      const avatar = safeAvatar(profileCache?.avatar_url || meta.avatar_url || meta.picture);
+      // profiles 未加载完时不显示 OAuth 头像（先字母占位），杜绝 GitHub 头像闪显
+      const avatar = profileCache === undefined ? "" : safeAvatar(profileCache?.avatar_url || meta.avatar_url || meta.picture);
       if (badge) {
         const avatarHtml = avatar
           ? `<img class="user-avatar user-avatar-btn" src="${avatar}" alt="头像" title="点击更换头像" loading="lazy">`
@@ -96,7 +101,7 @@
     if (!modal || !body || !user) return;
     const meta = user.user_metadata || {};
     const name = profileCache?.username || meta.user_name || meta.name || meta.full_name || meta.preferred_username || user.email || "用户";
-    const avatar = safeAvatar(profileCache?.avatar_url || meta.avatar_url || meta.picture);
+    const avatar = profileCache === undefined ? "" : safeAvatar(profileCache?.avatar_url || meta.avatar_url || meta.picture);
     const head = avatar
       ? `<img class="user-dropdown-avatar" src="${avatar}" alt="" loading="lazy">`
       : `<span class="user-dropdown-avatar">${escapeHtml(name.charAt(0).toUpperCase())}</span>`;
@@ -324,9 +329,11 @@
 
     const { error: upErr } = await supabase.auth.updateUser({ data: { avatar_url: data.avatar_url } });
     if (upErr) throw upErr;
-    // profiles 表已由 Edge Function 写入，这里同步本地缓存（避免被 user_metadata 旧值覆盖显示）
-    profileCache = { ...(profileCache || {}), avatar_url: data.avatar_url };
+    // profiles 表已由 Edge Function 写入，这里同步本地缓存（避免被 user_metadata 旧值覆盖显示）；
+    // 存储路径固定为 avatar.jpg，加时间戳参数防止浏览器缓存旧图
+    profileCache = { ...(profileCache || {}), avatar_url: data.avatar_url + "?t=" + Date.now() };
     renderAuthUI();
+    emit(); // 通知个人中心等页面刷新资料显示
   }
 
   function escapeHtml(s) {

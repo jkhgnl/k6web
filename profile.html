@@ -1036,7 +1036,7 @@
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
 </script>
-<script src="auth.js?v=1.22.5"></script>
+<script src="auth.js?v=1.22.6"></script>
 <script>
 
 (function () {
@@ -1076,12 +1076,16 @@
   const safeAvatar = (u) => /^(https?:)?\/\//i.test(u || "") || /^data:image\//i.test(u || "") ? u : "";
 
   // 拉取 profiles 表资料后渲染；资料展示以 profiles 表为准
+  const AVATAR_T = Date.now(); // 会话级缓存戳，防止浏览器缓存旧的自托管头像
   async function renderWithProfile(user) {
     if (!user) { render(null); return; }
     let profile = null;
     try {
       const { data } = await supabase.from("profiles").select("username, avatar_url, bio").eq("id", user.id).maybeSingle();
       profile = data;
+      if (profile?.avatar_url && profile.avatar_url.includes("/storage/")) {
+        profile.avatar_url += "?t=" + AVATAR_T;
+      }
     } catch (_) { /* 忽略，回退 user_metadata 显示 */ }
     render(user, profile);
   }
