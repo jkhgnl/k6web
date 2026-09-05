@@ -1175,20 +1175,24 @@
     $("ghResultModal").style.display = "flex";
   }
 
-  // 绑定成功：展示 GitHub 账号名/头像确认卡，账号不对可一键解绑
-  function showGhLinkSuccess(gh) {
+  // 绑定回调收尾：展示 GitHub 账号信息确认卡；用户点"确认无误"前，状态区仍显示未绑定
+  let ghConfirming = false;
+
+  // 绑定成功：展示 GitHub 账号名/头像确认卡；onConfirm 在用户确认后调用（刷新为已绑定状态）
+  function showGhLinkSuccess(gh, onConfirm) {
     const d = gh.identity_data || {};
     const name = d.user_name || d.name || "GitHub 账号";
     const avatar = d.avatar_url ? `<img src="${esc(d.avatar_url)}" alt="" style="width:56px;height:56px;border-radius:50%;display:block;margin:0 auto 10px">` : "";
+    ghConfirming = true;
     showGhResult(
-      "✅ GitHub 绑定成功",
+      "🐙 确认绑定此 GitHub 账号？",
       avatar +
         `<div style="font-size:16px;font-weight:600">${esc(name)}</div>` +
         (d.email ? `<div style="color:#777;font-size:13px;margin-top:2px">${esc(d.email)}</div>` : "") +
-        `<div style="margin-top:10px;font-size:13px;color:#666">请确认这是你要绑定的 GitHub 账号；如果不是，可立即解绑。</div>`,
+        `<div style="margin-top:10px;font-size:13px;color:#666">GitHub 授权已完成。请确认这是你要绑定的账号：点"确认无误"完成绑定；如果不是你的账号，点"取消绑定"立即撤销。</div>`,
       [
-        { text: "解绑", danger: true, onclick: () => { closeGhResult(); unbindGh(gh); } },
-        { text: "确认无误", primary: true, onclick: closeGhResult },
+        { text: "取消绑定", danger: true, onclick: () => { ghConfirming = false; closeGhResult(); unbindGh(gh); } },
+        { text: "确认无误", primary: true, onclick: () => { ghConfirming = false; closeGhResult(); if (onConfirm) onConfirm(); } },
       ]
     );
   }
@@ -1205,20 +1209,23 @@
     ]);
   }
 
-  // 授权回调后的收尾：刷新用户身份，展示绑定结果
-  async function handleGhLinkReturn() {
+  // 授权回调后的收尾：确认卡弹出期间把 GitHub 身份从渲染数据中遮住，确认后才显示已绑定
+  // 返回 true 表示本函数已接管渲染（pending 流程），调用方无需再常规渲染
+  async function handleGhLinkReturn(user) {
     if (GH_LINK_ERROR) {
-      showGhLinkError(GH_LINK_ERROR);
       localStorage.removeItem(GH_LINK_PENDING_KEY);
-      return;
+      if (user) renderWithProfile(user);
+      showGhLinkError(GH_LINK_ERROR);
+      return true;
     }
-    if (!localStorage.getItem(GH_LINK_PENDING_KEY)) return;
+    if (!localStorage.getItem(GH_LINK_PENDING_KEY)) return false;
     localStorage.removeItem(GH_LINK_PENDING_KEY);
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) return;
-    renderWithProfile(data.user);
-    const gh = (data.user.identities || []).find((i) => i.provider === "github");
-    if (gh) showGhLinkSuccess(gh);
+    if (!user) return false;
+    const gh = (user.identities || []).find((i) => i.provider === "github");
+    if (!gh) return false;
+    renderWithProfile({ ...user, identities: (user.identities || []).filter((i) => i.provider !== "github") });
+    showGhLinkSuccess(gh, () => renderWithProfile(user));
+    return true;
   }
 
   async function unbindGh(identity) {
@@ -1284,7 +1291,7 @@
   $("ghBindCancel")?.addEventListener("click", closeGhBindModal);
   $("ghBindConfirm")?.addEventListener("click", startGhLink);
   $("ghBindModal")?.addEventListener("click", (e) => { if (e.target === $("ghBindModal")) closeGhBindModal(); });
-  $("ghResultModal")?.addEventListener("click", (e) => { if (e.target === $("ghResultModal")) closeGhResult(); });
+  // 结果卡（含绑定确认卡）必须点按钮明确选择，不允许点遮罩跳过
 
   // 简介字数统计
   $("ppEditBio")?.addEventListener("input", () => {
@@ -1375,10 +1382,10 @@
 
   // 初始化：先用 getUser 拉服务端实时数据渲染（getSession 读的是本地缓存，身份列表可能过时）
   window.K5AUTH.init();
-  window.K5AUTH.onAuth((u) => renderWithProfile(u));
-  supabase.auth.getUser().then(({ data }) => {
-    if (data.user) renderWithProfile(data.user);
-    handleGhLinkReturn();
+  window.K5AUTH.onAuth((u) => { if (!ghConfirming) renderWithProfile(u); });
+  supabase.auth.getUser().then(async ({ data }) => {
+    const handled = await handleGhLinkReturn(data.user);
+    if (!handled && data.user) renderWithProfile(data.user);
   });
 })();
 
