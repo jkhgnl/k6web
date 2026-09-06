@@ -1,7 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /vendor/
-Disallow: /img/
 
 Sitemap: https://jkhgnl.top/sitemap.xml
 
