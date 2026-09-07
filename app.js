@@ -3690,16 +3690,21 @@
       log("握手完成，开始分页编程");
 
       // ③ 分页编程（256B/页，逐页 ACK，重试 3 次）
+      // 首页 ACK 前 bootloader 要按 pageCount 把整个应用区擦一遍（1KB/扇区），
+      // 满配固件擦除可达十几秒，固定 3s 超时不够 → 首页超时按扇区数放大
       const PS = proto.FLASH_MSG.PAGE_SIZE;
       const pageCount = Math.ceil(fwData.length / PS);
+      const sectorCount = Math.ceil((pageCount * PS) / 1024);
+      const firstPageTimeout = Math.min(60000, Math.max(15000, sectorCount * 500));
       const timestamp = Date.now() >>> 0;
       for (let i = 0; i < pageCount; i++) {
         const page = fwData.subarray(i * PS, Math.min((i + 1) * PS, fwData.length));
         const data = proto.buildFwPage(timestamp, i, pageCount, page);
         let done = false, lastErr = "";
+        const ackTimeout = i === 0 ? firstPageTimeout : 3000;
         for (let attempt = 1; attempt <= 3 && !done; attempt++) {
           await writer.write(proto.buildFlashFrame(proto.FLASH_MSG.PROG_FW, data));
-          const resp = await waitForMsg(proto.FLASH_MSG.PROG_FW_RESP, 3000);
+          const resp = await waitForMsg(proto.FLASH_MSG.PROG_FW_RESP, ackTimeout);
           if (!resp) { lastErr = "ACK 超时"; continue; }
           if (resp.length < 12) { lastErr = "ACK 长度异常"; continue; }
           const dv = new DataView(resp.buffer, resp.byteOffset, resp.byteLength);
