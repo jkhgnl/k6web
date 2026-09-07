@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "2.0.0";
+  const K5WEB_VERSION = "2.0.1";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -1088,8 +1088,13 @@
   });
 
   // ---------- 串口 ----------
+  // readerAlive：读取循环是否健在。设备断电重枚举（如按住 PTT 重启进刷机模式）
+  // 会让 reader.read() 抛错退出且不再收数——刷写前检查此标志，死了就自动重开串口。
+  let readerAlive = false;
+
   async function readLoop() {
     const frameDec = new proto.FrameDecoder();
+    readerAlive = true;
     try {
       for (;;) {
         const { value, done } = await reader.read();
@@ -1100,10 +1105,25 @@
         }
       }
     } catch (e) {
-      if (e.name !== "AbortError") log("读取中断：" + e.message, "err");
+      if (e.name !== "AbortError") {
+        readerAlive = false;
+        log("读取中断：" + e.message, "err");
+      }
     } finally {
-      reader.releaseLock();
+      try { reader.releaseLock(); } catch (e) { /* ignore */ }
     }
+  }
+
+  // 读取循环死亡后重开同一端口（无需用户再选端口，已授权过）
+  async function recoverPort() {
+    try { if (writer) { writer.releaseLock(); writer = null; } } catch (e) { /* ignore */ }
+    try { if (reader) { reader.releaseLock(); } } catch (e) { /* ignore */ }
+    try { await port.close(); } catch (e) { /* ignore */ }
+    await port.open({ baudRate: 38400 });
+    writer = port.writable.getWriter();
+    reader = port.readable.getReader();
+    readLoop();
+    log("串口已自动恢复");
   }
 
   async function sendCommand(id, payload) {
@@ -3463,21 +3483,25 @@
     return null;
   }
 
-  // 阶段 1：等设备广播（连续 5 条有效 0x0518，相邻间隔 5~3000ms）
-  // 注意：不要用过短的子超时——bootloader 广播间隔在 1s 上下抖动，
-  // 间隔稍大就误判"不在刷机模式"；这里一直等到总超时，给用户按住 PTT 开机留时间
+  // 阶段 1：等设备广播（收满 3 条 0x0518 即认为在刷机模式）
+  // 不做相邻间隔判定——bootloader 广播间隔抖动大，间隔清零规则会卡死检测；
+  // 只要设备在发 0x0518 就是刷机模式。每 5s 打心跳日志区分"设备没广播/串口已死"。
   async function waitDeviceInfo(maxMs) {
     const deadline = Date.now() + maxMs;
+    const start = Date.now();
     replyQueue.length = 0; // 丢弃连接早期（app 模式槽位轮询）遗留的帧
-    let lastTime = 0, valid = 0;
+    let valid = 0, nextLog = start + 5000;
     while (Date.now() < deadline) {
-      const f = await waitForMsg(proto.FLASH_MSG.NOTIFY_DEV_INFO, Math.max(100, deadline - Date.now()));
-      if (!f) return null;
-      const now = Date.now();
-      const dt = now - lastTime;
-      valid = !lastTime || (dt >= 5 && dt <= 3000) ? valid + 1 : 1;
-      lastTime = now;
-      if (valid >= 5) return f;
+      const f = await waitForMsg(proto.FLASH_MSG.NOTIFY_DEV_INFO,
+        Math.min(5000, Math.max(100, deadline - Date.now())));
+      if (f) {
+        valid++;
+        if (valid >= 3) return f;
+      }
+      if (Date.now() >= nextLog) {
+        nextLog = Date.now() + 5000;
+        log(`等待刷机模式设备... 已等待 ${((Date.now() - start) / 1000).toFixed(0)}s，收到 ${valid} 条广播`);
+      }
     }
     return null;
   }
@@ -3675,6 +3699,14 @@
     const bar = $("flashProgressBar");
     bar.style.width = "0%";
     try {
+      // ⓪ 串口健康检查：按住 PTT 重启进刷机模式时设备断电重枚举，
+      // 读取循环可能已退出（之后永远收不到数据），先尝试自动恢复
+      if (!readerAlive) {
+        log("检测到串口读取已中断（设备可能重启过），尝试自动恢复...");
+        setStatus("正在恢复串口...", "info");
+        try { await recoverPort(); }
+        catch (e) { throw new Error("串口恢复失败，请点「断开」后重新连接串口再试"); }
+      }
       // ① 等设备（用户需已按住 PTT 开机进入刷机模式）
       log("等待刷机模式设备...（按住 PTT 开机）");
       setStatus("等待刷机模式设备...（按住 PTT 开机）", "info");
