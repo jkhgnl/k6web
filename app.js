@@ -3463,16 +3463,19 @@
     return null;
   }
 
-  // 阶段 1：等设备广播（连续 5 条有效 0x0518，相邻间隔 5~1000ms）
+  // 阶段 1：等设备广播（连续 5 条有效 0x0518，相邻间隔 5~3000ms）
+  // 注意：不要用过短的子超时——bootloader 广播间隔在 1s 上下抖动，
+  // 间隔稍大就误判"不在刷机模式"；这里一直等到总超时，给用户按住 PTT 开机留时间
   async function waitDeviceInfo(maxMs) {
     const deadline = Date.now() + maxMs;
+    replyQueue.length = 0; // 丢弃连接早期（app 模式槽位轮询）遗留的帧
     let lastTime = 0, valid = 0;
     while (Date.now() < deadline) {
-      const f = await waitForMsg(proto.FLASH_MSG.NOTIFY_DEV_INFO, 1200);
-      if (!f) return null; // 1.2s 无广播 → 不在刷机模式
+      const f = await waitForMsg(proto.FLASH_MSG.NOTIFY_DEV_INFO, Math.max(100, deadline - Date.now()));
+      if (!f) return null;
       const now = Date.now();
       const dt = now - lastTime;
-      valid = !lastTime || (dt >= 5 && dt <= 1000) ? valid + 1 : 1;
+      valid = !lastTime || (dt >= 5 && dt <= 3000) ? valid + 1 : 1;
       lastTime = now;
       if (valid >= 5) return f;
     }
