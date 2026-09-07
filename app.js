@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "2.0.2";
+  const K5WEB_VERSION = "2.0.3";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -1102,6 +1102,7 @@
         if (value && value.length) {
           const frames = frameDec.push(value); // Uint8Array，直接喂帧解码器
           for (const f of frames) replyQueue.push(f);
+          dispatchReplies();
         }
       }
     } catch (e) {
@@ -1112,6 +1113,45 @@
     } finally {
       try { reader.releaseLock(); } catch (e) { /* ignore */ }
     }
+  }
+
+  // ---------- 串口回复按消息 ID 分发 ----------
+  // 多个并发流程（后台槽位轮询、刷机、字库等）会同时等回复。
+  // 旧实现是大家轮询同一个 replyQueue、把不匹配的帧直接扔掉——
+  // 刷机时后台 readAllSlots 会把 0x051a 页 ACK 当垃圾丢掉，反之亦然。
+  // 现在每条帧只交给正在等它 ID 的等待方，没人要的暂存（上限 100 条防堆积）。
+  const replyWaiters = []; // { id, resolve, timer }
+
+  function dispatchReplies() {
+    for (let i = 0; i < replyQueue.length; i++) {
+      const f = replyQueue[i];
+      const fid = f.length >= 2 ? (f[0] | (f[1] << 8)) : -1;
+      const w = replyWaiters.find((x) => x.id === fid);
+      if (!w) continue; // 没人等这条，留在队列里
+      replyQueue.splice(i, 1);
+      i--;
+      clearTimeout(w.timer);
+      replyWaiters.splice(replyWaiters.indexOf(w), 1);
+      w.resolve(f);
+    }
+    while (replyQueue.length > 100) replyQueue.shift(); // 防无人认领的帧堆积
+  }
+
+  // 等待指定 ID 的帧：先查积压，没有则挂起等待新帧，超时返回 null
+  function waitReplyId(id, timeoutMs) {
+    const idx = replyQueue.findIndex(
+      (f) => f.length >= 2 && (f[0] | (f[1] << 8)) === id
+    );
+    if (idx >= 0) return Promise.resolve(replyQueue.splice(idx, 1)[0]);
+    return new Promise((resolve) => {
+      const w = { id, resolve };
+      w.timer = setTimeout(() => {
+        const i = replyWaiters.indexOf(w);
+        if (i >= 0) replyWaiters.splice(i, 1);
+        resolve(null);
+      }, timeoutMs);
+      replyWaiters.push(w);
+    });
   }
 
   // 读取循环死亡后重开同一端口（无需用户再选端口，已授权过）
@@ -1129,19 +1169,10 @@
   async function sendCommand(id, payload) {
     const frame = proto.buildFrame(id, payload);
     await writer.write(frame);
-    // 等待对应回复（带 5s 超时）
-    const deadline = Date.now() + 5000;
-    while (Date.now() < deadline) {
-      if (replyQueue.length) {
-        const reply = replyQueue.shift();
-        const parsed = proto.parseReply(reply);
-        if (parsed.id === id + 3) return parsed; // 回复 ID = 命令 ID + 3
-        // 其他回复（如 K5Viewer 流）忽略
-        continue;
-      }
-      await new Promise((r) => setTimeout(r, 20));
-    }
-    throw new Error("回复超时 (0x" + id.toString(16) + ")");
+    // 等待对应回复（带 5s 超时）；其他 ID 的帧留给别的等待方
+    const reply = await waitReplyId(id + 3, 5000); // 回复 ID = 命令 ID + 3
+    if (!reply) throw new Error("回复超时 (0x" + id.toString(16) + ")");
+    return proto.parseReply(reply);
   }
 
   $("btnConnect").addEventListener("click", async () => {
@@ -1628,16 +1659,9 @@
   async function sendAndWaitRaw(id, payload, timeoutMs = 5000) {
     const frame = proto.buildFrame(id, payload);
     await writer.write(frame);
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      if (replyQueue.length) {
-        const reply = replyQueue.shift();
-        const dv = new DataView(reply.buffer, reply.byteOffset, reply.byteLength);
-        if (dv.getUint16(0, true) === id + 3) return reply;
-      }
-      await new Promise((r) => setTimeout(r, 20));
-    }
-    throw new Error("回复超时");
+    const reply = await waitReplyId(id + 3, timeoutMs);
+    if (!reply) throw new Error("回复超时");
+    return reply;
   }
 
   async function readFontBytes(offset, len) {
@@ -3469,18 +3493,9 @@
   // ---------- 固件刷写（bootloader 协议，参考 Apache-2.0 的 uvtools2/js/flash.js） ----------
   let fwData = null;
 
-  // 从回复队列等一条指定 id 的消息，其余（广播/K5Viewer 流等）丢弃
+  // 等一条指定 id 的消息；不匹配的帧（广播/K5Viewer 流等）留给其他等待方
   async function waitForMsg(id, timeoutMs) {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      if (replyQueue.length) {
-        const f = replyQueue.shift();
-        if (f.length >= 2 && (f[0] | (f[1] << 8)) === id) return f;
-        continue;
-      }
-      await new Promise((r) => setTimeout(r, 10));
-    }
-    return null;
+    return waitReplyId(id, timeoutMs);
   }
 
   // 阶段 1：等设备广播（收满 3 条 0x0518 即认为在刷机模式）
