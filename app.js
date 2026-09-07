@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "2.0.1";
+  const K5WEB_VERSION = "2.0.2";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -3725,20 +3725,23 @@
       log("握手完成，开始分页编程");
 
       // ③ 分页编程（256B/页，逐页 ACK，重试 3 次）
-      // 首页 ACK 前 bootloader 要按 pageCount 把整个应用区擦一遍（1KB/扇区），
-      // 满配固件擦除可达十几秒，固定 3s 超时不够 → 首页超时按扇区数放大
+      // bootloader 收到第 0 页后先回 ACK、再按 pageCount 整片擦除应用区（1KB/扇区，
+      // 满配固件可达十几秒），擦除期间串口不服务、发来的帧被丢弃。
+      // 所以：首页 ACK 等得久；后续页若撞上进擦除窗口也要能兜住 →
+      // 非首页超时按重试次数递增 3s→10s→30s，正常路径仍是 3s。
       const PS = proto.FLASH_MSG.PAGE_SIZE;
       const pageCount = Math.ceil(fwData.length / PS);
       const sectorCount = Math.ceil((pageCount * PS) / 1024);
       const firstPageTimeout = Math.min(60000, Math.max(15000, sectorCount * 500));
+      const RETRY_TIMEOUTS = [3000, 10000, 30000];
       const timestamp = Date.now() >>> 0;
       for (let i = 0; i < pageCount; i++) {
         const page = fwData.subarray(i * PS, Math.min((i + 1) * PS, fwData.length));
         const data = proto.buildFwPage(timestamp, i, pageCount, page);
         let done = false, lastErr = "";
-        const ackTimeout = i === 0 ? firstPageTimeout : 3000;
         for (let attempt = 1; attempt <= 3 && !done; attempt++) {
           await writer.write(proto.buildFlashFrame(proto.FLASH_MSG.PROG_FW, data));
+          const ackTimeout = i === 0 ? firstPageTimeout : RETRY_TIMEOUTS[attempt - 1];
           const resp = await waitForMsg(proto.FLASH_MSG.PROG_FW_RESP, ackTimeout);
           if (!resp) { lastErr = "ACK 超时"; continue; }
           if (resp.length < 12) { lastErr = "ACK 长度异常"; continue; }
