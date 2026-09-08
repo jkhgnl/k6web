@@ -473,6 +473,116 @@ const FLASH_MSG = {
   APP_MAX_SIZE: 118 * 1024,  // 应用区上限 0x08002800..0x08020000
 };
 
+// 多系统（MS-INST）槽位刷写协议。
+// 适用于已安装多系统引导（BL1+BL2+MS-INST）的 UV-K1/K5/K6 V3：
+// 机器开机停在 MS-INST 界面时，串口 38400 8N1 直接收发裸帧（非 F4HWN 加密帧）。
+// 帧头 12 字节：'M' 'S' cmd u8 | 0 | arg u32 LE | dataLen u32 LE，随后裸数据。
+// 应答为字节流 'M' 'S' status（status ∈ {0,1,2,3,4,5,126}）；
+// GET_INFO 应答在 status=OK 后再跟 u32 LE 长度 + ASCII 信息串。
+// 注意：主机发出的帧头会被线路回显，GET_INFO 的 cmd=1 与 STATUS_ERR 同值，
+// 读应答时需跳过一对回显的 'M''S'\x01。
+const MS_PROTO = {
+  MAGIC0: 0x4d,            // 'M'
+  MAGIC1: 0x53,            // 'S'
+  CMD_GET_INFO: 1,
+  CMD_WRITE_SLOT: 32,      // arg=槽号(1..3)，data=固件原始字节（≤128KB）
+  CMD_SWITCH_SLOT: 34,     // arg=槽号，无数据；设备交给 BL2 擦写 MCU 并重启
+  CMD_WRITE_META: 49,      // arg=槽号，data=槽名 UTF-8（机内 Menu 显示名）
+  STATUS_OK: 0,
+  STATUS_ERR: 1,
+  STATUS_NO_BACKUP: 2,
+  STATUS_BAD_IMAGE: 3,
+  STATUS_BUSY: 4,
+  STATUS_VERIFY_FAIL: 5,
+  STATUS_UNSUPPORTED: 126,
+  BAUD: 38400,
+  SLOT_MAX: 128 * 1024,    // 单槽固件上限 128 KB
+  CHUNK: 64,               // 写数据每帧 64 字节（间隔 28ms，每 4KB 多停 800ms）
+  // 槽位 → 外部 SPI Flash 地址（与多系统 BL2 布局一致）
+  SLOTS: [
+    { slot: 1, spi: 0x60000,  name: "槽 1" },
+    { slot: 2, spi: 0x80000,  name: "槽 2" },
+    { slot: 3, spi: 0x120000, name: "槽 3" },
+  ],
+};
+
+// .uvk 固件容器解密钥（16 字节，与 MS-INST 配套工具一致）
+const UVK_KEY = [90, 60, 111, 18, 139, 164, 46, 113, 217, 5, 195, 79, 103, 232, 27, 147];
+
+/** CRC-32（init 0xFFFFFFFF，reflected poly 0xEDB88320），用于 .uvk 校验。 */
+function crc32(data) {
+  let crc = 0xffffffff;
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data[i];
+    for (let b = 0; b < 8; b++) {
+      crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+/** 构建 MS-INST 帧头（12 字节）：'M''S' cmd 0 | arg u32 LE | dataLen u32 LE */
+function buildMsHeader(cmd, arg, dataLen) {
+  const h = new Uint8Array(12);
+  h[0] = MS_PROTO.MAGIC0;
+  h[1] = MS_PROTO.MAGIC1;
+  h[2] = cmd & 0xff;
+  h[3] = 0;
+  const dv = new DataView(h.buffer);
+  dv.setUint32(4, arg >>> 0, true);
+  dv.setUint32(8, dataLen >>> 0, true);
+  return h;
+}
+
+/** MS 状态码 → 中文描述 */
+function msStatusText(status) {
+  switch (status) {
+    case MS_PROTO.STATUS_OK: return "OK";
+    case MS_PROTO.STATUS_ERR: return "ERR（设备错误）";
+    case MS_PROTO.STATUS_NO_BACKUP: return "NO_BACKUP（SPI 无原厂引导备份）";
+    case MS_PROTO.STATUS_BAD_IMAGE: return "BAD_IMAGE（镜像被拒：过大/校验失败/串口未收齐）";
+    case MS_PROTO.STATUS_BUSY: return "BUSY";
+    case MS_PROTO.STATUS_VERIFY_FAIL: return "VERIFY_FAIL（写入校验失败）";
+    case MS_PROTO.STATUS_UNSUPPORTED: return "UNSUPPORTED（MS-INST 版本过旧，不支持该命令）";
+    default: return "status=" + status;
+  }
+}
+
+/** 槽位固件向量表检查：栈顶 0x20000000..0x20040000，复位向量为奇地址且落在应用区 0x08002800..0x08020000 */
+function isSlotFwVectorOk(buf) {
+  if (!buf || buf.length < 8) return false;
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const sp = dv.getUint32(0, true);
+  let reset = dv.getUint32(4, true);
+  if (sp < 0x20000000 || sp > 0x20040000) return false;
+  if ((reset & 1) === 0) return false;
+  reset &= ~1;
+  return reset >= 0x08002800 && reset < 0x08020000;
+}
+
+/** 解码 .uvk 固件容器：'UVK1' | ver u8=1 | nonce 8B | len u32 LE | crc32 u32 LE | 加密数据。
+ *  第 i 字节：data[i] ^ (key[i%16] ^ nonce[i%8] ^ ((i*61+165)&0xff))，解出后 CRC32 校验。 */
+function decodeUvk(buf) {
+  if (buf.length < 21) throw new Error(".uvk 文件过小");
+  const magic = String.fromCharCode(buf[0], buf[1], buf[2], buf[3]);
+  if (magic !== "UVK1") throw new Error(".uvk 格式不匹配：" + magic);
+  if (buf[4] !== 1) throw new Error(".uvk 版本不支持：" + buf[4]);
+  const nonce = buf.subarray(5, 13);
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const len = dv.getUint32(13, true);
+  const expectCrc = dv.getUint32(17, true);
+  const enc = buf.subarray(21);
+  if (enc.length < len) throw new Error(".uvk 数据不足：" + enc.length + "/" + len);
+  const out = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    const k = UVK_KEY[i % 16] ^ nonce[i % 8];
+    const k2 = (i * 61 + 165) & 0xff;
+    out[i] = enc[i] ^ ((k ^ k2) & 0xff);
+  }
+  if (crc32(out) !== expectCrc) throw new Error(".uvk 校验失败");
+  return out;
+}
+
 /** CRC-16/CCITT-FALSE, matches App/driver/crc.c CRC_Calculate(). */
 function crc16(data) {
   let crc = 0;
@@ -690,6 +800,7 @@ function concat(a, b) {
 })(typeof self !== "undefined" ? self : this, function () {
   return {
     OBFUSCATION, CMD, CN_FONT, BOOT_AUDIO, FLASH_MSG, CALIB, LOGO, CHAN, CTCSS_OPTIONS, DCS_OPTIONS,
+    MS_PROTO, crc32, buildMsHeader, msStatusText, isSlotFwVectorOk, decodeUvk,
     CODE_TYPE, MODULATION, TX_DIR, BANDWIDTH, POWER, STEP,
     DD_HEADERS, POWER_NAMES, MODULATION_NAMES, DD_DIR_NAMES,
     crc16, crc8,

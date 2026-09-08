@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "2.0.3";
+  const K5WEB_VERSION = "2.1.0";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -3546,6 +3546,7 @@
     fwData = buf;
     $("btnFlash").disabled = false;
     log(`固件已加载：${f.name}（${buf.length} 字节，${Math.ceil(buf.length / 256)} 页）`);
+    msRefreshUi();
   });
 
   // ---------- 获取远程固件（读取仓库 update.json） ----------
@@ -3703,6 +3704,7 @@
     status.textContent = `已选择：${fw.name}${fw.version ? " v" + fw.version : ""}（${fw.buf.length} 字节，${Math.ceil(fw.buf.length / 256)} 页），可直接刷写`;
     status.className = "hint ok";
     log(`已选择远程固件：${fw.name}${fw.version ? " v" + fw.version : ""}（${fw.buf.length} 字节）`);
+    msRefreshUi();
   }
 
   $("btnFlash").addEventListener("click", async () => {
@@ -3780,6 +3782,261 @@
       $("btnFlash").disabled = false;
     }
   });
+
+  // ---------- 多系统槽位刷写（MS-INST 协议，仅最终槽位兼容，不含引导安装） ----------
+  // 机器需已安装多系统引导（BL1+BL2+MS-INST）并开机停在 MS-INST 界面。
+  // 与 F4HWN 帧协议完全不同：裸 'M''S' 帧头 + 原始数据，应答 'M''S' status，
+  // 因此用独立的串口会话（msPort），不复用主会话的帧解码器。
+  let msPort = null, msReader = null, msWriter = null;
+  let msRxBuf = new Uint8Array(0);
+  let msPumping = false;
+  let msFwBytes = null, msFwName = ""; // 本卡片自选的固件（优先于上方 fwData）
+
+  function msRefreshUi() {
+    const hasFw = !!(msFwBytes || fwData);
+    if ($("btnMsWrite")) $("btnMsWrite").disabled = !(msPort && hasFw);
+    if ($("btnMsSwitch")) $("btnMsSwitch").disabled = !msPort;
+    const el = $("msFwStatus");
+    if (el) {
+      if (msFwBytes) {
+        el.textContent = `使用本页文件：${msFwName}（${msFwBytes.length} 字节）`;
+        el.className = "hint ok";
+      } else if (fwData) {
+        el.textContent = `使用上方已加载固件（${fwData.length} 字节）；也可在下方另选 .bin/.uvk 文件`;
+        el.className = "hint ok";
+      } else {
+        el.textContent = "尚未选择固件：可点上方「获取远程固件」，或在此选择 .bin/.uvk 文件";
+        el.className = "hint";
+      }
+    }
+  }
+
+  function msPump() {
+    msPumping = true;
+    (async () => {
+      while (msPumping && msReader) {
+        try {
+          const { value, done } = await msReader.read();
+          if (done) break;
+          if (value && value.length) {
+            const b = new Uint8Array(msRxBuf.length + value.length);
+            b.set(msRxBuf, 0); b.set(value, msRxBuf.length);
+            msRxBuf = b;
+          }
+        } catch (e) { break; }
+      }
+      msPumping = false;
+    })();
+  }
+
+  async function msSleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+  async function msTake(n, timeoutMs) {
+    const deadline = Date.now() + (timeoutMs || 15000);
+    while (msRxBuf.length < n) {
+      if (!msPort) throw new Error("串口未连接");
+      if (Date.now() > deadline) throw new Error("串口读超时");
+      await msSleep(15);
+    }
+    const out = msRxBuf.subarray(0, n);
+    msRxBuf = msRxBuf.slice(n);
+    return out;
+  }
+
+  // 等 'M''S' status 应答。GET_INFO（cmd=1）的帧头回显 'M''S'\x01 会被误读为
+  // STATUS_ERR，需跳过这一对回显再找真正的应答（参考站同款处理）。
+  async function msWaitStatus(timeoutMs, isGetInfo) {
+    const deadline = Date.now() + (timeoutMs || 60000);
+    const valid = new Set([0, 1, 2, 3, 4, 5, 126]);
+    let last = 0;
+    while (Date.now() < deadline) {
+      if (msRxBuf.length > 0) {
+        const b = (await msTake(1, Math.min(500, deadline - Date.now())))[0];
+        if (last === proto.MS_PROTO.MAGIC0 && b === proto.MS_PROTO.MAGIC1) {
+          const s = (await msTake(1, 5000))[0];
+          if (valid.has(s)) {
+            if (isGetInfo && s === proto.MS_PROTO.STATUS_ERR) { last = 0; continue; }
+            return s;
+          }
+          last = s;
+          continue;
+        }
+        last = b;
+      } else {
+        await msSleep(15);
+      }
+    }
+    throw new Error("等待应答超时");
+  }
+
+  // 发一条 MS 命令：12 字节帧头 + 可选数据（64B/帧，28ms 间隔，每 4KB 多停 800ms 等设备擦写）
+  async function msSend(cmd, arg, data, timeoutMs) {
+    if (!msWriter) throw new Error("请先连接 MS-INST 串口");
+    await msSleep(60);
+    msRxBuf = new Uint8Array(0); // 排空残留（回显/噪声）
+    if (msWriter.ready) await msWriter.ready;
+    const payload = data ? new Uint8Array(data) : new Uint8Array(0);
+    await msWriter.write(proto.buildMsHeader(cmd, arg || 0, payload.length));
+    if (payload.length) {
+      await msSleep(80); // 设备先处理帧头再收数据
+      const CH = proto.MS_PROTO.CHUNK;
+      for (let off = 0; off < payload.length; off += CH) {
+        if (msWriter.ready) await msWriter.ready;
+        await msWriter.write(payload.subarray(off, Math.min(off + CH, payload.length)));
+        const bar = $("msProgressBar");
+        if (bar) bar.style.width = (off / payload.length * 100).toFixed(1) + "%";
+        let delay = 28;
+        if (off > 0 && off % 4096 === 0) delay = 800;
+        await msSleep(delay);
+      }
+      const bar = $("msProgressBar");
+      if (bar) bar.style.width = "100%";
+    }
+    const status = await msWaitStatus(timeoutMs || 120000, cmd === proto.MS_PROTO.CMD_GET_INFO);
+    if (cmd === proto.MS_PROTO.CMD_GET_INFO) {
+      if (status !== proto.MS_PROTO.STATUS_OK) throw new Error("GET_INFO 失败：" + proto.msStatusText(status));
+      const lenBuf = await msTake(4, 5000);
+      const len = new DataView(lenBuf.buffer, lenBuf.byteOffset, lenBuf.byteLength).getUint32(0, true);
+      if (len > 128) throw new Error("GET_INFO 长度异常 " + len);
+      const infoBuf = await msTake(len, 5000);
+      return { status, info: new TextDecoder().decode(infoBuf) };
+    }
+    return { status };
+  }
+
+  async function msDisconnect() {
+    msPumping = false;
+    const r = msReader, w = msWriter, p = msPort;
+    msReader = null; msWriter = null; msPort = null;
+    msRxBuf = new Uint8Array(0);
+    if (r) { try { await Promise.race([r.cancel(), msSleep(400)]); } catch (e) { /* ignore */ } try { r.releaseLock(); } catch (e) { /* ignore */ } }
+    if (w) { try { await Promise.race([w.close(), msSleep(400)]); } catch (e) { /* ignore */ } try { w.releaseLock(); } catch (e) { /* ignore */ } }
+    if (p) { try { await Promise.race([p.close(), msSleep(600)]); } catch (e) { /* ignore */ } }
+    if ($("btnMsConnect")) { $("btnMsConnect").textContent = "🔌 连接 MS-INST"; $("btnMsConnect").classList.remove("secondary"); }
+    if ($("msInfo")) { $("msInfo").textContent = "未连接"; $("msInfo").className = "hint"; }
+    msRefreshUi();
+  }
+
+  $("btnMsConnect").addEventListener("click", async () => {
+    if (msPort) { await msDisconnect(); log("MS-INST 串口已断开"); return; }
+    if (!navigator.serial) { setStatus("当前浏览器不支持 Web Serial，请用 Chrome/Edge", "err"); return; }
+    try {
+      // 主会话（F4HWN 协议）与 MS-INST 是机器的两种不同状态，同一物理串口不能同时开：
+      // 若主会话还连着，先走它的断开路径再开 MS 会话
+      if (port) { $("btnConnect").click(); }
+      log("请选择串口（机器需已开机停在 MS-INST 界面）...");
+      msPort = await navigator.serial.requestPort();
+      await msPort.open({ baudRate: proto.MS_PROTO.BAUD, dataBits: 8, stopBits: 1, parity: "none", flowControl: "none", bufferSize: 4096 });
+      try { if (msPort.setSignals) await msPort.setSignals({ dataTerminalReady: true, requestToSend: true }); } catch (e) { /* ignore */ }
+      msReader = msPort.readable.getReader();
+      msWriter = msPort.writable.getWriter();
+      msRxBuf = new Uint8Array(0);
+      msPump();
+      await msSleep(150);
+      let info = null;
+      for (let i = 1; i <= 5 && !info; i++) {
+        try { info = (await msSend(proto.MS_PROTO.CMD_GET_INFO, 0, null, 2500)).info; }
+        catch (e) { if (i === 5) throw new Error("MS-INST 无应答（请确认机器开机停在 MS-INST 界面）"); }
+      }
+      $("btnMsConnect").textContent = "断开 MS-INST";
+      $("btnMsConnect").classList.add("secondary");
+      $("msInfo").textContent = "已连接：" + (info || "ok");
+      $("msInfo").className = "hint ok";
+      log("已连接 MS-INST：" + (info || "ok"));
+      setStatus("MS-INST 已连接 ✓", "ok");
+    } catch (e) {
+      await msDisconnect();
+      setStatus("MS-INST 连接失败：" + e.message, "err");
+      log("MS-INST 连接失败：" + e.message, "err");
+    }
+    msRefreshUi();
+  });
+
+  $("msFwFile").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    msFwBytes = null; msFwName = "";
+    if (!f) { msRefreshUi(); return; }
+    try {
+      let buf = new Uint8Array(await f.arrayBuffer());
+      if (buf.length >= 4 && String.fromCharCode(buf[0], buf[1], buf[2], buf[3]) === "UVK1") {
+        log("检测到 .uvk 容器，解码中...");
+        buf = proto.decodeUvk(buf);
+      }
+      if (!buf.length || buf.length > proto.MS_PROTO.SLOT_MAX) {
+        throw new Error(`固件大小无效：${buf.length} 字节（应 1~${proto.MS_PROTO.SLOT_MAX}）`);
+      }
+      if (!proto.isSlotFwVectorOk(buf)) {
+        log("警告：" + f.name + " 向量表看起来无效，写入后可能无法从 Menu 启动", "err");
+      }
+      msFwBytes = buf; msFwName = f.name;
+      log(`多系统固件已加载：${f.name}（${buf.length} 字节）`);
+      if (!$("msSlotName").value) {
+        $("msSlotName").value = f.name.replace(/^.*[\\/]/, "").replace(/\.[A-Za-z]{2,4}$/, "").slice(0, 15);
+      }
+    } catch (err) {
+      setStatus("固件加载失败：" + err.message, "err");
+      log("多系统固件加载失败：" + err.message, "err");
+    }
+    msRefreshUi();
+  });
+
+  $("btnMsWrite").addEventListener("click", async () => {
+    if (!msPort) { setStatus("请先连接 MS-INST", "err"); return; }
+    const buf = msFwBytes || fwData;
+    if (!buf) { setStatus("请先选择固件", "err"); return; }
+    if (buf.length > proto.MS_PROTO.SLOT_MAX) { setStatus(`固件过大（${buf.length} > ${proto.MS_PROTO.SLOT_MAX}），槽位上限 128 KB`, "err"); return; }
+    if (!proto.isSlotFwVectorOk(buf)) { setStatus("拒绝写入：固件向量表无效，请换正确的 .bin/.uvk", "err"); return; }
+    const slot = parseInt($("msSlot").value, 10);
+    const btn = $("btnMsWrite");
+    btn.disabled = true;
+    $("msProgress").style.display = "block";
+    const bar = $("msProgressBar");
+    bar.style.width = "0%";
+    try {
+      log(`写入槽 ${slot}（${buf.length} 字节）。只写 SPI Flash，不会立即生效...`);
+      const w = await msSend(proto.MS_PROTO.CMD_WRITE_SLOT, slot, buf, 300000);
+      if (w.status !== proto.MS_PROTO.STATUS_OK) throw new Error(proto.msStatusText(w.status));
+      const name = $("msSlotName").value.trim().slice(0, 15);
+      if (name) {
+        try {
+          const m = await msSend(proto.MS_PROTO.CMD_WRITE_META, slot, new TextEncoder().encode(name), 15000);
+          if (m.status === proto.MS_PROTO.STATUS_UNSUPPORTED) log("MS-INST 版本过旧，机内 Menu 仍显示默认名");
+          else if (m.status !== proto.MS_PROTO.STATUS_OK) log("槽名写入失败（固件已写入）：" + proto.msStatusText(m.status), "err");
+          else log("机内 Menu 将显示：" + name);
+        } catch (e) { log("槽名写入失败（固件已写入）：" + e.message, "err"); }
+      }
+      bar.style.width = "100%";
+      setStatus(`✅ 槽 ${slot} 写入成功！点「切换并启动此槽」或断电后侧键进 Menu 选系统`, "ok");
+      log(`槽 ${slot} 写入成功`);
+    } catch (err) {
+      setStatus("写槽失败：" + err.message, "err");
+      log("写槽异常：" + err.message, "err");
+    } finally {
+      msRefreshUi();
+    }
+  });
+
+  $("btnMsSwitch").addEventListener("click", async () => {
+    if (!msPort) { setStatus("请先连接 MS-INST", "err"); return; }
+    const slot = parseInt($("msSlot").value, 10);
+    const btn = $("btnMsSwitch");
+    btn.disabled = true;
+    try {
+      log(`切换槽 ${slot}：任务交给机内 Menu(BL2) 擦写 MCU（MS-INST 里不能直接擦自己）...`);
+      const r = await msSend(proto.MS_PROTO.CMD_SWITCH_SLOT, slot, null, 20000);
+      if (r.status !== proto.MS_PROTO.STATUS_OK) throw new Error(proto.msStatusText(r.status));
+      setStatus("✅ 已受理。机器将出现进度条并重启进新系统（约 30–90 秒），串口断开属正常", "ok");
+      log("切换已受理，机器即将重启进槽 " + slot);
+      await msSleep(300);
+      await msDisconnect();
+    } catch (err) {
+      setStatus("切换失败：" + err.message + "（请确认槽已写入正确固件）", "err");
+      log("切换异常：" + err.message, "err");
+      msRefreshUi();
+    }
+  });
+
+  msRefreshUi();
 
   // ===================== 工具函数 =====================
 

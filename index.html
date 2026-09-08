@@ -1465,6 +1465,38 @@ window.addEventListener("load", function () {
     <p class="hint">刷写中请勿断电或拔线；完成后断开串口并重新开机。刷机失败不会变砖——保持按住 PTT 重新开机即可再次进入刷机模式重刷。</p>
   </div>
 
+  <div class="card">
+    <h2>多系统槽位刷写（MS-INST 协议）</h2>
+    <p class="hint">适用于<b>已安装多系统引导</b>的机器：把固件写入机内 SPI Flash 的槽位（不影响其他槽位系统），再由机内 Menu(BL2) 切换启动。前提：机器已装好多系统（本站不提供引导安装），开机停在 <b>MS-INST</b> 界面后用数据线/K 头连接。</p>
+    <div class="row" style="align-items:flex-end;gap:8px;flex-wrap:wrap">
+      <button id="btnMsConnect">🔌 连接 MS-INST</button>
+      <span id="msInfo" class="hint" style="margin:0">未连接</span>
+    </div>
+    <div class="row" style="margin-top:8px;align-items:flex-end;gap:12px;flex-wrap:wrap">
+      <div>
+        <label>目标槽位</label>
+        <select id="msSlot">
+          <option value="1">槽 1（SPI 0x60000）</option>
+          <option value="2">槽 2（SPI 0x80000）</option>
+          <option value="3">槽 3（SPI 0x120000）</option>
+        </select>
+      </div>
+      <div style="flex:1;min-width:180px">
+        <label>槽名（机内 Menu 显示，≤ 15 字符，可留空）</label>
+        <input id="msSlotName" type="text" maxlength="15" placeholder="例如 F4HWN 多普勒">
+      </div>
+    </div>
+    <label style="margin-top:8px">固件文件（裸 .bin 或 .uvk，≤ 128 KB；也可用上方已加载的远程/本地固件）</label>
+    <input id="msFwFile" type="file" accept=".bin,.uvk">
+    <p id="msFwStatus" class="hint" style="min-height:18px"></p>
+    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+      <button id="btnMsWrite" disabled>📥 写入槽位</button>
+      <button id="btnMsSwitch" disabled>🚀 切换并启动此槽</button>
+    </div>
+    <div id="msProgress" class="progress"><div id="msProgressBar"></div></div>
+    <p class="hint">写槽只写 SPI Flash，不会立即生效；点「切换并启动此槽」后机器擦写 MCU 并重启（约 30–90 秒，串口断开属正常）。也可断电后按住任意侧键进 Menu 选系统。</p>
+  </div>
+
 </div>
 
 <!-- ========== 选项卡：校准数据 ========== -->
@@ -2298,7 +2330,7 @@ window.addEventListener("load", function () {
 <script>
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
-  window.K5WEB_VERSION = "2.0.3";
+  window.K5WEB_VERSION = "2.1.0";
 </script>
 <script src="auth.js?v=1.22.6" defer></script>
 <script src="thanks.js?v=1.22.4" defer></script>
