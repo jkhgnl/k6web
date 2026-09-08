@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "2.1.0";
+  const K5WEB_VERSION = "2.2.0";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -3547,6 +3547,7 @@
     $("btnFlash").disabled = false;
     log(`固件已加载：${f.name}（${buf.length} 字节，${Math.ceil(buf.length / 256)} 页）`);
     msRefreshUi();
+    btRefreshUi();
   });
 
   // ---------- 获取远程固件（读取仓库 update.json） ----------
@@ -3705,6 +3706,7 @@
     status.className = "hint ok";
     log(`已选择远程固件：${fw.name}${fw.version ? " v" + fw.version : ""}（${fw.buf.length} 字节）`);
     msRefreshUi();
+    btRefreshUi();
   }
 
   $("btnFlash").addEventListener("click", async () => {
@@ -4037,6 +4039,160 @@
   });
 
   msRefreshUi();
+
+  // ---------- 白头佬多系统（UF2 / 免串口：生成文件拖进 ICHI 盘） ----------
+  // 白头佬与 MS-INST 互斥：它不开串口协议，槽位刷入 = 把按 SPI 槽基址打包的 UF2
+  // 拖进 Ichi 工具的 ICHI 虚拟磁盘。这里只做纯文件生成（+ 可选直写盘符）。
+  let btFwBytes = null, btFwName = "";
+
+  function btRefreshUi() {
+    const hasFw = !!(btFwBytes || fwData);
+    for (const id of ["btnBtDownload", "btnBtDrive", "btnBtMainUf2"]) {
+      if ($(id)) $(id).disabled = !hasFw;
+    }
+    const el = $("btFwStatus");
+    if (el) {
+      if (btFwBytes) {
+        el.textContent = `使用本页文件：${btFwName}（${btFwBytes.length} 字节）`;
+        el.className = "hint ok";
+      } else if (fwData) {
+        el.textContent = `使用上方已加载固件（${fwData.length} 字节）；也可在下方另选 .bin/.uvk 文件`;
+        el.className = "hint ok";
+      } else {
+        el.textContent = "尚未选择固件：可点上方「获取远程固件」，或在此选择 .bin/.uvk 文件";
+        el.className = "hint";
+      }
+    }
+  }
+
+  // GB2312 编码槽名（ASCII 单字节，汉字双字节）；表未加载时仅允许 ASCII
+  function encodeSlotNameGb(text) {
+    const gb = window.K5WEB && window.K5WEB.gb2312;
+    const out = [];
+    for (const ch of text) {
+      if (ch.charCodeAt(0) < 0x80) { out.push(ch.charCodeAt(0)); continue; }
+      if (!gb) throw new Error("GB2312 编码表未加载，槽名暂只支持 ASCII");
+      const r = gb.encode(ch);
+      if (!r.ok) throw new Error(`槽名字符 '${r.char}' 不在 GB2312 内`);
+      out.push(r.bytes[0], r.bytes[1]);
+    }
+    if (out.length > proto.BETULA.NAME_SIZE - 1) throw new Error(`槽名过长（GB2312 编码后 ${out.length} 字节，上限 ${proto.BETULA.NAME_SIZE - 1}）`);
+    out.push(0); // 字符串结尾
+    return new Uint8Array(out);
+  }
+
+  function downloadBytes(bytes, filename) {
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  // 取当前生效固件并做槽位校验；返回整槽 128KB（尾部 0xFF 填充，清掉上一套残留）
+  function btSlotImage() {
+    const buf = btFwBytes || fwData;
+    if (!buf) throw new Error("请先选择固件");
+    if (buf.length > proto.BETULA.SLOT_SIZE) throw new Error(`固件过大（${buf.length} > ${proto.BETULA.SLOT_SIZE}），槽位上限 128 KB`);
+    if (!proto.isSlotFwVectorOk(buf)) throw new Error("固件向量表无效，请换正确的 .bin/.uvk");
+    const img = new Uint8Array(proto.BETULA.SLOT_SIZE).fill(0xff);
+    img.set(buf, 0);
+    return img;
+  }
+
+  function btTargets() {
+    const slot = parseInt($("btSlot").value, 10);
+    const info = proto.BETULA.SLOTS.find((s) => s.slot === slot);
+    const files = [{
+      name: `slot${slot}-firmware.uf2`,
+      bytes: proto.buildUf2(btSlotImage(), info.spi, proto.BETULA.FAMILY_ID),
+      desc: `槽 ${slot} 固件（SPI 0x${info.spi.toString(16)}）`,
+    }];
+    const slotName = $("btSlotName").value.trim();
+    if (slotName) {
+      files.push({
+        name: `slot${slot}-name.uf2`,
+        bytes: proto.buildUf2(encodeSlotNameGb(slotName), proto.BETULA.NAME_BASE + (slot - 1) * 0x100, proto.BETULA.FAMILY_ID),
+        desc: `槽 ${slot} 名称「${slotName}」`,
+      });
+    }
+    return files;
+  }
+
+  $("btFwFile").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    btFwBytes = null; btFwName = "";
+    if (!f) { btRefreshUi(); return; }
+    try {
+      let buf = new Uint8Array(await f.arrayBuffer());
+      if (buf.length >= 4 && String.fromCharCode(buf[0], buf[1], buf[2], buf[3]) === "UVK1") {
+        log("检测到 .uvk 容器，解码中...");
+        buf = proto.decodeUvk(buf);
+      }
+      if (!buf.length || buf.length > proto.BETULA.SLOT_SIZE) {
+        throw new Error(`固件大小无效：${buf.length} 字节（应 1~${proto.BETULA.SLOT_SIZE}）`);
+      }
+      if (!proto.isSlotFwVectorOk(buf)) {
+        log("警告：" + f.name + " 向量表看起来无效，写入后可能无法启动", "err");
+      }
+      btFwBytes = buf; btFwName = f.name;
+      log(`多系统固件已加载：${f.name}（${buf.length} 字节）`);
+      if (!$("btSlotName").value) {
+        $("btSlotName").value = f.name.replace(/^.*[\\/]/, "").replace(/\.[A-Za-z]{2,4}$/, "").slice(0, 20);
+      }
+    } catch (err) {
+      setStatus("固件加载失败：" + err.message, "err");
+      log("白头佬固件加载失败：" + err.message, "err");
+    }
+    btRefreshUi();
+  });
+
+  $("btnBtDownload").addEventListener("click", () => {
+    try {
+      const files = btTargets();
+      for (const f of files) { downloadBytes(f.bytes, f.name); log("已生成 " + f.desc + " → " + f.name); }
+      setStatus("✅ UF2 已下载。S1 开机进 BL2 菜单 → Ichi Flash Tool，把文件拖进 ICHI 盘", "ok");
+    } catch (err) {
+      setStatus("生成失败：" + err.message, "err");
+      log("UF2 生成失败：" + err.message, "err");
+    }
+  });
+
+  $("btnBtDrive").addEventListener("click", async () => {
+    if (!window.showDirectoryPicker) { setStatus("当前浏览器不支持目录写入，请改用「下载槽位 UF2」后手动拖拽", "err"); return; }
+    try {
+      const files = btTargets();
+      const dir = await window.showDirectoryPicker({ mode: "readwrite" });
+      for (const f of files) {
+        const fh = await dir.getFileHandle(f.name, { create: true });
+        const w = await fh.createWritable();
+        await w.write(f.bytes);
+        await w.close();
+        log("已写入 ICHI 盘：" + f.name + "（" + f.desc + "）");
+      }
+      setStatus("✅ 已写入所选目录。若刚写的是 ICHI 盘，等机器闪灯结束后断电，S1 开机选槽启动", "ok");
+    } catch (err) {
+      if (err && err.name === "AbortError") return; // 用户取消选目录
+      setStatus("写入失败：" + err.message, "err");
+      log("直写 ICHI 盘失败：" + err.message, "err");
+    }
+  });
+
+  $("btnBtMainUf2").addEventListener("click", () => {
+    try {
+      const buf = btFwBytes || fwData;
+      if (!buf) throw new Error("请先选择固件");
+      if (!proto.isSlotFwVectorOk(buf)) throw new Error("固件向量表无效，请换正确的 .bin/.uvk");
+      downloadBytes(proto.buildUf2(buf, proto.BETULA.APP_BASE, proto.BETULA.FAMILY_ID), "main-firmware.uf2");
+      setStatus("✅ 主固件 UF2 已下载。PTT 开机出 MOTO 盘后拖入（等同整机升级，不影响多系统槽位）", "ok");
+      log("已生成主固件 UF2（MCU 0x08002800，" + buf.length + " 字节）");
+    } catch (err) {
+      setStatus("生成失败：" + err.message, "err");
+      log("主固件 UF2 生成失败：" + err.message, "err");
+    }
+  });
+
+  btRefreshUi();
 
   // ===================== 工具函数 =====================
 

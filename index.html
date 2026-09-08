@@ -1497,6 +1497,35 @@ window.addEventListener("load", function () {
     <p class="hint">写槽只写 SPI Flash，不会立即生效；点「切换并启动此槽」后机器擦写 MCU 并重启（约 30–90 秒，串口断开属正常）。也可断电后按住任意侧键进 Menu 选系统。</p>
   </div>
 
+  <div class="card">
+    <h2>白头佬多系统（UF2 / 免串口）</h2>
+    <p class="hint">适用于<b>已安装白头佬多系统</b>（Moto 引导 + BL2 菜单）的机器。刷槽不需要串口：生成 UF2 后，<b>S1 键开机进 BL2 菜单 → Ichi Flash Tool</b>，电脑弹出 <b>ICHI</b> 磁盘，把 UF2 拖进去即可（也可点「直写 ICHI 盘」免拖拽）。注意与 MS-INST 是两套互斥的多系统，槽位布局不同。</p>
+    <div class="row" style="align-items:flex-end;gap:12px;flex-wrap:wrap">
+      <div>
+        <label>目标槽位</label>
+        <select id="btSlot">
+          <option value="1">槽 1（SPI 0x80000）</option>
+          <option value="2">槽 2（SPI 0x60000）</option>
+          <option value="3">槽 3（SPI 0x40000）</option>
+          <option value="4">槽 4（SPI 0x20000）</option>
+        </select>
+      </div>
+      <div style="flex:1;min-width:180px">
+        <label>槽名（BL2 菜单显示，GB2312 编码，可留空）</label>
+        <input id="btSlotName" type="text" maxlength="40" placeholder="例如 F4HWN 多普勒">
+      </div>
+    </div>
+    <label style="margin-top:8px">固件文件（裸 .bin 或 .uvk，≤ 128 KB；也可用上方已加载的远程/本地固件）</label>
+    <input id="btFwFile" type="file" accept=".bin,.uvk">
+    <p id="btFwStatus" class="hint" style="min-height:18px"></p>
+    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+      <button id="btnBtDownload" disabled>⬇️ 下载槽位 UF2</button>
+      <button id="btnBtDrive" disabled>💾 直写 ICHI 盘（选目录）</button>
+      <button id="btnBtMainUf2" disabled>⬇️ 下载主固件 UF2（MOTO 盘）</button>
+    </div>
+    <p class="hint">槽位 UF2 会把整槽 128KB 填满（尾部 0xFF），避免上一套固件残留；填了槽名会同时生成名称 UF2。写完 ICHI 盘后断电，S1 开机进 BL2 菜单选对应槽位启动。「主固件 UF2」用于 PTT 开机的 MOTO 盘，等同日常整机升级。</p>
+  </div>
+
 </div>
 
 <!-- ========== 选项卡：校准数据 ========== -->
@@ -2330,7 +2359,7 @@ window.addEventListener("load", function () {
 <script>
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
-  window.K5WEB_VERSION = "2.1.0";
+  window.K5WEB_VERSION = "2.2.0";
 </script>
 <script src="auth.js?v=1.22.6" defer></script>
 <script src="thanks.js?v=1.22.4" defer></script>
@@ -2344,7 +2373,7 @@ window.addEventListener("load", function () {
 <script src="protocol.js?v=16x17" defer></script>
 <script src="coord.js" defer></script>
 <script src="calc.js" defer></script>
-<script src="app.js?v=2.1.0" defer></script>
+<script src="app.js?v=2.2.0" defer></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
   // 侧边栏展开/折叠

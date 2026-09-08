@@ -583,6 +583,53 @@ function decodeUvk(buf) {
   return out;
 }
 
+// 白头佬（Betula）多系统 UF2 参数。
+// 与 MS-INST 是两套互不兼容的多系统：白头佬不串口刷槽，而是 S1 开机进 BL2 菜单
+// 启动 Ichi Flash Tool，电脑弹出 ICHI 虚拟磁盘，拖入 UF2 即按目标地址写外部 SPI。
+// 目标地址规则（据官方分区表与样例 UF2 实测）：
+//   槽位固件 = SPI 槽基址（槽1 0x80000 / 槽2 0x60000 / 槽3 0x40000 / 槽4 0x20000，倒序）
+//   槽位名称 = 0xFA100 + (槽号-1)*0x100，每槽 256 字节
+//   主固件   = MCU 0x08002800（MOTO 盘，PTT 开机）
+// 写入类 UF2 带 familyID 0x57755a57（flags=0x2000），清空类不带——Ichi 两种都收。
+const BETULA = {
+  SLOT_SIZE: 128 * 1024,     // 每槽 128 KB
+  SLOTS: [
+    { slot: 1, spi: 0x80000, name: "槽 1" },
+    { slot: 2, spi: 0x60000, name: "槽 2" },
+    { slot: 3, spi: 0x40000, name: "槽 3" },
+    { slot: 4, spi: 0x20000, name: "槽 4" },
+  ],
+  NAME_BASE: 0xfa100,        // 槽位名称区起始（每槽 256 字节）
+  NAME_SIZE: 256,
+  APP_BASE: 0x08002800,      // MOTO 盘主固件基址
+  FAMILY_ID: 0x57755a57,
+};
+
+/** 生成 UF2（256 字节/块，flags=0x2000 带 familyID）。
+ *  逐块行为与官方工具一致（已对官方 UF2 逐字节验证）：每块 payloadSize 恒为 256，
+ *  最后一块不足部分及块内尾部区域均以 0x00 补齐。 */
+function buildUf2(data, baseAddr, familyId) {
+  const PAYLOAD = 256;
+  const nBlocks = Math.max(1, Math.ceil(data.length / PAYLOAD));
+  const out = new Uint8Array(nBlocks * 512);
+  for (let i = 0; i < nBlocks; i++) {
+    const off = i * 512;
+    const chunk = data.subarray(i * PAYLOAD, Math.min((i + 1) * PAYLOAD, data.length));
+    const dv = new DataView(out.buffer, off, 512);
+    dv.setUint32(0, 0x0a324655, true);   // magicStart0 "UF2\n"
+    dv.setUint32(4, 0x9e5d5157, true);   // magicStart1
+    dv.setUint32(8, 0x00002000, true);   // flags: familyID present
+    dv.setUint32(12, (baseAddr + i * PAYLOAD) >>> 0, true);
+    dv.setUint32(16, PAYLOAD, true);
+    dv.setUint32(20, i, true);
+    dv.setUint32(24, nBlocks, true);
+    dv.setUint32(28, familyId >>> 0, true);
+    out.set(chunk, off + 32);
+    dv.setUint32(508, 0x0ab16f30, true); // magicEnd
+  }
+  return out;
+}
+
 /** CRC-16/CCITT-FALSE, matches App/driver/crc.c CRC_Calculate(). */
 function crc16(data) {
   let crc = 0;
@@ -801,6 +848,7 @@ function concat(a, b) {
   return {
     OBFUSCATION, CMD, CN_FONT, BOOT_AUDIO, FLASH_MSG, CALIB, LOGO, CHAN, CTCSS_OPTIONS, DCS_OPTIONS,
     MS_PROTO, crc32, buildMsHeader, msStatusText, isSlotFwVectorOk, decodeUvk,
+    BETULA, buildUf2,
     CODE_TYPE, MODULATION, TX_DIR, BANDWIDTH, POWER, STEP,
     DD_HEADERS, POWER_NAMES, MODULATION_NAMES, DD_DIR_NAMES,
     crc16, crc8,
