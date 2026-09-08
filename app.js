@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "2.2.0";
+  const K5WEB_VERSION = "2.2.1";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -3785,7 +3785,7 @@
     }
   });
 
-  // ---------- 多系统槽位刷写（MS-INST 协议，仅最终槽位兼容，不含引导安装） ----------
+  // ---------- 小闫连不上多系统(MS-INST协议)（MS-INST 协议，仅最终槽位兼容，不含引导安装） ----------
   // 机器需已安装多系统引导（BL1+BL2+MS-INST）并开机停在 MS-INST 界面。
   // 与 F4HWN 帧协议完全不同：裸 'M''S' 帧头 + 原始数据，应答 'M''S' status，
   // 因此用独立的串口会话（msPort），不复用主会话的帧解码器。
