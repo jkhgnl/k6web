@@ -3,5 +3,3 @@ Allow: /
 Disallow: /vendor/
 
 Sitemap: https://jkhgnl.top/sitemap.xml
-
-IndexNow: 1cf60d4a5b62d3b547ed6adedc19bdbf
