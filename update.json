@@ -1,1 +1,5 @@
-{"version": "5.9.13", "note": "多普勒固件 v5.9.13", "firmware_url": "https://gitee.com/jkhgnl/uv-k1-k5v3-firmware-doppler/releases/download/v5.9.13/f4hwn.fusion.bin"}
+{
+  "version": "1.0.0",
+  "note": "v1.0.0",
+  "firmware_url": "https://gitee.com/jkhgnl/uv-k1-k5v3-firmware-doppler/releases/download/v1.0.0/StarArrival.bin"
+}
