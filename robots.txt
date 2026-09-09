@@ -1,5 +1,4 @@
 User-agent: *
 Allow: /
-Disallow: /vendor/
 
 Sitemap: https://jkhgnl.top/sitemap.xml
