@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "2.2.2";
+  const K5WEB_VERSION = "2.2.3";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -4378,8 +4378,7 @@
     requestAnimationFrame(tick);
   }).catch(() => {});
 
-  // APP 下载按钮：href 固定指向 GitHub Release（由 Actions 自动同步 Gitee 最新版）
-  // 此处仅读取 app-version.json 更新按钮文案，显示当前版本号
+  // APP 下载按钮：优先使用 Gitee 最新 APK，GitHub Release 作为备用链接
   async function refreshAppDownloadBtn() {
     const btn = $("appDownloadBtn");
     if (!btn) return;
@@ -4392,6 +4391,7 @@
         const d = await resp.json();
         if (d && d.version) {
           const ver = String(d.version).replace(/^v/i, "");
+          if (d.download_url) btn.href = d.download_url;
           btn.textContent = `📱 下载配套 APP（Android v${ver}）`;
         }
       }

@@ -1,5 +1,5 @@
-# 同步 APP 最新版：从 Gitee Release 拉取 APK，发布为 GitHub Release 固定资产
-# 下载按钮永远指向 https://github.com/jkhgnl/k6web/releases/latest/download/uvk6tools-latest.apk
+# 同步 APP 最新版：从 Gitee Release 拉取 APK，并发布 Gitee 下载地址
+# GitHub Release 仍作为备用镜像保留
 # 点击直接弹出下载对话框（GitHub 返回 attachment），不跳转、无代理、无 Blob
 name: Sync App Latest
 
@@ -70,8 +70,8 @@ jobs:
             echo "版本无变化，跳过提交"
             exit 0
           fi
-          printf '{"version":"%s","updated_at":"%s"}\n' \
-            "${{ steps.gitee.outputs.tag }}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > app-version.json
+          printf '{"version":"%s","download_url":"%s","updated_at":"%s"}\n' \
+            "${{ steps.gitee.outputs.tag }}" "${{ steps.gitee.outputs.url }}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > app-version.json
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add app-version.json
