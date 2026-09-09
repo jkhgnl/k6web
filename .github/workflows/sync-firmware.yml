@@ -1,0 +1,104 @@
+name: 同步远程固件版本
+
+on:
+  schedule:
+    - cron: "15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-firmware
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  sync-firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出 gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+
+      - name: 获取并校验最新固件
+        id: firmware
+        shell: bash
+        env:
+          API_URL: https://gitee.com/api/v5/repos/jkhgnl/uv-k1-k5v3-firmware-doppler/releases/latest
+        run: |
+          set -euo pipefail
+          release_json="$(mktemp)"
+          trap 'rm -f "$release_json" /tmp/firmware.bin' EXIT
+
+          curl --fail --silent --show-error --location --retry 3 "$API_URL" -o "$release_json"
+          jq -e '(.tag_name | type == "string") and (.assets | type == "array")' "$release_json" >/dev/null
+
+          tag="$(jq -r '.tag_name' "$release_json")"
+          version="${tag#[vV]}"
+          if [[ -z "$version" ]]; then
+            echo "Release tag 无效：$tag" >&2
+            exit 1
+          fi
+
+          asset_json="$(jq -c '[.assets[] | select((.name | ascii_downcase | endswith(".bin")))] | sort_by(if .name == "f4hwn.fusion.bin" then 0 else 1 end) | .[0] // empty' "$release_json")"
+          if [[ -z "$asset_json" ]]; then
+            echo "Release $tag 没有 .bin 固件资产" >&2
+            exit 1
+          fi
+
+          asset_name="$(jq -r '.name' <<<"$asset_json")"
+          firmware_url="$(jq -r '.browser_download_url // .download_url // empty' <<<"$asset_json")"
+          if [[ -z "$firmware_url" ]]; then
+            echo "固件资产缺少下载地址：$asset_name" >&2
+            exit 1
+          fi
+
+          curl --fail --silent --show-error --location --retry 3 "$firmware_url" -o /tmp/firmware.bin
+          size="$(stat -c '%s' /tmp/firmware.bin)"
+          if (( size == 0 || size > 118 * 1024 )); then
+            echo "固件大小无效：${size} 字节（允许 1-118 KB）" >&2
+            exit 1
+          fi
+
+          note="$(jq -r '.name // .body // empty' "$release_json" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
+          [[ -n "$note" ]] || note="多普勒固件 v$version"
+
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "asset_name=$asset_name"
+            echo "firmware_url=$firmware_url"
+            echo "note=$note"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: 更新固件清单
+        shell: bash
+        env:
+          VERSION: ${{ steps.firmware.outputs.version }}
+          FIRMWARE_URL: ${{ steps.firmware.outputs.firmware_url }}
+          NOTE: ${{ steps.firmware.outputs.note }}
+        run: |
+          set -euo pipefail
+          current_version=""
+          current_url=""
+          if [[ -f site/update.json ]]; then
+            current_version="$(jq -r '.version // empty' site/update.json)"
+            current_url="$(jq -r '.firmware_url // .url // empty' site/update.json)"
+          fi
+
+          if [[ "$current_version" == "$VERSION" && "$current_url" == "$FIRMWARE_URL" ]]; then
+            echo "固件清单已是最新版本：$VERSION"
+            exit 0
+          fi
+
+          jq -n --arg version "$VERSION" --arg note "$NOTE" --arg url "$FIRMWARE_URL" \
+            '{version: $version, note: $note, firmware_url: $url}' > site/update.json
+
+          cd site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add update.json
+          git commit -m "chore: 同步固件最新版本 v$VERSION"
+          git push origin HEAD:gh-pages
