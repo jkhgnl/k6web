@@ -66,7 +66,7 @@ jobs:
         run: |
           cd site
           # 仅当版本号发生变化时才回写（避免时间戳导致的空提交）
-          if [ -f app-version.json ] && [ "$(jq -r '.version // empty' app-version.json)" = "${{ steps.gitee.outputs.tag }}" ]; then
+          if [ -f app-version.json ] && [ "$(jq -r '.version // empty' app-version.json)" = "${{ steps.gitee.outputs.tag }}" ] && [ "$(jq -r '.download_url // empty' app-version.json)" = "${{ steps.gitee.outputs.url }}" ]; then
             echo "版本无变化，跳过提交"
             exit 0
           fi
