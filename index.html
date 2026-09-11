@@ -283,6 +283,41 @@ window.addEventListener("load", function () {
   .coffee-thanks-form-status.err { color: #c62828; }
   .coffee-thanks-form-status.ok { color: #1a7f37; }
 
+  /* 友情链接 */
+  .flink-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+  .flink-title { margin: 0; font-size: 16px; color: #1c2433; }
+  .flink-sub { margin: 4px 0 0; font-size: 12px; color: #8892a0; }
+  .flink-admin-hint { font-size: 12px; color: #b26a00; background: #fff4e5; border: 1px solid #ffe2b8; padding: 6px 10px; border-radius: 8px; margin: 10px 0; }
+  .flink-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 14px; }
+  .flink-card { display: flex; align-items: flex-start; gap: 12px; padding: 14px; background: #f8fafc; border: 1px solid #eef1f5; border-radius: 12px; transition: all .18s; }
+  .flink-card:hover { border-color: #d6e2f7; box-shadow: 0 6px 18px rgba(47,111,220,.10); transform: translateY(-1px); }
+  .flink-avatar { width: 48px; height: 48px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: linear-gradient(135deg, #2f6fdc, #6f9df0); display: flex; align-items: center; justify-content: center; text-decoration: none; }
+  .flink-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .flink-avatar-fallback { color: #fff; font-size: 20px; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center; }
+  .flink-body { flex: 1; min-width: 0; }
+  .flink-name { font-size: 14px; font-weight: 600; color: #1c2433; text-decoration: none; word-break: break-word; }
+  .flink-name:hover { color: #2f6fdc; text-decoration: underline; }
+  .flink-host { font-size: 11px; color: #a3aab6; margin-top: 2px; word-break: break-all; }
+  .flink-desc { font-size: 12px; color: #5b6472; margin-top: 6px; line-height: 1.5; word-break: break-word; }
+  .flink-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .flink-actions button { padding: 5px 9px; font-size: 12px; border-radius: 7px; border: 1px solid #e3e8ef; background: #fff; cursor: pointer; transition: all .15s; }
+  .flink-actions button:hover { border-color: #2f6fdc; color: #2f6fdc; }
+  .flink-actions .danger { color: #c62828; border-color: #f3c7c7; background: #fff5f5; }
+  .flink-actions .danger:hover { background: #c62828; color: #fff; border-color: #c62828; }
+  .flink-empty { text-align: center; color: #97a0ad; font-size: 13px; padding: 24px; background: #fafbfe; border: 1px dashed #e3e8ef; border-radius: 10px; grid-column: 1 / -1; }
+  .flink-loading { text-align: center; color: #8892a0; font-size: 13px; padding: 16px; grid-column: 1 / -1; }
+  .flink-form { margin-top: 16px; padding: 14px; background: #fff; border: 1px solid #eef1f5; border-radius: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .flink-form-title { font-size: 13px; font-weight: 700; color: #1c2433; margin: 0; }
+  .flink-form-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .flink-form-row label { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #555; font-weight: 500; }
+  .flink-form input, .flink-form textarea { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; font-family: inherit; box-sizing: border-box; }
+  .flink-form input:focus, .flink-form textarea:focus { outline: none; border-color: #2f6fdc; box-shadow: 0 0 0 3px rgba(47,111,220,.12); }
+  .flink-form textarea { resize: vertical; min-height: 48px; }
+  .flink-form-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+  .flink-form-status { font-size: 12px; flex: 1; text-align: left; }
+  .flink-form-status.err { color: #c62828; }
+  .flink-form-status.ok { color: #1a7f37; }
+
   .visit-bar {
     display: flex; align-items: baseline; justify-content: center; gap: 6px;
     margin-top: 24px; padding: 16px 0;
@@ -1163,6 +1198,11 @@ window.addEventListener("load", function () {
     </div>
     <div class="nav-group">
       <div class="nav-items">
+        <div class="nav-item" data-tab="tabFriends" type="button">友链</div>
+      </div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-items">
         <div class="nav-item" data-tab="tabAbout" type="button">关于</div>
       </div>
     </div>
@@ -2033,6 +2073,41 @@ window.addEventListener("load", function () {
   </div>
 </div>
 
+<div id="tabFriends" class="tabpanel">
+  <h2 class="page-title">友情链接</h2>
+  <div class="card">
+    <div class="flink-head">
+      <div>
+        <h3 class="flink-title">🔗 友链</h3>
+        <p class="flink-sub">感谢这些朋友与站点，欢迎交换友链</p>
+      </div>
+      <button id="friendLinksAdd" type="button" class="secondary" style="display:none">＋ 添加友链</button>
+    </div>
+    <div id="friendLinksAdminHint" class="flink-admin-hint" style="display:none">🛠️ 管理员模式：可添加、编辑、删除友链</div>
+    <div id="friendLinksList" class="flink-list">
+      <div class="flink-loading">加载中…</div>
+    </div>
+    <div id="friendLinksForm" class="flink-form" style="display:none">
+      <p class="flink-form-title" id="friendLinksFormTitle">新增友链</p>
+      <div class="flink-form-row">
+        <label>网站名称 *<input id="flName" type="text" maxlength="60" placeholder="对方网站名称" autocomplete="off"></label>
+        <label>网站链接 *<input id="flSite" type="url" maxlength="500" placeholder="https://example.com" autocomplete="off"></label>
+      </div>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#555;font-weight:500">头像链接
+        <input id="flAvatar" type="url" maxlength="500" placeholder="https://example.com/avatar.png（可选）" autocomplete="off">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#555;font-weight:500">网站简介
+        <textarea id="flDesc" maxlength="300" rows="2" placeholder="一句话介绍对方网站（可选）"></textarea>
+      </label>
+      <div class="flink-form-actions">
+        <span id="friendLinksFormStatus" class="flink-form-status"></span>
+        <button id="friendLinksFormCancel" type="button" class="secondary">取消</button>
+        <button id="friendLinksFormSave" type="button">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="tabAbout" class="tabpanel">
   <h2 class="page-title">关于</h2>
   <div class="card" style="text-align:center">
@@ -2359,10 +2434,11 @@ window.addEventListener("load", function () {
 <script>
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
-  window.K5WEB_VERSION = "2.2.4";
+  window.K5WEB_VERSION = "2.2.5";
 </script>
 <script src="auth.js?v=1.22.6" defer></script>
 <script src="thanks.js?v=1.22.4" defer></script>
+<script src="friend-links.js?v=1.0.0" defer></script>
 <script src="workshop.js?v=1.23.0" defer></script>
 <script src="comments.js?v=1.13.0" defer></script>
 <script src="notifications.js?v=1.22.4" defer></script>
@@ -2373,7 +2449,7 @@ window.addEventListener("load", function () {
 <script src="protocol.js?v=16x17" defer></script>
 <script src="coord.js" defer></script>
 <script src="calc.js" defer></script>
-<script src="app.js?v=2.2.4" defer></script>
+<script src="app.js?v=2.2.5" defer></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
   // 侧边栏展开/折叠
@@ -2444,6 +2520,8 @@ window.addEventListener("load", function () {
   if (window.K5AUTH) K5AUTH.init();
   // 初始化鸣谢榜
   if (window.K5THANKS) K5THANKS.init();
+  // 初始化友情链接
+  if (window.K5FRIENDS) K5FRIENDS.init();
   // 初始化创意工坊
   if (window.K5WORKSHOP) K5WORKSHOP.init();
   // 初始化首页反馈评论区
