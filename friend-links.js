@@ -83,16 +83,18 @@
            </div>`
         : "";
       return `
-        <div class="flink-card" data-id="${it.id}">
-          <a class="flink-avatar" href="${url}" target="_blank" rel="noopener noreferrer">
-            ${avatarHtml}
-            <span class="flink-avatar-fallback"${avatarHtml ? ' style="display:none"' : ""}>${escapeHtml(initial)}</span>
+        <div class="flink-card-wrap" data-id="${it.id}">
+          <a class="flink-card" href="${url}" target="_blank" rel="noopener noreferrer">
+            <div class="flink-avatar">
+              ${avatarHtml}
+              <span class="flink-avatar-fallback"${avatarHtml ? ' style="display:none"' : ""}>${escapeHtml(initial)}</span>
+            </div>
+            <div class="flink-body">
+              <div class="flink-name">${escapeHtml(it.name)}</div>
+              <div class="flink-host">${escapeHtml(hostOf(it.site_url))}</div>
+              ${descHtml}
+            </div>
           </a>
-          <div class="flink-body">
-            <a class="flink-name" href="${url}" target="_blank" rel="noopener noreferrer">${escapeHtml(it.name)}</a>
-            <div class="flink-host">${escapeHtml(hostOf(it.site_url))}</div>
-            ${descHtml}
-          </div>
           ${actionsHtml}
         </div>`;
     }).join("");
