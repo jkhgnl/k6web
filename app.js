@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "2.2.8";
+  const K5WEB_VERSION = "2.2.9";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -4286,6 +4286,33 @@
     // onAuth 不回放当前状态：页面加载时已登录则主动同步一次
     if (window.K5AUTH.isLoggedIn()) {
       syncFavoritesWithCloud().then((ok) => { if (ok) refreshFavUI(); });
+    }
+  }
+
+  // 收藏页「同步云端」按钮：手动拉取合并云端收藏，无需刷新页面
+  {
+    const btn = $("btnFavSync");
+    if (btn) {
+      btn.addEventListener("click", async () => {
+        if (!window.K5AUTH || !window.K5AUTH.isLoggedIn()) {
+          log("请先登录后再同步云端收藏", "err");
+          window.K5AUTH.openModal();
+          return;
+        }
+        btn.disabled = true;
+        const old = btn.textContent;
+        btn.textContent = "⏳ 同步中...";
+        try {
+          const ok = await syncFavoritesWithCloud();
+          if (ok) {
+            refreshFavUI();
+            log("✅ 已从云端同步收藏");
+          }
+        } finally {
+          btn.disabled = false;
+          btn.textContent = old;
+        }
+      });
     }
   }
 

@@ -1885,7 +1885,7 @@ window.addEventListener("load", function () {
 <div id="tabFav" class="tabpanel">
   <h2 class="page-title">收藏卫星</h2>
   <div class="card">
-    <p class="hint">收藏的卫星会显示在星历写入的下拉列表顶部，方便快速选择。点击 ⭐ 收藏/取消收藏。</p>
+    <p class="hint">收藏的卫星会显示在星历写入的下拉列表顶部，方便快速选择。点击 ⭐ 收藏/取消收藏。<button id="btnFavSync" class="fav-btn" style="margin-left:8px">🔄 同步云端</button></p>
     <div class="sat-combo" style="margin-bottom:12px">
       <input id="favSearch" type="text" placeholder="搜索卫星名称或 NORAD 编号..." autocomplete="off" spellcheck="false">
       <div id="favDropdown" class="sat-dropdown" hidden></div>
@@ -2435,7 +2435,7 @@ window.addEventListener("load", function () {
 <script>
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
-  window.K5WEB_VERSION = "2.2.8";
+  window.K5WEB_VERSION = "2.2.9";
 </script>
 <script src="auth.js?v=1.22.6" defer></script>
 <script src="thanks.js?v=1.22.4" defer></script>
@@ -2450,7 +2450,7 @@ window.addEventListener("load", function () {
 <script src="protocol.js?v=16x17" defer></script>
 <script src="coord.js" defer></script>
 <script src="calc.js" defer></script>
-<script src="app.js?v=2.2.8" defer></script>
+<script src="app.js?v=2.2.9" defer></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
   // 侧边栏展开/折叠
