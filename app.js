@@ -109,10 +109,12 @@
       .then((rows) => rows.map((x) => String(x.norad_id)));
   }
   function cloudFavAdd(token, norad) {
+    const uid = window.K5AUTH && window.K5AUTH.getUserId ? window.K5AUTH.getUserId() : null;
+    if (!uid) return Promise.reject(new Error("未登录"));
     return favApi("?on_conflict=user_id,norad_id", token, {
       method: "POST",
       headers: { Prefer: "resolution=ignore-duplicates" },
-      body: JSON.stringify({ norad_id: String(norad) }),
+      body: JSON.stringify({ user_id: uid, norad_id: String(norad) }),
     }).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); });
   }
   function cloudFavDel(token, norad) {
@@ -151,7 +153,7 @@
     if (window.K5AUTH && window.K5AUTH.isLoggedIn()) {
       window.K5AUTH.getToken().then((t) => {
         if (!t) return;
-        (adding ? cloudFavAdd : cloudFavDel)(t, norad).catch(() => {});
+        (adding ? cloudFavAdd : cloudFavDel)(t, norad).catch((e) => log("收藏云端同步失败：" + e.message, "err"));
       });
     }
   }
