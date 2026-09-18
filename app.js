@@ -77,9 +77,9 @@
   };
   let satList = [];
 
-  // ---------- 卫星收藏（localStorage） ----------
+  // ---------- 卫星收藏（localStorage + 登录账号云端同步） ----------
   const FAV_KEY = "k5web_favorites_v1";
-  let favorites = []; // NORAD ID 数组
+  let favorites = []; // NORAD ID 字符串数组
 
   function loadFavorites() {
     try {
@@ -90,11 +90,70 @@
   function saveFavorites() {
     try { localStorage.setItem(FAV_KEY, JSON.stringify(favorites)); } catch (_) {}
   }
-  function isFav(norad) { return favorites.indexOf(norad) >= 0; }
+  function isFav(norad) { return favorites.indexOf(String(norad)) >= 0; }
+
+  function favApi(url, token, options = {}) {
+    return fetch((window.SUPABASE_URL || "") + "/rest/v1/user_favorites" + url, {
+      ...options,
+      headers: {
+        apikey: window.SUPABASE_PUBLISHABLE_KEY || "",
+        Authorization: "Bearer " + token,
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    });
+  }
+  function cloudFavList(token) {
+    return favApi("?select=norad_id", token)
+      .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then((rows) => rows.map((x) => String(x.norad_id)));
+  }
+  function cloudFavAdd(token, norad) {
+    return favApi("?on_conflict=user_id,norad_id", token, {
+      method: "POST",
+      headers: { Prefer: "resolution=ignore-duplicates" },
+      body: JSON.stringify({ norad_id: String(norad) }),
+    }).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); });
+  }
+  function cloudFavDel(token, norad) {
+    return favApi("?norad_id=eq." + encodeURIComponent(norad), token, { method: "DELETE" })
+      .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); });
+  }
+
+  // 登录后将本地收藏与云端合并：本地独有的上传云端，云端独有的合并进本地
+  async function syncFavoritesWithCloud() {
+    if (!window.K5AUTH || !window.K5AUTH.isLoggedIn()) return false;
+    const token = await window.K5AUTH.getToken();
+    if (!token) return false;
+    try {
+      const cloud = await cloudFavList(token);
+      const cloudSet = new Set(cloud);
+      const localOnly = favorites.filter((n) => !cloudSet.has(n));
+      if (localOnly.length) {
+        await Promise.all(localOnly.map((n) => cloudFavAdd(token, n)));
+      }
+      favorites = [...new Set(favorites.concat(cloud))];
+      saveFavorites();
+      return true;
+    } catch (e) {
+      log("收藏云端同步失败：" + e.message, "err");
+      return false;
+    }
+  }
+
   function toggleFav(norad) {
+    norad = String(norad);
     const i = favorites.indexOf(norad);
-    if (i >= 0) favorites.splice(i, 1); else favorites.push(norad);
+    const adding = i < 0;
+    if (adding) favorites.push(norad); else favorites.splice(i, 1);
     saveFavorites();
+    // 已登录则后台同步到云端，失败不打断本地操作
+    if (window.K5AUTH && window.K5AUTH.isLoggedIn()) {
+      window.K5AUTH.getToken().then((t) => {
+        if (!t) return;
+        (adding ? cloudFavAdd : cloudFavDel)(t, norad).catch(() => {});
+      });
+    }
   }
 
   // ---------- TLE 本地缓存（localStorage，增量获取） ----------
@@ -4210,6 +4269,23 @@
 
   // 加载收藏列表
   loadFavorites();
+
+  // 登录后合并云端收藏并刷新界面；登出后回到本地收藏
+  function refreshFavUI() {
+    renderFavTab();
+    const dd = $("satDropdown");
+    if (dd && !dd.hidden) renderSatDropdown();
+  }
+  if (window.K5AUTH) {
+    window.K5AUTH.onAuth((u) => {
+      if (!u) { refreshFavUI(); return; }
+      syncFavoritesWithCloud().then((ok) => { if (ok) refreshFavUI(); });
+    });
+    // onAuth 不回放当前状态：页面加载时已登录则主动同步一次
+    if (window.K5AUTH.isLoggedIn()) {
+      syncFavoritesWithCloud().then((ok) => { if (ok) refreshFavUI(); });
+    }
+  }
 
   // 页面加载后从本地缓存恢复 TLE（秒开选星；缓存超过 12h 时下拉框锁定并强制刷新）
   {
