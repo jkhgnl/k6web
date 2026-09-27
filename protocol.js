@@ -100,7 +100,11 @@ const BOOT_AUDIO = {
   FLASH_SIZE: 0x7000,        // 28 KB 最大可用
   SECTOR_COUNT: 7,           // 28 KB / 4 KB = 7 个 sector（sectorIndex 0..6）
   SECTOR_SIZE: 0x1000,       // 4 KB 每扇区
-  CHUNK: 232,                // 每帧写入上限（256B 环形缓冲余量）
+  // 整帧 = 数据 + 偏移4 + 命令头4 + CRC2 + 帧头尾4 = CHUNK + 16。
+  // 固件 App/usb/usbd_cdc_if.c 接收缓冲 read_buffer 只有 128B，整帧 ≤128 才能一次收全；
+  // 超过就要分两次 USB 读取拼接，偶发丢字节 → 固件收不到完整命令 → 回复超时 (0x5f6)。
+  // 与字库写入先例一致（196B/232B 均丢帧，100B 稳定）。
+  CHUNK: 100,
   MAX_DATA_SIZE: 0x7000,     // 音频数据最大 28 KB
   RECOMMENDED_MAX_SIZE: 24576, // 建议 ≤3 秒（24 KB）
 };
