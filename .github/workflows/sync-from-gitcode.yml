@@ -1,0 +1,87 @@
+# 把 GitCode 上的 gh-pages 同步回 GitHub：
+# 网站由 GitHub Pages 托管（jkhgnl.top），而日常提交现在先推到 GitCode（origin）。
+# GitHub Actions 无法被 GitCode 的 push 事件触发，因此这里定时轮询 GitCode 的新提交，
+# 合并后推回 GitHub，自动带动 Pages 部署与「SEO Push (IndexNow + Baidu)」工作流。
+#
+# 合并策略：
+#   - GitCode 领先            → 快进合并（常规情况）
+#   - 两端分叉（本仓库的定时机器人提交了 update.json / app-version.json）→ 创建合并提交，不覆盖任何一端
+#
+# 回推 GitCode（可选）：在仓库 Settings → Secrets and variables → Actions 配置
+# GITCODE_TOKEN（GitCode 个人访问令牌）后，本工作流会把合并结果回推 GitCode，
+# 让两边的机器人提交保持一致；未配置时只做单向同步，不影响主流程。
+name: Sync from GitCode
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # 每 15 分钟检查一次
+  workflow_dispatch:          # 支持手动触发
+
+permissions:
+  contents: write             # 允许推送 gh-pages
+
+concurrency:
+  group: sync-from-gitcode
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages（完整历史，便于合并）
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+
+      - name: 拉取 GitCode 并合并推送
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          GITCODE_URL="https://gitcode.com/BA4UOW/k6web.git"
+          if [ -n "$GITCODE_TOKEN" ]; then
+            GITCODE_URL="https://2501_93538290:${GITCODE_TOKEN}@gitcode.com/BA4UOW/k6web.git"
+          fi
+          git remote add gitcode "$GITCODE_URL"
+          git fetch gitcode gh-pages
+
+          LOCAL="$(git rev-parse gh-pages)"
+          REMOTE="$(git rev-parse gitcode/gh-pages)"
+          echo "GitHub: $LOCAL"
+          echo "GitCode: $REMOTE"
+          if [ "$LOCAL" = "$REMOTE" ]; then
+            echo "两端一致，无需同步"
+            exit 0
+          fi
+
+          if git merge-base --is-ancestor gh-pages gitcode/gh-pages; then
+            echo "GitCode 领先，快进合并..."
+            git merge --ff-only gitcode/gh-pages
+          else
+            echo "两端分叉（可能含本仓库机器人提交），创建合并提交..."
+            git merge --no-ff --no-edit gitcode/gh-pages
+          fi
+          git push origin gh-pages
+          echo "已同步到 GitHub：$(git rev-parse gh-pages)"
+
+      - name: 回推 GitCode（未配置 GITCODE_TOKEN 时自动跳过）
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GITCODE_TOKEN" ]; then
+            echo "未配置 GITCODE_TOKEN，跳过回推（单向同步模式）"
+            exit 0
+          fi
+          BEFORE="$(git rev-parse gitcode/gh-pages)"
+          AFTER="$(git rev-parse gh-pages)"
+          if [ "$AFTER" = "$BEFORE" ]; then
+            echo "GitCode 已是最新"
+            exit 0
+          fi
+          git push "https://2501_93538290:${GITCODE_TOKEN}@gitcode.com/BA4UOW/k6web.git" gh-pages
+          echo "已回推 GitCode"
