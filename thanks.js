@@ -82,6 +82,9 @@
       const callsignHtml = it.name && it.callsign
         ? `<span class="coffee-callsign">${escapeHtml(it.callsign)}</span>`
         : "";
+      const avatarHtml = it.avatar_url
+        ? `<span class="coffee-thanks-avatar"><img src="${escapeHtml(it.avatar_url)}" alt="" loading="lazy" onerror="this.parentNode.textContent='☕'"></span>`
+        : `<span class="coffee-thanks-avatar">☕</span>`;
       const msgHtml = it.message
         ? `<div class="coffee-thanks-msg">${escapeHtml(it.message)}</div>`
         : "";
@@ -94,7 +97,7 @@
         : "";
       return `
         <div class="coffee-thanks-item" data-id="${it.id}">
-          <span class="coffee-thanks-avatar">☕</span>
+          ${avatarHtml}
           <div class="coffee-thanks-main">
             <div class="coffee-thanks-name">${escapeHtml(displayName)}${callsignHtml}</div>
             ${msgHtml}${metaHtml}

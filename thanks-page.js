@@ -51,6 +51,15 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
 
+  // 头像：有图显示图片（加载失败回退 emoji），无图显示类别 emoji
+  function avatarHtml(it, category) {
+    const emoji = category === "sponsor" ? "☕" : "🚀";
+    if (it.avatar_url) {
+      return `<span class="thx-avatar ${category}"><img src="${escapeHtml(it.avatar_url)}" alt="" loading="lazy" onerror="this.parentNode.textContent='${emoji}'"></span>`;
+    }
+    return `<span class="thx-avatar ${category}">${emoji}</span>`;
+  }
+
   // ---------- 列表 ----------
   async function fetchAllItems() {
     const all = [];
@@ -113,10 +122,10 @@
              <button type="button" class="danger" data-id="${it.id}" title="删除">🗑️</button>
            </div>`
         : "";
-      const avatarIcon = category === "sponsor" ? "☕" : "🚀";
+      const avatarIcon = avatarHtml(it, category);
       return `
         <div class="thx-item" data-id="${it.id}">
-          <span class="thx-avatar ${category}">${avatarIcon}</span>
+          ${avatarIcon}
           <div class="thx-main">
             <div class="thx-name">${escapeHtml(displayName)}${callsignHtml}</div>
             ${msgHtml}${metaHtml}
@@ -163,6 +172,55 @@
     if (items.length || document.querySelectorAll("#thxBetaList .thx-empty, #thxSponsorList .thx-empty").length) renderLists();
   }
 
+  // ---------- 头像预览 / 上传 ----------
+  function updateAvatarPreview() {
+    const url = ($("thPageAvatar").value || "").trim();
+    const img = $("thPageAvatarPreview");
+    if (!img) return;
+    if (url && /^https?:\/\//i.test(url)) {
+      img.src = url;
+      img.style.display = "";
+    } else {
+      img.removeAttribute("src");
+      img.style.display = "none";
+    }
+  }
+
+  async function uploadAvatar() {
+    const fileInput = $("thPageAvatarFile");
+    const file = fileInput && fileInput.files && fileInput.files[0];
+    if (!file) { setFormStatus("请先选择图片文件", "err"); return; }
+
+    const token = await window.K5AUTH.getToken();
+    if (!token) { setFormStatus("登录状态已失效，请重新登录", "err"); window.K5AUTH.openModal(); return; }
+
+    const btn = $("thPageAvatarUpload");
+    const oldText = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "上传中…"; }
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const resp = await fetch(`${FUNC_BASE}/upload-thanks-avatar`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          apikey: window.SUPABASE_PUBLISHABLE_KEY || "",
+        },
+        body: fd,
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "HTTP " + resp.status);
+      $("thPageAvatar").value = data.avatar_url;
+      updateAvatarPreview();
+      setFormStatus("✅ 头像已上传，点击保存后生效", "ok");
+    } catch (e) {
+      setFormStatus("头像上传失败：" + e.message, "err");
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = oldText; }
+      if (fileInput) fileInput.value = "";
+    }
+  }
+
   // ---------- 新增 / 编辑表单 ----------
   function toggleAmountField() {
     const category = $("thPageCategory").value;
@@ -179,6 +237,8 @@
     $("thPageCallsign").value = item ? (item.callsign || "") : "";
     $("thPageAmount").value = item && item.amount != null ? item.amount : "";
     $("thPageMessage").value = item ? (item.message || "") : "";
+    $("thPageAvatar").value = item ? (item.avatar_url || "") : "";
+    updateAvatarPreview();
     toggleAmountField();
     setFormStatus("", "");
     form.style.display = "flex";
@@ -235,7 +295,10 @@
           Authorization: "Bearer " + token,
           apikey: window.SUPABASE_PUBLISHABLE_KEY || "",
         },
-        body: JSON.stringify({ name, callsign, amount, message, category }),
+        body: JSON.stringify({
+          name, callsign, amount, message, category,
+          avatar_url: ($("thPageAvatar").value || "").trim() || null,
+        }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "HTTP " + resp.status);
@@ -286,6 +349,14 @@
     if (cancelBtn) cancelBtn.addEventListener("click", hideForm);
     if (saveBtn) saveBtn.addEventListener("click", saveThanks);
     if (categorySel) categorySel.addEventListener("change", toggleAmountField);
+
+    // 头像：选择文件后立即上传；链接手动输入时刷新预览
+    const avatarUploadBtn = $("thPageAvatarUpload");
+    const avatarFileInput = $("thPageAvatarFile");
+    const avatarUrlInput = $("thPageAvatar");
+    if (avatarUploadBtn) avatarUploadBtn.addEventListener("click", uploadAvatar);
+    if (avatarFileInput) avatarFileInput.addEventListener("change", uploadAvatar);
+    if (avatarUrlInput) avatarUrlInput.addEventListener("input", updateAvatarPreview);
 
     // 登录状态变化时刷新管理员 UI
     if (window.K5AUTH) window.K5AUTH.onAuth(() => renderAdminUI());

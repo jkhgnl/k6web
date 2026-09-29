@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
 
     let query = supabase
       .from("thanks")
-      .select("id, name, callsign, amount, message, category, display_order, created_at", { count: "exact" })
+      .select("id, name, callsign, amount, message, category, avatar_url, display_order, created_at", { count: "exact" })
       .order("display_order", { ascending: true })
       .order("created_at", { ascending: false })
       .range((page - 1) * pageSize, page * pageSize - 1);

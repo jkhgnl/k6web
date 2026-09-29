@@ -1,8 +1,9 @@
 // 鸣谢榜 - 管理接口（仅管理员 Jkhgnl 可写）
-// POST   { name?, callsign?, amount, message, category, display_order }  -> 新增（name 与 callsign 至少填一项）
-// PUT    ?id=xxx + { name?, callsign?, amount, message, category, display_order } -> 更新
+// POST   { name?, callsign?, amount, message, category, avatar_url?, display_order }  -> 新增（name 与 callsign 至少填一项）
+// PUT    ?id=xxx + { name?, callsign?, amount, message, category, avatar_url?, display_order } -> 更新
 // DELETE ?id=xxx  -> 删除
 // category: 'sponsor' = 赞助支持用户（默认）；'beta' = 首批内测用户
+// avatar_url: 头像图片链接（可选）；PUT 请求未携带该字段时不改动原值
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, getUser, handleOptions } from "../_shared/cors.ts";
 
@@ -12,6 +13,15 @@ function parseCategory(raw: unknown): string | null {
   if (raw == null || String(raw).trim() === "") return "sponsor";
   const v = String(raw).trim();
   return (THANKS_CATEGORIES as readonly string[]).includes(v) ? v : null;
+}
+
+// 头像链接：空值 -> null；带协议校验；非法返回 undefined（由调用方决定报错或跳过）
+function parseAvatarUrl(raw: unknown): string | null | undefined {
+  if (raw == null) return null;
+  const v = String(raw).trim();
+  if (v === "") return null;
+  if (!/^https?:\/\/.+/i.test(v) || v.length > 500) return undefined;
+  return v;
 }
 
 function isAdmin(user: { email?: string; user_metadata?: Record<string, unknown> }): boolean {
@@ -66,6 +76,8 @@ Deno.serve(async (req) => {
       const displayOrder = body.display_order != null ? parseInt(String(body.display_order), 10) : undefined;
       const category = parseCategory(body.category);
       if (!category) return jsonResponse({ error: "类别仅支持 sponsor / beta" }, 400);
+      const avatarUrl = body.avatar_url === undefined ? undefined : parseAvatarUrl(body.avatar_url);
+      if (avatarUrl === undefined) return jsonResponse({ error: "头像链接不合法（http(s) 开头，不超过 500 字符）" }, 400);
       let amount: number | null = null;
       if (body.amount != null && String(body.amount).trim() !== "") {
         const n = Number(body.amount);
@@ -87,13 +99,15 @@ Deno.serve(async (req) => {
         message: message || null,
         category,
       };
+      // PUT 未携带 avatar_url 字段时不改动原值（如弹窗表单无头像输入）
+      if (avatarUrl !== undefined) updates.avatar_url = avatarUrl;
       if (Number.isFinite(displayOrder as number)) updates.display_order = displayOrder;
 
       const { data, error } = await supabase
         .from("thanks")
         .update(updates)
         .eq("id", id)
-        .select("id, name, callsign, amount, message, category, display_order, created_at")
+        .select("id, name, callsign, amount, message, category, avatar_url, display_order, created_at")
         .single();
       if (error) throw error;
       return jsonResponse({ item: data });
@@ -108,6 +122,8 @@ Deno.serve(async (req) => {
       const displayOrder = body.display_order != null ? parseInt(String(body.display_order), 10) : 0;
       const category = parseCategory(body.category);
       if (!category) return jsonResponse({ error: "类别仅支持 sponsor / beta" }, 400);
+      const avatarUrl = parseAvatarUrl(body.avatar_url);
+      if (avatarUrl === undefined) return jsonResponse({ error: "头像链接不合法（http(s) 开头，不超过 500 字符）" }, 400);
       let amount: number | null = null;
       if (body.amount != null && String(body.amount).trim() !== "") {
         const n = Number(body.amount);
@@ -130,9 +146,10 @@ Deno.serve(async (req) => {
           amount,
           message: message || null,
           category,
+          avatar_url: avatarUrl,
           display_order: Number.isFinite(displayOrder) ? displayOrder : 0,
         })
-        .select("id, name, callsign, amount, message, category, display_order, created_at")
+        .select("id, name, callsign, amount, message, category, avatar_url, display_order, created_at")
         .single();
       if (error) throw error;
       return jsonResponse({ item: data }, 201);

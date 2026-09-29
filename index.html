@@ -257,7 +257,8 @@ window.addEventListener("load", function () {
   .coffee-thanks-sub { font-size: 12px; color: #8892a0; }
   .coffee-thanks-list { display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; padding-right: 2px; }
   .coffee-thanks-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #f8fafc; border: 1px solid #eef1f5; border-radius: 10px; }
-  .coffee-thanks-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #f5a623, #f7c948); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .coffee-thanks-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #f5a623, #f7c948); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; overflow: hidden; }
+  .coffee-thanks-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .coffee-thanks-main { flex: 1; min-width: 0; }
   .coffee-thanks-name { font-size: 13px; font-weight: 600; color: #1c2433; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .coffee-callsign { font-size: 11px; font-weight: 600; color: #2f6fdc; background: #eef4ff; border: 1px solid #dbe4f5; padding: 1px 6px; border-radius: 999px; font-family: Consolas, monospace; letter-spacing: .3px; }
@@ -330,7 +331,8 @@ window.addEventListener("load", function () {
   .thx-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
   .thx-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px; background: #f8fafc; border: 1px solid #eef1f5; border-radius: 12px; position: relative; transition: all .18s; }
   .thx-item:hover { border-color: #d6e2f7; box-shadow: 0 4px 14px rgba(47,111,220,.08); }
-  .thx-avatar { width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .thx-avatar { width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; overflow: hidden; }
+  .thx-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .thx-avatar.beta { background: linear-gradient(135deg, #4a90d9, #7fb3ef); }
   .thx-avatar.sponsor { background: linear-gradient(135deg, #f5a623, #f7c948); }
   .thx-main { flex: 1; min-width: 0; }
@@ -2199,6 +2201,14 @@ window.addEventListener("load", function () {
           <input id="thPageAmount" type="number" min="0" step="0.01" placeholder="可选">
         </label>
       </div>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#555;font-weight:500">头像
+        <span style="display:flex;gap:8px;align-items:center">
+          <img id="thPageAvatarPreview" src="" alt="" style="display:none;width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid #e3e8ef;flex-shrink:0">
+          <input id="thPageAvatar" type="url" maxlength="500" placeholder="图片链接，或点击右侧上传（可选）" autocomplete="off" style="flex:1;min-width:0">
+          <input id="thPageAvatarFile" type="file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none">
+          <button id="thPageAvatarUpload" type="button" class="secondary" style="white-space:nowrap">📤 上传</button>
+        </span>
+      </label>
       <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#555;font-weight:500">留言
         <textarea id="thPageMessage" maxlength="200" rows="2" placeholder="想说的话（可选）"></textarea>
       </label>
