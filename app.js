@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "2.2.11";
+  const K5WEB_VERSION = "2.2.12";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -1236,21 +1236,11 @@
     return proto.parseReply(reply);
   }
 
-  $("btnConnect").addEventListener("click", async () => {
-    if (port) {
-      try { if (writer) { writer.releaseLock(); writer = null; } } catch (e) { /* ignore */ }
-      try { await port.close(); } catch (e) { /* ignore */ }
-      port = null;
-      $("btnConnect").textContent = "连接";
-      $("btnConnect").classList.remove("secondary");
-      log("串口已断开");
-      // 断开时清空槽位显示
-      for (let i = 0; i < 4; i++) updateSlotCard(i, "");
-      return;
-    }
+  // 弹出串口选择并连接（38400 波特率），成功返回 true
+  async function connectSerial() {
     if (!navigator.serial) {
       setStatus("当前浏览器不支持 Web Serial，请用 Chrome/Edge（需 https 或 localhost 环境）", "err");
-      return;
+      return false;
     }
     try {
       port = await navigator.serial.requestPort();
@@ -1264,14 +1254,39 @@
       log("串口已连接");
       // 自动读取四个槽位名称
       readAllSlots();
+      return true;
     } catch (e) {
       setStatus("连接失败：" + e.message, "err");
+      return false;
     }
+  }
+
+  // 写入/读取类按钮共用：未连接时直接弹出连接选择，连上后继续原操作
+  async function ensureConnected() {
+    if (port) return true;
+    setStatus("未连接，请在弹窗中选择串口连接...", "info");
+    log("未连接串口，自动弹出连接选择");
+    return await connectSerial();
+  }
+
+  $("btnConnect").addEventListener("click", async () => {
+    if (port) {
+      try { if (writer) { writer.releaseLock(); writer = null; } } catch (e) { /* ignore */ }
+      try { await port.close(); } catch (e) { /* ignore */ }
+      port = null;
+      $("btnConnect").textContent = "连接";
+      $("btnConnect").classList.remove("secondary");
+      log("串口已断开");
+      // 断开时清空槽位显示
+      for (let i = 0; i < 4; i++) updateSlotCard(i, "");
+      return;
+    }
+    await connectSerial();
   });
 
   // ---------- 写入星历 ----------
   $("btnWrite").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     if (!passData) { setStatus("请先计算过境", "err"); return; }
 
     $("btnWrite").disabled = true;
@@ -1355,7 +1370,7 @@
 
   // ---------- 删除全部星历（1-4 槽） ----------
   $("btnEraseAll").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     if (!confirm("将删除 1-4 槽位的全部星历数据，此操作不可恢复。确定继续？")) return;
     const btn = $("btnEraseAll");
     btn.disabled = true;
@@ -1462,7 +1477,7 @@
 
   // 保存槽位名称
   $("btnSlotRename").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     // 先读取当前选中槽位确保有最新数据
     await readSlot(selectedSlot);
     if (!slotEditBlock) { setStatus("请先点击槽位卡片读取数据", "err"); return; }
@@ -1672,7 +1687,7 @@
   });
 
   $("btnFont").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     if (!fontData) { setStatus("请先选择字库文件", "err"); return; }
 
     $("btnFont").disabled = true;
@@ -1761,7 +1776,7 @@
   }
 
   $("btnFontView").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     const ch = $("fontViewChar").value.trim();
     if (!ch) { setStatus("请输入一个汉字", "err"); return; }
     $("btnFontView").disabled = true;
@@ -1783,7 +1798,7 @@
   });
 
   $("btnFontCheck").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     $("btnFontCheck").disabled = true;
     try {
       const bytes = await readFontBytes(0, proto.CN_FONT.GLYPH_SIZE);
@@ -1989,7 +2004,7 @@
   });
 
   $("btnLogoWrite").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     if (!logoData) { setStatus("请先选择图片文件", "err"); return; }
 
     $("btnLogoWrite").disabled = true;
@@ -2050,7 +2065,7 @@
   });
 
   $("btnLogoRead").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     $("btnLogoRead").disabled = true;
     try {
       const ver = await ensureSession();
@@ -2182,7 +2197,7 @@
       const len = new DataView(bytes.buffer, bytes.byteOffset, 4).getUint32(0, true);
       const dataLen = Math.min(len, bytes.length - 4);
       updateAudioInfo("已从创意工坊载入：" + file.name + "（数据 " + dataLen + " 字节，约 " + (dataLen / 8000).toFixed(2) + "s）  bin " + bytes.length + " 字节（" + (bytes.length / 1024).toFixed(1) + " KB）");
-      updateBootAudioStatus("已就绪，点“写入开机音效”刷入（需先连接串口）");
+      updateBootAudioStatus("已就绪，点“写入开机音效”刷入（未连接会自动弹出串口选择）");
       const wBtn = $("btnBootAudioWrite");
       const eBtn = $("btnBootAudioExport");
       const pBtn = $("btnBootAudioPreview");
@@ -2380,7 +2395,7 @@
       bootAudioBin = bin;
       const effDur = (compressed ? MAX_DATA : encoded.length) / 8000;
       updateAudioInfo("已加载：" + file.name + "  倍速 " + speed + "x  有效时长 " + effDur.toFixed(2) + "s（编码 " + encoded.length + " 字节）  bin " + bin.length + " 字节（" + (bin.length / 1024).toFixed(1) + " KB）" + (compressed ? "  ⚠已截断" : ""));
-      updateBootAudioStatus("已就绪，点“写入开机音效”刷入（需先连接串口）");
+      updateBootAudioStatus("已就绪，点“写入开机音效”刷入（未连接会自动弹出串口选择）");
       const wBtn = $("btnBootAudioWrite");
       const eBtn = $("btnBootAudioExport");
       const pBtn = $("btnBootAudioPreview");
@@ -2526,7 +2541,7 @@
   const _btnWrite = $("btnBootAudioWrite");
   if (_btnWrite) {
     _btnWrite.addEventListener("click", async () => {
-      if (!port) { setStatus("请先连接串口", "err"); return; }
+      if (!(await ensureConnected())) return;
       if (!bootAudioBin) { setStatus("请先选择音频文件", "err"); return; }
       const BA = proto.BOOT_AUDIO;
       if (bootAudioBin.length > BA.FLASH_SIZE) { setStatus("bin 过大（" + bootAudioBin.length + " 字节），超过 28 KB 上限", "err"); return; }
@@ -2582,7 +2597,7 @@
   const _btnDisable = $("btnBootAudioDisable");
   if (_btnDisable) {
     _btnDisable.addEventListener("click", async () => {
-      if (!port) { setStatus("请先连接串口", "err"); return; }
+      if (!(await ensureConnected())) return;
       if (!confirm("确定要关闭开机音效吗？这会擦除 0x1F8000 扇区，长度头变为 0xFF（禁用播放）。")) return;
       _btnDisable.disabled = true;
       try {
@@ -2607,7 +2622,7 @@
   const _btnCheck = $("btnBootAudioCheck");
   if (_btnCheck) {
     _btnCheck.addEventListener("click", async () => {
-      if (!port) { setStatus("请先连接串口", "err"); return; }
+      if (!(await ensureConnected())) return;
       _btnCheck.disabled = true;
       try {
         log("读取开机音效区校验（0x1F8000 起 128 字节）...");
@@ -2645,7 +2660,7 @@
   const _btnBootAudioBackup = $("btnBootAudioBackup");
   if (_btnBootAudioBackup) {
     _btnBootAudioBackup.addEventListener("click", async () => {
-      if (!port) { setStatus("请先连接串口", "err"); return; }
+      if (!(await ensureConnected())) return;
       _btnBootAudioBackup.disabled = true;
       try {
         const BA = proto.BOOT_AUDIO;
@@ -2707,7 +2722,7 @@
   }
 
   $("btnCalExp").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     $("btnCalExp").disabled = true;
     try {
       const ver = await ensureSession();
@@ -2762,7 +2777,7 @@
   });
 
   $("btnCalImp").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     if (!calData) { setStatus("请先选择校准文件", "err"); return; }
     if (!confirm("确认导入？写错校准数据会导致频率/功率/电量异常，请确认文件来自本机。")) return;
 
@@ -2966,7 +2981,7 @@
   syncOffsetFromTx(); // 初始化：按默认 RX/TX 推出方向+差频，并设置差频框可编辑状态
 
   $("btnChProg").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     const channel = parseInt($("chNum").value, 10) - 1;
     if (isNaN(channel) || channel < 0 || channel >= proto.CHAN.MAX_COUNT) {
       setStatus(`信道号无效，应为 1~${proto.CHAN.MAX_COUNT}`, "err"); return;
@@ -2991,7 +3006,7 @@
   });
 
   $("btnChRead").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     const channel = parseInt($("chNum").value, 10) - 1;
     if (isNaN(channel) || channel < 0 || channel >= proto.CHAN.MAX_COUNT) {
       setStatus(`信道号无效，应为 1~${proto.CHAN.MAX_COUNT}`, "err"); return;
@@ -3349,7 +3364,7 @@
   });
 
   $("btnChProgCsv").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     syncTableData();
     if (!chCsvData || !chCsvData.length) { setStatus("请先选择信道文件", "err"); return; }
     $("btnChProgCsv").disabled = true;
@@ -3419,7 +3434,7 @@
   }
 
   $("btnChExpCsv").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     const C = proto.CHAN;
     const start = parseInt($("chExpStart").value, 10) - 1;
     const end = parseInt($("chExpEnd").value, 10) - 1;
@@ -3497,7 +3512,7 @@
 
   // ---------- 清空信道（恢复出厂擦除态 0xFF） ----------
   $("btnChClear").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     const C = proto.CHAN;
     const start = parseInt($("chClrStart").value, 10) - 1;
     const end = parseInt($("chClrEnd").value, 10) - 1;
@@ -3611,167 +3626,469 @@
     btRefreshUi();
   });
 
-  // ---------- 获取远程固件（读取仓库 update.json） ----------
+  // ---------- 选择固件弹窗（创意工坊 / 知名固件，对齐手机 APP） ----------
+  // 创意工坊：Supabase 按 firmware 分类列出作品，选中后经服务端取回文件内容
+  // 知名固件：Gitee 云端清单（失败回落内置清单），按条目里的有序源逐个回落下载
 
-  // 远程固件列表（每个固件自动通过 CORS 代理下载到内存，用户直接点选即可刷写）
-  const remoteFwCache = []; // [{ name, version, note, buf }]
+  const FW_WS_FUNC_BASE = (window.SUPABASE_URL || "").replace(/\/$/, "") + "/functions/v1";
+  const FW_WS_PAGE_SIZE = 10;
+  const FW_MANIFEST_URL = "https://gitee.com/jkhgnl/uvk6-tools-android/raw/main/known-firmwares.json";
 
-  $("btnFwList").addEventListener("click", async () => {
-    const btn = $("btnFwList");
-    const status = $("fwRemoteStatus");
-    const listBox = $("fwReleaseList");
-    btn.disabled = true;
-    btn.textContent = "获取中...";
-    status.textContent = "正在获取固件列表...";
-    status.className = "hint";
-    listBox.innerHTML = "";
-    remoteFwCache.length = 0;
+  // 内置兜底清单：与 APP 内置清单 / 仓库根目录 known-firmwares.json 保持一致
+  const FW_MANIFEST_BUILTIN = {
+    accel: ["https://ghfast.top/", "https://gh-proxy.com/", "https://ghproxy.net/", "https://gh.xxooo.cf/"],
+    firmwares: [
+      { id: "stararrival", name: "星来 StarArrival", desc: "本项目配套固件：多普勒/中文字库/实时推送", kind: "gitee_update_json", source: "https://gitee.com/jkhgnl/uv-k1-k5v3-firmware-doppler/raw/main/update.json" },
+      { id: "dondji", name: "叮咚鸡 Dondji", desc: "中文固件，广播/MDC1200/双 PTT（Apache-2.0）", kind: "direct", sources: ["https://cdn.jsdelivr.net/gh/EthanYan6/Dondji@motorola_r7/docs/firmware/Dondji.fusion.bin", "https://ghfast.top/https://raw.githubusercontent.com/EthanYan6/Dondji/motorola_r7/docs/firmware/Dondji.fusion.bin", "https://gh-proxy.com/https://raw.githubusercontent.com/EthanYan6/Dondji/motorola_r7/docs/firmware/Dondji.fusion.bin", "https://ghproxy.net/https://raw.githubusercontent.com/EthanYan6/Dondji/motorola_r7/docs/firmware/Dondji.fusion.bin", "https://gh.xxooo.cf/https://raw.githubusercontent.com/EthanYan6/Dondji/motorola_r7/docs/firmware/Dondji.fusion.bin", "https://raw.githubusercontent.com/EthanYan6/Dondji/motorola_r7/docs/firmware/Dondji.fusion.bin"], version_url: "https://api.github.com/repos/EthanYan6/Dondji/releases/latest" },
+      { id: "syrup", name: "小甜水 Syrup", desc: "中文固件，音效与自定义尾音（Apache-2.0）", kind: "direct", sources: ["https://cdn.jsdelivr.net/gh/EthanYan6/Syrup@main/docs/firmware/syrup.bin", "https://ghfast.top/https://raw.githubusercontent.com/EthanYan6/Syrup/main/docs/firmware/syrup.bin", "https://gh-proxy.com/https://raw.githubusercontent.com/EthanYan6/Syrup/main/docs/firmware/syrup.bin", "https://ghproxy.net/https://raw.githubusercontent.com/EthanYan6/Syrup/main/docs/firmware/syrup.bin", "https://gh.xxooo.cf/https://raw.githubusercontent.com/EthanYan6/Syrup/main/docs/firmware/syrup.bin", "https://raw.githubusercontent.com/EthanYan6/Syrup/main/docs/firmware/syrup.bin"], version_url: "https://api.github.com/repos/EthanYan6/Syrup/releases/latest" },
+      { id: "f4hwn_fusion", name: "F4HWN Fusion", desc: "官方推荐通用版（日常使用）", kind: "github_release", api: "https://api.github.com/repos/armel/uv-k1-k5v3-firmware-custom/releases/latest", asset_regex: "f4hwn\\.fusion\\..*\\.bin$", version_url: "https://api.github.com/repos/armel/uv-k1-k5v3-firmware-custom/releases/latest" },
+      { id: "f4hwn_fieldops", name: "F4HWN FieldOps", desc: "救援 / 猎狐 / 摩斯信标", kind: "github_release", api: "https://api.github.com/repos/armel/uv-k1-k5v3-firmware-custom/releases/latest", asset_regex: "f4hwn\\.fieldops\\..*\\.bin$", version_url: "https://api.github.com/repos/armel/uv-k1-k5v3-firmware-custom/releases/latest" },
+      { id: "f4hwn_transfer", name: "F4HWN Transfer", desc: "AirCopy / BEAM 对传", kind: "github_release", api: "https://api.github.com/repos/armel/uv-k1-k5v3-firmware-custom/releases/latest", asset_regex: "f4hwn\\.transfer\\..*\\.bin$", version_url: "https://api.github.com/repos/armel/uv-k1-k5v3-firmware-custom/releases/latest" },
+      { id: "f4hwn_labs", name: "F4HWN Labs", desc: "实验版：含 overlay 应用平台", kind: "github_release", api: "https://api.github.com/repos/armel/uv-k1-k5v3-firmware-custom/releases/latest", asset_regex: "f4hwn\\.labs\\..*\\.bin$", version_url: "https://api.github.com/repos/armel/uv-k1-k5v3-firmware-custom/releases/latest" },
+    ],
+  };
 
+  const fwPick = {
+    tab: 0, appliedQuery: "",
+    wsItems: [], wsPage: 0, wsTotal: 0, wsLoading: false, wsLoadingMore: false, wsEnd: false,
+    manifest: null, manifestFromCloud: false, versions: {}, manifestLoaded: false,
+    busyKey: null, busyText: "",
+  };
+
+  function fwEsc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function fwFmtSize(bytes) {
+    if (!bytes) return "0 B";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+  }
+
+  function fwPickAnonHeaders() {
+    const h = { Authorization: "Bearer " + (window.SUPABASE_PUBLISHABLE_KEY || "") };
+    if (window.SUPABASE_PUBLISHABLE_KEY) h.apikey = window.SUPABASE_PUBLISHABLE_KEY;
+    return h;
+  }
+
+  // 每个地址的尝试顺序：静态托管优先走 CORS 代理；已是代理/加速镜像地址的不再套娃
+  function fwPickUrlTries(url) {
+    const accel = (fwPick.manifest && fwPick.manifest.accel) || FW_MANIFEST_BUILTIN.accel;
+    if (url.startsWith(WORKER_PROXY_URL) || accel.some((p) => url.startsWith(p))) return [url];
+    const proxied = WORKER_PROXY_URL + "?url=" + encodeURIComponent(url);
+    return IS_GITHUB_PAGES ? [proxied, url] : [url, proxied];
+  }
+
+  async function fwPickFetchJson(url) {
+    let lastErr = null;
+    for (const u of fwPickUrlTries(url)) {
+      try {
+        const resp = await fetchWithTimeout(u, {}, 15000);
+        return JSON.parse(await resp.text());
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error("请求失败");
+  }
+
+  // 流式下载 + 进度回调（0~1），限制体积 ≤ 槽位上限 128KB
+  async function fwPickFetchBytes(url, onProgress) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 60000);
     try {
-      // GitHub Pages 模式：从 GitHub 仓库读取固件列表（raw.githubusercontent.com 支持 CORS）
-      const fwListUrl = IS_GITHUB_PAGES
-        ? "https://raw.githubusercontent.com/jkhgnl/k6web/gh-pages/update.json"
-        : "/fw/list";
-      const resp = await fetchWithTimeout(fwListUrl, {}, 15000);
-      const text = await resp.text();
-      let data;
-      try { data = JSON.parse(text); } catch (_) { throw new Error("服务器返回数据格式异常"); }
-
-      // 兼容两种格式：数组或单个对象
-      const list = Array.isArray(data) ? data : (data.firmware_url ? [data] : []);
-      if (list.length === 0) throw new Error("固件仓库暂无固件");
-
-      // 先渲染占位卡片（带 loading 状态），同时后台并发下载所有固件
-      let html = "";
-      for (let i = 0; i < list.length; i++) {
-        const fw = list[i];
-        const name = fw.name || "f4hwn.fusion.bin";
-        const version = fw.version || "";
-        const note = (fw.note || fw.description || fw.body || "").trim();
-        html += `<div class="fw-release" id="fwItem${i}">`;
-        html += `<div class="fw-release-header">`;
-        html += `<span class="fw-release-tag">${name}${version ? " v" + version : ""}</span>`;
-        html += `</div>`;
-        if (note) html += `<div class="fw-release-body">${note}</div>`;
-        html += `<div class="fw-asset">`;
-        html += `<span class="fw-asset-name">${name}</span>`;
-        html += `<span class="fw-asset-size" id="fwSize${i}" style="color:#888">⏳ 下载中...</span>`;
-        html += `</div>`;
-        html += `</div>`;
+      const resp = await fetch(url, { signal: ctrl.signal });
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const total = parseInt(resp.headers.get("Content-Length") || "0", 10);
+      if (!resp.body || !total) {
+        const buf = new Uint8Array(await resp.arrayBuffer());
+        if (onProgress) onProgress(1);
+        return buf;
       }
-      listBox.innerHTML = html;
+      const reader = resp.body.getReader();
+      const chunks = [];
+      let received = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (received > proto.MS_PROTO.SLOT_MAX) throw new Error(`文件过大（超过 ${proto.MS_PROTO.SLOT_MAX / 1024}KB）`);
+        if (onProgress) onProgress(received / total);
+      }
+      const out = new Uint8Array(received);
+      let off = 0;
+      for (const c of chunks) { out.set(c, off); off += c.length; }
+      if (out.length !== total) throw new Error(`下载不完整：${out.length}/${total} 字节`);
+      return out;
+    } finally {
+      clearTimeout(t);
+    }
+  }
 
-      // 并发下载所有固件到内存
-      const total = list.length;
-      let done = 0;
-      status.textContent = `正在下载 ${total} 个固件...`;
-      status.className = "hint";
+  // 按清单条目构造有序候选地址（对齐 APP KnownFirmwareRepository.download 的三种 kind）
+  async function fwPickKnownCandidates(fw) {
+    const candidates = [];
+    let version = "";
+    const push = (url, label) => { if (url) candidates.push({ url, label }); };
 
-      const downloadTasks = list.map(async (fw, i) => {
-        const name = fw.name || "f4hwn.fusion.bin";
-        const version = fw.version || "";
-        const url = fw.url || fw.firmware_url || "";
-        const sizeEl = $(`fwSize${i}`);
-        const itemEl = $(`fwItem${i}`);
+    if (fw.kind === "gitee_update_json") {
+      if (!fw.source) throw new Error("清单缺少 source");
+      const json = await fwPickFetchJson(fw.source);
+      version = String((json && json.version) || "").trim();
+      push(String((json && json.firmware_url) || "").trim(), "官方发布");
+      if (!candidates.length) throw new Error("版本清单里没有 firmware_url");
+    } else if (fw.kind === "github_release") {
+      let assetUrl = null;
+      try {
+        const json = await fwPickFetchJson(fw.api);
+        version = String((json && json.tag_name) || "").replace(/^[vV]/, "").trim();
+        const re = fw.asset_regex ? new RegExp(fw.asset_regex) : null;
+        const hit = ((json && json.assets) || []).find((a) =>
+          a && a.browser_download_url && (!re || re.test(a.name || "")));
+        if (hit) assetUrl = hit.browser_download_url;
+      } catch (e) {
+        fwPickLog("版本查询失败（" + e.message + "），改用清单兜底地址");
+      }
+      if (assetUrl) {
+        push(assetUrl, "GitHub 直连");
+        const accel = (fwPick.manifest && fwPick.manifest.accel) || FW_MANIFEST_BUILTIN.accel;
+        accel.forEach((p) => push(p + assetUrl, "加速镜像 " + p.replace(/^https?:\/\//, "").replace(/\/$/, "")));
+      }
+      (fw.sources || []).forEach((u) => push(u, "清单兜底地址"));
+    } else {
+      (fw.sources || []).forEach((u, i) => push(u, i === 0 ? "主源" : "备用源 " + i));
+      if (fw.version_url) {
+        try { version = String((await fwPickFetchJson(fw.version_url)).tag_name || "").replace(/^[vV]/, "").trim(); }
+        catch (_) { /* 版本仅展示，失败不影响 */ }
+      }
+    }
 
-        if (!url) {
-          if (sizeEl) { sizeEl.textContent = "⚠️ 无下载地址"; sizeEl.style.color = "#c62828"; }
-          return;
-        }
+    const seen = new Set();
+    const unique = [];
+    for (const c of candidates) {
+      if (c.url && !seen.has(c.url)) { seen.add(c.url); unique.push(c); }
+    }
+    return { candidates: unique, version };
+  }
 
+  // 逐个候选地址尝试下载，首个成功即返回
+  async function fwPickDownload(candidates, fwName) {
+    const errors = [];
+    for (const c of candidates) {
+      for (const url of fwPickUrlTries(c.url)) {
         try {
-          let buf;
-          if (IS_GITHUB_PAGES) {
-            const proxyUrl = WORKER_PROXY_URL + "?url=" + encodeURIComponent(url);
-            const r = await fetchWithTimeout(proxyUrl, {}, 60000);
-            if (!r.ok) throw new Error("HTTP " + r.status);
-            buf = new Uint8Array(await r.arrayBuffer());
-          } else {
-            const r = await fetchWithTimeout(url, {}, 60000);
-            if (!r.ok) throw new Error("HTTP " + r.status);
-            buf = new Uint8Array(await r.arrayBuffer());
-          }
+          const viaProxy = url.startsWith(WORKER_PROXY_URL);
+          fwPickSetProgress(0, `${fwName} · ${c.label}${viaProxy ? "（代理）" : ""}...`);
+          const bytes = await fwPickFetchBytes(url, (p) =>
+            fwPickSetProgress(p, `${fwName} · ${c.label} ${Math.round(p * 100)}%`));
+          return { bytes, source: c.label };
+        } catch (e) {
+          fwPickLog(`⚠️ ${c.label} 失败：${e.message}`);
+          errors.push(`${c.label}：${e.message}`);
+        }
+      }
+    }
+    throw new Error(errors.join("；") || "没有可用的下载地址");
+  }
 
-          if (!buf.length || buf.length > proto.FLASH_MSG.APP_MAX_SIZE) {
-            throw new Error(`大小无效：${buf.length} 字节`);
-          }
+  function fwPickSetBusy(key, text) {
+    fwPick.busyKey = key;
+    const box = $("fwPickBusy");
+    if (box) box.style.display = key ? "block" : "none";
+    if (key) fwPickSetProgress(0, text || "");
+  }
+  function fwPickSetProgress(p, text) {
+    if (text) {
+      fwPick.busyText = text;
+      const txt = $("fwPickBusyText");
+      if (txt) txt.textContent = text;
+    }
+    const bar = $("fwPickProgressBar");
+    if (bar) bar.style.width = (Math.min(1, Math.max(0, p)) * 100).toFixed(1) + "%";
+  }
+  function fwPickLog(msg) {
+    const el = $("fwPickStatus");
+    if (el) el.textContent = msg;
+  }
 
-          remoteFwCache.push({ name, version, note: (fw.note || fw.description || fw.body || "").trim(), buf });
+  function fwPickParseManifest(data) {
+    const m = { accel: Array.isArray(data.accel) ? data.accel.filter(Boolean) : [], firmwares: [] };
+    (Array.isArray(data.firmwares) ? data.firmwares : []).forEach((o) => {
+      if (!o || !o.id || !o.name) return;
+      m.firmwares.push({
+        id: String(o.id), name: String(o.name), desc: String(o.desc || ""),
+        kind: String(o.kind || "direct"),
+        sources: Array.isArray(o.sources) ? o.sources.filter(Boolean) : [],
+        source: String(o.source || ""), api: String(o.api || ""),
+        asset_regex: String(o.asset_regex || ""), version_url: String(o.version_url || ""),
+      });
+    });
+    return m;
+  }
 
-          // 更新 UI：显示大小，加点击事件
-          if (sizeEl) {
-            const kb = (buf.length / 1024).toFixed(1);
-            sizeEl.textContent = `✅ ${kb} KB · 点击选择`;
-            sizeEl.style.color = "#1a7f37";
-          }
-          if (itemEl) {
-            itemEl.style.cursor = "pointer";
-            itemEl.addEventListener("click", () => selectRemoteFirmware(i));
-          }
-        } catch (err) {
-          if (sizeEl) { sizeEl.textContent = "❌ 下载失败：" + err.message; sizeEl.style.color = "#c62828"; }
-          log(`固件 ${name} 下载失败：${err.message}`, "err");
-        } finally {
-          done++;
-          status.textContent = `正在下载固件... ${done}/${total}`;
+  async function fwPickLoadManifest() {
+    try {
+      const m = fwPickParseManifest(await fwPickFetchJson(FW_MANIFEST_URL));
+      if (!m.firmwares.length) throw new Error("清单为空");
+      fwPick.manifest = m;
+      fwPick.manifestFromCloud = true;
+      fwPickLog(`固件清单已更新（${m.firmwares.length} 个固件）`);
+    } catch (e) {
+      fwPick.manifest = fwPickParseManifest(FW_MANIFEST_BUILTIN);
+      fwPick.manifestFromCloud = false;
+      fwPickLog("云端清单读取失败（" + e.message + "），使用内置清单");
+    }
+    const el = $("fwPickManifest");
+    if (el) el.textContent = fwPick.manifestFromCloud ? "固件清单：云端（Gitee）" : "固件清单：内置（云端清单读取失败）";
+    if (fwPick.tab === 1 && !fwPick.busyKey) fwPickRenderKnown(); // 下载中不重渲染，避免冲掉进度条
+    // 并发探测展示版本号（失败不影响下载）；相同 URL 只查一次
+    const urlJobs = {};
+    fwPick.manifest.firmwares.forEach((f) => {
+      if (!f.version_url) return;
+      if (!urlJobs[f.version_url]) {
+        urlJobs[f.version_url] = fwPickFetchJson(f.version_url)
+          .then((j) => String((j && j.tag_name) || "").replace(/^[vV]/, "").trim())
+          .catch(() => "");
+      }
+      urlJobs[f.version_url].then((v) => {
+        if (!v) return;
+        fwPick.versions[f.id] = v;
+        if (fwPick.tab === 1 && !fwPick.busyKey) fwPickRenderKnown();
+      });
+    });
+  }
+
+  async function fwPickLoadWorkshop(page) {
+    const listEl = $("fwPickList");
+    if (page === 1) {
+      fwPick.wsLoading = true;
+      listEl.innerHTML = `<div class="fw-pick-empty">加载中…</div>`;
+    } else {
+      if (fwPick.wsLoadingMore || fwPick.wsEnd) return;
+      fwPick.wsLoadingMore = true;
+      const more = $("fwPickMore");
+      if (more) more.textContent = "加载中…";
+    }
+    try {
+      const params = new URLSearchParams({ page: String(page), page_size: String(FW_WS_PAGE_SIZE), category: "firmware" });
+      if (fwPick.appliedQuery) params.set("q", fwPick.appliedQuery);
+      const resp = await fetchWithTimeout(`${FW_WS_FUNC_BASE}/list-workshop?${params}`, { headers: fwPickAnonHeaders() }, 15000);
+      const data = await resp.json();
+      const items = data.items || [];
+      fwPick.wsTotal = data.total || 0;
+      if (page === 1) {
+        fwPick.wsItems = items;
+      } else {
+        const ids = new Set(fwPick.wsItems.map((x) => x.id));
+        fwPick.wsItems = fwPick.wsItems.concat(items.filter((x) => !ids.has(x.id)));
+      }
+      fwPick.wsPage = page;
+      fwPick.wsEnd = items.length === 0 || fwPick.wsItems.length >= fwPick.wsTotal;
+      fwPickRenderWorkshop();
+    } catch (e) {
+      if (page === 1) {
+        listEl.innerHTML = `<div class="fw-pick-empty">工坊加载失败：${fwEsc(e.message)}<br><small>需要能访问 Supabase 的网络，可切换到「知名固件」选项卡</small></div>`;
+      } else {
+        fwPickLog("加载更多失败：" + e.message);
+      }
+    } finally {
+      fwPick.wsLoading = false;
+      fwPick.wsLoadingMore = false;
+    }
+  }
+
+  function fwPickBindItems() {
+    const listEl = $("fwPickList");
+    listEl.querySelectorAll(".fw-pick-item").forEach((el) => {
+      el.addEventListener("click", () => {
+        if (fwPick.busyKey) return;
+        if (el.dataset.kind === "ws") {
+          const item = fwPick.wsItems[parseInt(el.dataset.i, 10)];
+          if (item) fwPickPickWorkshop(item);
+        } else {
+          const manifest = fwPick.manifest || fwPickParseManifest(FW_MANIFEST_BUILTIN);
+          const fw = manifest.firmwares.find((x) => x.id === el.dataset.id);
+          if (fw) fwPickPickKnown(fw);
         }
       });
+    });
+    const more = $("fwPickMore");
+    if (more) more.addEventListener("click", () => {
+      if (!fwPick.wsLoadingMore && !fwPick.wsEnd) fwPickLoadWorkshop(fwPick.wsPage + 1);
+    });
+  }
 
-      await Promise.all(downloadTasks);
-
-      if (remoteFwCache.length > 0) {
-        status.textContent = `✅ ${remoteFwCache.length}/${total} 个固件已就绪，请点击选择`;
-        status.className = "hint ok";
-        log(`远程固件全部就绪：${remoteFwCache.length}/${total}`);
-      } else {
-        status.textContent = "❌ 所有固件下载失败";
-        status.className = "hint err";
-      }
-    } catch (err) {
-      status.textContent = "获取失败：" + err.message;
-      status.className = "hint err";
-      log("远程固件获取失败：" + err.message, "err");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "🔍 获取远程固件";
+  function fwPickRenderWorkshop() {
+    const listEl = $("fwPickList");
+    if (!fwPick.wsItems.length) {
+      listEl.innerHTML = `<div class="fw-pick-empty">${fwPick.appliedQuery ? "没有匹配的作品" : "工坊还没有固件类作品，快来上传第一个吧"}</div>`;
+      return;
     }
-  });
+    let html = fwPick.wsItems.map((it, i) => {
+      const thumb = it.thumbnail_url
+        ? `<img class="fw-pick-thumb" src="${fwEsc(it.thumbnail_url)}" alt="" loading="lazy">`
+        : `<div class="fw-pick-thumb fw-pick-nothumb">💾</div>`;
+      const author = (it.profiles && it.profiles.username) || "匿名";
+      return `<div class="fw-pick-item" data-kind="ws" data-i="${i}" title="${fwEsc(it.title)}">
+        ${thumb}
+        <div class="fw-pick-main">
+          <div class="fw-pick-title">${fwEsc(it.title)}</div>
+          <div class="fw-pick-meta">${fwEsc(author)} · ${fwFmtSize(it.file_size)} · ${it.download_count || 0} 次下载</div>
+        </div>
+        <span class="fw-pick-action">选择</span>
+      </div>`;
+    }).join("");
+    if (!fwPick.wsEnd) html += `<div class="fw-pick-more" id="fwPickMore">${fwPick.wsLoadingMore ? "加载中…" : "加载更多"}</div>`;
+    listEl.innerHTML = html;
+    fwPickBindItems();
+  }
 
-  function selectRemoteFirmware(index) {
-    const fw = remoteFwCache[index];
-    if (!fw) return;
-    fwData = fw.buf;
+  function fwPickRenderKnown() {
+    const listEl = $("fwPickList");
+    if (!fwPick.manifest) {
+      listEl.innerHTML = `<div class="fw-pick-empty">固件清单加载中…</div>`;
+      return;
+    }
+    const q = fwPick.appliedQuery.toLowerCase();
+    const list = fwPick.manifest.firmwares.filter((f) =>
+      !q || f.name.toLowerCase().includes(q) || f.desc.toLowerCase().includes(q));
+    if (!list.length) {
+      listEl.innerHTML = `<div class="fw-pick-empty">没有匹配的固件</div>`;
+      return;
+    }
+    listEl.innerHTML = list.map((f) => {
+      const ver = fwPick.versions[f.id] ? ` <span class="fw-pick-ver">v${fwEsc(fwPick.versions[f.id])}</span>` : "";
+      return `<div class="fw-pick-item" data-kind="kw" data-id="${fwEsc(f.id)}" title="${fwEsc(f.desc)}">
+        <div class="fw-pick-icon">🔧</div>
+        <div class="fw-pick-main">
+          <div class="fw-pick-title">${fwEsc(f.name)}${ver}</div>
+          <div class="fw-pick-meta">${fwEsc(f.desc)}</div>
+        </div>
+        <span class="fw-pick-action">下载</span>
+      </div>`;
+    }).join("");
+    fwPickBindItems();
+  }
+
+  // 校验并把固件填入刷写区（.uvk 容器先解码成裸 bin）
+  function fwPickApply(name, bytes) {
+    let buf = bytes;
+    if (buf.length >= 4 && String.fromCharCode(buf[0], buf[1], buf[2], buf[3]) === "UVK1") {
+      log("检测到 .uvk 容器，解码中...");
+      buf = proto.decodeUvk(buf);
+    }
+    if (!buf.length || buf.length > proto.FLASH_MSG.APP_MAX_SIZE) {
+      throw new Error(`固件大小无效：${buf.length} 字节（主固件应 1~${proto.FLASH_MSG.APP_MAX_SIZE} 字节；多系统槽位固件请到「小闫连不上多系统」卡片单独选择文件）`);
+    }
+    fwData = buf;
     $("btnFlash").disabled = false;
-    // 高亮选中的卡片
-    document.querySelectorAll("#fwReleaseList .fw-release").forEach((el, i) => {
-      el.style.borderColor = i === index ? "#2f6fdc" : "";
-      el.style.background = i === index ? "#f0f6ff" : "";
-    });
-    // 更新按钮文字
-    document.querySelectorAll("#fwReleaseList .fw-asset-size").forEach((el, i) => {
-      if (i === index) {
-        const kb = (fw.buf.length / 1024).toFixed(1);
-        el.textContent = `✅ 已选择 · ${kb} KB`;
-        el.style.color = "#2f6fdc";
-      } else {
-        const cacheItem = remoteFwCache[i];
-        if (cacheItem) {
-          const kb = (cacheItem.buf.length / 1024).toFixed(1);
-          el.textContent = `✅ ${kb} KB · 点击选择`;
-          el.style.color = "#1a7f37";
-        }
-      }
-    });
     const status = $("fwRemoteStatus");
-    status.textContent = `已选择：${fw.name}${fw.version ? " v" + fw.version : ""}（${fw.buf.length} 字节，${Math.ceil(fw.buf.length / 256)} 页），可直接刷写`;
+    status.textContent = `已选择：${name}（${buf.length} 字节，${Math.ceil(buf.length / 256)} 页），可直接刷写`;
     status.className = "hint ok";
-    log(`已选择远程固件：${fw.name}${fw.version ? " v" + fw.version : ""}（${fw.buf.length} 字节）`);
+    log(`已选择远程固件：${name}（${buf.length} 字节）`);
     msRefreshUi();
     btRefreshUi();
   }
 
+  async function fwPickPickWorkshop(item) {
+    fwPickSetBusy("ws:" + item.id, `获取《${item.title}》...`);
+    try {
+      const resp = await fetchWithTimeout(
+        `${FW_WS_FUNC_BASE}/get-workshop-item?id=${encodeURIComponent(item.id)}&include_file=1`,
+        { headers: fwPickAnonHeaders() }, 60000);
+      const data = await resp.json();
+      if (!data.item) throw new Error(data.error || "加载失败");
+      if (!data.file_b64) throw new Error("无法获取文件内容");
+      const bin = atob(data.file_b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      // 下载计数（不阻塞）
+      fetch(`${FW_WS_FUNC_BASE}/bump-download?id=${encodeURIComponent(item.id)}`, { method: "POST", headers: fwPickAnonHeaders() }).catch(() => {});
+      fwPickApply(item.title, bytes);
+      fwPickSetBusy(null); // 先清忙再关窗，否则会被 fwPickClose 的下载中守卫拦下
+      fwPickClose();
+    } catch (e) {
+      fwPickLog("工坊固件获取失败：" + e.message);
+      log(`工坊固件《${item.title}》获取失败：${e.message}`, "err");
+    } finally {
+      fwPickSetBusy(null);
+    }
+  }
+
+  async function fwPickPickKnown(fw) {
+    fwPickSetBusy("kw:" + fw.id, `下载 ${fw.name}...`);
+    try {
+      const { candidates, version } = await fwPickKnownCandidates(fw);
+      if (!candidates.length) throw new Error("该固件没有可用的下载地址");
+      const { bytes, source } = await fwPickDownload(candidates, fw.name);
+      if (bytes.length >= 4 && bytes[0] === 0x55 && bytes[1] === 0x46 && bytes[2] === 0x32 && bytes[3] === 0x0a)
+        throw new Error("该文件是 UF2 刷机包，不能作为固件源");
+      const label = fw.name + (version ? " v" + version : "");
+      log(`已获取知名固件：${label}（${bytes.length} 字节，${source}）`);
+      fwPickApply(label, bytes);
+      fwPickSetBusy(null); // 先清忙再关窗，否则会被 fwPickClose 的下载中守卫拦下
+      fwPickClose();
+    } catch (e) {
+      fwPickLog(`${fw.name} 下载失败：${e.message}`);
+      log(`知名固件 ${fw.name} 下载失败：${e.message}`, "err");
+    } finally {
+      fwPickSetBusy(null);
+    }
+  }
+
+  function fwPickSetTab(tab) {
+    fwPick.tab = tab;
+    document.querySelectorAll("#fwPickerModal .fw-pick-tab").forEach((b) =>
+      b.classList.toggle("active", parseInt(b.dataset.tab, 10) === tab));
+    $("fwPickSearch").placeholder = tab === 0 ? "搜索工坊固件作品" : "搜索固件名称";
+    if (tab === 0) {
+      if (!fwPick.wsItems.length && !fwPick.wsLoading) fwPickLoadWorkshop(1);
+      else fwPickRenderWorkshop();
+    } else {
+      fwPickRenderKnown();
+    }
+  }
+
+  function fwPickOpen() {
+    $("fwPickerModal").classList.add("show");
+    if (!fwPick.manifestLoaded) {
+      fwPick.manifestLoaded = true;
+      fwPickLoadManifest();
+    }
+    fwPickSetTab(fwPick.tab);
+  }
+
+  function fwPickClose() {
+    if (fwPick.busyKey) return; // 下载中不允许关闭（与 APP 一致）
+    $("fwPickerModal").classList.remove("show");
+  }
+
+  $("btnFwList").addEventListener("click", fwPickOpen);
+  $("btnFwPickClose").addEventListener("click", fwPickClose);
+  $("fwPickerModal").addEventListener("click", (e) => {
+    if (e.target === $("fwPickerModal")) fwPickClose();
+  });
+  document.querySelectorAll("#fwPickerModal .fw-pick-tab").forEach((b) =>
+    b.addEventListener("click", () => fwPickSetTab(parseInt(b.dataset.tab, 10))));
+
+  let fwPickSearchTimer = null;
+  function fwPickApplySearch() {
+    const q = $("fwPickSearch").value.trim();
+    if (q === fwPick.appliedQuery) return;
+    fwPick.appliedQuery = q;
+    if (fwPick.tab === 0) fwPickLoadWorkshop(1);
+    else fwPickRenderKnown();
+  }
+  $("fwPickSearch").addEventListener("input", () => {
+    clearTimeout(fwPickSearchTimer);
+    fwPickSearchTimer = setTimeout(fwPickApplySearch, 300);
+  });
+  $("fwPickSearch").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); clearTimeout(fwPickSearchTimer); fwPickApplySearch(); }
+  });
+
   $("btnFlash").addEventListener("click", async () => {
-    if (!port) { setStatus("请先连接串口", "err"); return; }
+    if (!(await ensureConnected())) return;
     if (!fwData) { setStatus("请先选择固件文件", "err"); return; }
 
     $("btnFlash").disabled = true;
@@ -3868,7 +4185,7 @@
         el.textContent = `使用上方已加载固件（${fwData.length} 字节）；也可在下方另选 .bin/.uvk 文件`;
         el.className = "hint ok";
       } else {
-        el.textContent = "尚未选择固件：可点上方「获取远程固件」，或在此选择 .bin/.uvk 文件";
+        el.textContent = "尚未选择固件：可点上方「选择远程固件」，或在此选择 .bin/.uvk 文件";
         el.className = "hint";
       }
     }
@@ -4120,7 +4437,7 @@
         el.textContent = `使用上方已加载固件（${fwData.length} 字节）；也可在下方另选 .bin/.uvk 文件`;
         el.className = "hint ok";
       } else {
-        el.textContent = "尚未选择固件：可点上方「获取远程固件」，或在此选择 .bin/.uvk 文件";
+        el.textContent = "尚未选择固件：可点上方「选择远程固件」，或在此选择 .bin/.uvk 文件";
         el.className = "hint";
       }
     }

@@ -10,10 +10,22 @@
  */
 
 // 允许代理的域名白名单（安全限制）
+// 除 Gitee 外还需覆盖：知名固件清单的 GitHub 直连/JSDelivr 源，
+// 以及清单 accel 里的 GitHub 加速镜像（镜像本身不带 CORS 头，浏览器无法直连）
 const ALLOWED_HOSTS = [
   "gitee.com",
   "raw.giteeusercontent.com",
-  "giteeusercontent.com"
+  "giteeusercontent.com",
+  "github.com",
+  "api.github.com",
+  "raw.githubusercontent.com",
+  "objects.githubusercontent.com",
+  "codeload.github.com",
+  "cdn.jsdelivr.net",
+  "ghfast.top",
+  "gh-proxy.com",
+  "ghproxy.net",
+  "gh.xxooo.cf"
 ];
 
 // 允许的请求来源（根据你的 GitHub Pages 域名调整）

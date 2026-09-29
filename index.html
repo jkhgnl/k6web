@@ -420,16 +420,39 @@ window.addEventListener("load", function () {
   .gps-qr-status.err { color: #c62828; }
   .gps-qr-tip { font-size: 12px; color: #999; margin: 8px 0 0; text-align: left; }
 
-  /* 远程固件列表 */
-  .fw-release { border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; background: #fafbfc; }
-  .fw-release-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-  .fw-release-tag { font-weight: 600; font-size: 14px; color: #2f6fdc; }
-  .fw-release-date { font-size: 12px; color: #888; }
-  .fw-release-body { font-size: 12px; color: #555; white-space: pre-wrap; margin-bottom: 6px; max-height: 60px; overflow: hidden; }
-  .fw-asset { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; background: #fff; border: 1px solid #e8e8e8; border-radius: 4px; margin-top: 4px; }
-  .fw-asset-name { font-size: 13px; font-family: Consolas, monospace; }
-  .fw-asset-size { font-size: 12px; color: #888; margin-left: 8px; }
-  .fw-asset-btn { padding: 4px 10px; font-size: 12px; }
+  /* 固件选择弹窗（创意工坊 / 知名固件） */
+  .fw-pick-panel { max-width: 480px; text-align: left; }
+  .fw-pick-tabs { display: flex; border-bottom: 2px solid #e8ebf0; margin-top: 10px; }
+  .fw-pick-tab {
+    flex: 1; padding: 9px 0; font-size: 14px; font-weight: 600; color: #66707e;
+    background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; cursor: pointer;
+  }
+  .fw-pick-tab.active { color: #2f6fdc; border-bottom-color: #2f6fdc; }
+  .fw-pick-list {
+    max-height: 46vh; min-height: 180px; overflow-y: auto; margin-top: 8px;
+    border: 1px solid #e8ebf0; border-radius: 8px; background: #fafbfc;
+  }
+  .fw-pick-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+    cursor: pointer; border-bottom: 1px solid #eef1f5; background: #fff;
+  }
+  .fw-pick-item:last-child { border-bottom: none; }
+  .fw-pick-item:hover { background: #f0f6ff; }
+  .fw-pick-thumb { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; background: #eef1f5; flex: none; }
+  .fw-pick-nothumb { display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .fw-pick-icon {
+    width: 40px; height: 40px; border-radius: 8px; background: #e8effc; flex: none;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+  }
+  .fw-pick-main { flex: 1; min-width: 0; }
+  .fw-pick-title { font-size: 14px; font-weight: 600; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fw-pick-ver { color: #2f6fdc; font-weight: 500; font-size: 12px; }
+  .fw-pick-meta { font-size: 12px; color: #8a93a3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .fw-pick-action { font-size: 12px; color: #2f6fdc; flex: none; }
+  .fw-pick-more { text-align: center; padding: 10px; font-size: 13px; color: #2f6fdc; cursor: pointer; background: #fff; }
+  .fw-pick-empty { padding: 34px 16px; text-align: center; color: #98a0ad; font-size: 13px; }
+  .fw-pick-busy { margin-top: 8px; }
+  .fw-pick-busy-text { font-size: 12px; color: #555; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* 信道批量写入表格固定列宽 */
   #chPreviewTable { table-layout: fixed; width: 100%; }
   #chPreviewTable th, #chPreviewTable td {
@@ -1531,12 +1554,11 @@ window.addEventListener("load", function () {
 
   <div class="card">
     <h2>获取远程固件</h2>
-    <p class="hint">从固件仓库获取最新固件文件（.bin），下载后自动填入下方刷写区域。</p>
+    <p class="hint">像手机 APP 一样从「创意工坊 / 知名固件」两个来源选择固件，选中后自动下载并填入下方刷写区域。</p>
     <div class="row" style="align-items:flex-end">
-      <button id="btnFwList">🔍 获取远程固件</button>
+      <button id="btnFwList">🔍 选择远程固件</button>
     </div>
-    <div id="fwReleaseList" style="margin-top:8px"></div>
-    <p id="fwRemoteStatus" class="hint" style="min-height:18px"></p>
+    <p id="fwRemoteStatus" class="hint" style="min-height:18px;margin-top:10px"></p>
   </div>
 
   <div class="card">
@@ -2543,11 +2565,31 @@ window.addEventListener("load", function () {
   </div>
 </div>
 
+<!-- 固件选择弹窗（创意工坊 / 知名固件，对齐手机 APP） -->
+<div id="fwPickerModal" class="modal-overlay">
+  <div class="modal-panel fw-pick-panel">
+    <h3>选择固件</h3>
+    <input id="fwPickSearch" type="text" placeholder="搜索工坊固件作品" autocomplete="off">
+    <div class="fw-pick-tabs">
+      <button type="button" class="fw-pick-tab active" data-tab="0">创意工坊</button>
+      <button type="button" class="fw-pick-tab" data-tab="1">知名固件</button>
+    </div>
+    <div id="fwPickList" class="fw-pick-list"></div>
+    <div id="fwPickBusy" class="fw-pick-busy" style="display:none">
+      <div class="fw-pick-busy-text" id="fwPickBusyText"></div>
+      <div class="progress"><div id="fwPickProgressBar"></div></div>
+    </div>
+    <p id="fwPickStatus" class="hint" style="min-height:16px;margin:6px 0 0"></p>
+    <p id="fwPickManifest" class="hint" style="margin:2px 0 10px"></p>
+    <button id="btnFwPickClose" type="button" class="secondary" style="width:100%">关闭</button>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 <script>
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
-  window.K5WEB_VERSION = "2.2.11";
+  window.K5WEB_VERSION = "2.2.12";
 </script>
 <script src="auth.js?v=1.22.6" defer></script>
 <script src="thanks.js?v=1.23.0" defer></script>
@@ -2563,7 +2605,7 @@ window.addEventListener("load", function () {
 <script src="protocol.js?v=16x17" defer></script>
 <script src="coord.js" defer></script>
 <script src="calc.js" defer></script>
-<script src="app.js?v=2.2.11" defer></script>
+<script src="app.js?v=2.2.12" defer></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
   // 侧边栏展开/折叠
