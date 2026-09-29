@@ -319,6 +319,44 @@ window.addEventListener("load", function () {
   .flink-form-status.err { color: #c62828; }
   .flink-form-status.ok { color: #1a7f37; }
 
+  /* 鸣谢页面 */
+  .thx-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+  .thx-title { margin: 0; font-size: 16px; color: #1c2433; }
+  .thx-sub { margin: 4px 0 0; font-size: 12px; color: #8892a0; }
+  .thx-admin-hint { font-size: 12px; color: #b26a00; background: #fff4e5; border: 1px solid #ffe2b8; padding: 6px 10px; border-radius: 8px; margin: 10px 0; }
+  .thx-section { margin-top: 16px; }
+  .thx-section-title { font-size: 14px; font-weight: 700; color: #1c2433; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .thx-section-count { font-size: 12px; font-weight: 500; color: #8892a0; background: #f1f4f9; border-radius: 999px; padding: 2px 9px; }
+  .thx-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+  .thx-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px; background: #f8fafc; border: 1px solid #eef1f5; border-radius: 12px; position: relative; transition: all .18s; }
+  .thx-item:hover { border-color: #d6e2f7; box-shadow: 0 4px 14px rgba(47,111,220,.08); }
+  .thx-avatar { width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .thx-avatar.beta { background: linear-gradient(135deg, #4a90d9, #7fb3ef); }
+  .thx-avatar.sponsor { background: linear-gradient(135deg, #f5a623, #f7c948); }
+  .thx-main { flex: 1; min-width: 0; }
+  .thx-name { font-size: 13px; font-weight: 600; color: #1c2433; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .thx-callsign { font-size: 11px; color: #2f6fdc; background: #eef4fd; border: 1px solid #d6e2f7; border-radius: 5px; padding: 1px 6px; font-weight: 500; }
+  .thx-msg { font-size: 12px; color: #5b6472; margin-top: 4px; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+  .thx-meta { font-size: 11px; color: #a3aab6; margin-top: 3px; }
+  .thx-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .thx-actions button { padding: 5px 9px; font-size: 12px; border-radius: 7px; border: 1px solid #e3e8ef; background: #fff; cursor: pointer; transition: all .15s; }
+  .thx-actions button:hover { border-color: #2f6fdc; color: #2f6fdc; }
+  .thx-actions .danger { color: #c62828; border-color: #f3c7c7; background: #fff5f5; }
+  .thx-actions .danger:hover { background: #c62828; color: #fff; border-color: #c62828; }
+  .thx-empty { text-align: center; color: #97a0ad; font-size: 13px; padding: 18px; background: #fafbfe; border: 1px dashed #e3e8ef; border-radius: 10px; grid-column: 1 / -1; }
+  .thx-loading { text-align: center; color: #8892a0; font-size: 13px; padding: 14px; grid-column: 1 / -1; }
+  .thx-form { margin-top: 16px; padding: 14px; background: #fff; border: 1px solid #eef1f5; border-radius: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .thx-form-title { font-size: 13px; font-weight: 700; color: #1c2433; margin: 0; }
+  .thx-form-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .thx-form-row label { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #555; font-weight: 500; }
+  .thx-form input, .thx-form select, .thx-form textarea { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; font-family: inherit; box-sizing: border-box; background: #fff; }
+  .thx-form input:focus, .thx-form select:focus, .thx-form textarea:focus { outline: none; border-color: #2f6fdc; box-shadow: 0 0 0 3px rgba(47,111,220,.12); }
+  .thx-form textarea { resize: vertical; min-height: 48px; }
+  .thx-form-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+  .thx-form-status { font-size: 12px; flex: 1; text-align: left; }
+  .thx-form-status.err { color: #c62828; }
+  .thx-form-status.ok { color: #1a7f37; }
+
   .visit-bar {
     display: flex; align-items: baseline; justify-content: center; gap: 6px;
     margin-top: 24px; padding: 16px 0;
@@ -1200,6 +1238,11 @@ window.addEventListener("load", function () {
     <div class="nav-group">
       <div class="nav-items">
         <div class="nav-item" data-tab="tabFriends" type="button">友链</div>
+      </div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-items">
+        <div class="nav-item" data-tab="tabThanks" type="button">鸣谢</div>
       </div>
     </div>
     <div class="nav-group">
@@ -2109,6 +2152,65 @@ window.addEventListener("load", function () {
   </div>
 </div>
 
+<div id="tabThanks" class="tabpanel">
+  <h2 class="page-title">鸣谢</h2>
+  <div class="card">
+    <div class="thx-head">
+      <div>
+        <h3 class="thx-title">🙏 鸣谢榜</h3>
+        <p class="thx-sub">感谢每一位参与内测与支持过这个工具的朋友</p>
+      </div>
+      <button id="thanksPageAdd" type="button" class="secondary" style="display:none">＋ 添加鸣谢</button>
+    </div>
+    <div id="thanksPageAdminHint" class="thx-admin-hint" style="display:none">🛠️ 管理员模式：可添加、编辑、删除鸣谢记录</div>
+
+    <!-- 首批内测用户 -->
+    <div class="thx-section">
+      <div class="thx-section-title">🚀 首批内测用户<span id="thxBetaCount" class="thx-section-count"></span></div>
+      <div id="thxBetaList" class="thx-list">
+        <div class="thx-loading">加载中…</div>
+      </div>
+    </div>
+
+    <!-- 赞助支持用户 -->
+    <div class="thx-section">
+      <div class="thx-section-title">☕ 赞助支持用户<span id="thxSponsorCount" class="thx-section-count"></span></div>
+      <div id="thxSponsorList" class="thx-list">
+        <div class="thx-loading">加载中…</div>
+      </div>
+    </div>
+
+    <div id="thanksPageForm" class="thx-form" style="display:none">
+      <p class="thx-form-title" id="thanksPageFormTitle">新增鸣谢</p>
+      <div class="thx-form-row">
+        <label>类别 *
+          <select id="thPageCategory">
+            <option value="sponsor">☕ 赞助支持用户</option>
+            <option value="beta">🚀 首批内测用户</option>
+          </select>
+        </label>
+        <label>姓名 / 昵称
+          <input id="thPageName" type="text" maxlength="40" placeholder="姓名或昵称（与呼号至少填一项）" autocomplete="off">
+        </label>
+        <label>呼号
+          <input id="thPageCallsign" type="text" maxlength="12" placeholder="如 BG2XXX（可选）" autocomplete="off">
+        </label>
+        <label id="thPageAmountLabel">金额（元）
+          <input id="thPageAmount" type="number" min="0" step="0.01" placeholder="可选">
+        </label>
+      </div>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#555;font-weight:500">留言
+        <textarea id="thPageMessage" maxlength="200" rows="2" placeholder="想说的话（可选）"></textarea>
+      </label>
+      <div class="thx-form-actions">
+        <span id="thanksPageFormStatus" class="thx-form-status"></span>
+        <button id="thanksPageFormCancel" type="button" class="secondary">取消</button>
+        <button id="thanksPageFormSave" type="button">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="tabAbout" class="tabpanel">
   <h2 class="page-title">关于</h2>
   <div class="card" style="text-align:center">
@@ -2163,7 +2265,7 @@ window.addEventListener("load", function () {
         <p class="coffee-thanks-form-title" id="coffeeThanksFormTitle">新增鸣谢</p>
         <div class="coffee-thanks-form-row">
           <label>姓名 / 昵称
-            <input id="thName" type="text" maxlength="40" placeholder="赞助者姓名或昵称" autocomplete="off">
+            <input id="thName" type="text" maxlength="40" placeholder="赞助者姓名或昵称（与呼号至少填一项）" autocomplete="off">
           </label>
           <label>呼号
             <input id="thCallsign" type="text" maxlength="12" placeholder="如 BG2XXX（可选）" autocomplete="off">
@@ -2435,10 +2537,11 @@ window.addEventListener("load", function () {
 <script>
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
-  window.K5WEB_VERSION = "2.2.10";
+  window.K5WEB_VERSION = "2.2.11";
 </script>
 <script src="auth.js?v=1.22.6" defer></script>
-<script src="thanks.js?v=1.22.4" defer></script>
+<script src="thanks.js?v=1.23.0" defer></script>
+<script src="thanks-page.js?v=1.0.0" defer></script>
 <script src="friend-links.js?v=1.0.1" defer></script>
 <script src="workshop.js?v=1.23.0" defer></script>
 <script src="comments.js?v=1.13.0" defer></script>
@@ -2450,7 +2553,7 @@ window.addEventListener("load", function () {
 <script src="protocol.js?v=16x17" defer></script>
 <script src="coord.js" defer></script>
 <script src="calc.js" defer></script>
-<script src="app.js?v=2.2.10" defer></script>
+<script src="app.js?v=2.2.11" defer></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
   // 侧边栏展开/折叠
@@ -2521,6 +2624,8 @@ window.addEventListener("load", function () {
   if (window.K5AUTH) K5AUTH.init();
   // 初始化鸣谢榜
   if (window.K5THANKS) K5THANKS.init();
+  // 初始化鸣谢页面
+  if (window.K5THANKSPAGE) K5THANKSPAGE.init();
   // 初始化友情链接
   if (window.K5FRIENDS) K5FRIENDS.init();
   // 初始化创意工坊

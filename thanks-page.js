@@ -1,8 +1,8 @@
 /**
- * K6Web 鸣谢榜 - 请他喝咖啡弹窗内的感谢名单
+ * K6Web 鸣谢页面 - "鸣谢"选项卡内的感谢名单（分组：首批内测用户 / 赞助支持用户）
  * 依赖：window.K5AUTH（auth.js）
  *       window.SUPABASE_URL（index.html 配置）
- * 暴露：window.K5THANKS
+ * 暴露：window.K5THANKSPAGE
  */
 (function () {
   "use strict";
@@ -10,8 +10,10 @@
   const FUNC_BASE = (window.SUPABASE_URL || "").replace(/\/$/, "") + "/functions/v1";
   const $ = (id) => document.getElementById(id);
 
-  let items = [];          // 当前鸣谢列表
+  let items = [];          // 全部鸣谢记录
   let editingId = null;    // null = 新增；非空 = 编辑该记录 id
+
+  const CATEGORY_LABEL = { sponsor: "☕ 赞助支持用户", beta: "🚀 首批内测用户" };
 
   function anonHeaders() {
     const h = { Authorization: "Bearer " + (window.SUPABASE_PUBLISHABLE_KEY || "") };
@@ -50,115 +52,158 @@
   }
 
   // ---------- 列表 ----------
-  // 弹窗鸣谢榜只展示赞助支持用户（beta 内测用户仅在"鸣谢"页面展示）
-  async function loadThanks() {
-    const listEl = $("coffeeThanksList");
-    if (!listEl) return;
-    listEl.innerHTML = `<div class="coffee-thanks-loading">加载中…</div>`;
-    try {
-      const resp = await fetch(`${FUNC_BASE}/list-thanks?category=sponsor`, { headers: anonHeaders() });
+  async function fetchAllItems() {
+    const all = [];
+    let page = 1;
+    // 分页拉全量（单页上限 100）
+    while (true) {
+      const resp = await fetch(`${FUNC_BASE}/list-thanks?page=${page}&page_size=100`, { headers: anonHeaders() });
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       const data = await resp.json();
-      items = data.items || [];
-      renderList();
+      const batch = data.items || [];
+      all.push(...batch);
+      if (all.length >= (data.total || 0) || batch.length < 100) break;
+      page++;
+    }
+    return all;
+  }
+
+  async function loadThanks() {
+    const betaEl = $("thxBetaList");
+    const sponsorEl = $("thxSponsorList");
+    if (!betaEl || !sponsorEl) return;
+    const loading = `<div class="thx-loading">加载中…</div>`;
+    betaEl.innerHTML = loading;
+    sponsorEl.innerHTML = loading;
+    try {
+      items = await fetchAllItems();
+      renderLists();
     } catch (e) {
-      listEl.innerHTML = `<div class="coffee-thanks-empty">鸣谢榜加载失败：${escapeHtml(e.message)}</div>`;
+      const errHtml = `<div class="thx-empty">鸣谢榜加载失败：${escapeHtml(e.message)}</div>`;
+      betaEl.innerHTML = errHtml;
+      sponsorEl.innerHTML = errHtml;
     }
   }
 
-  function renderList() {
-    const listEl = $("coffeeThanksList");
+  function renderList(el, category) {
     const admin = isAdmin(window.K5AUTH.getUser());
-    if (!listEl) return;
+    const list = items.filter((it) => (it.category || "sponsor") === category);
 
-    if (!items.length) {
-      listEl.innerHTML = `<div class="coffee-thanks-empty">还没有鸣谢记录，期待你的名字出现在这里 ☕</div>`;
+    if (!list.length) {
+      el.innerHTML = `<div class="thx-empty">暂无${CATEGORY_LABEL[category].replace(/^\S+\s/, "")}记录${category === "beta" ? "，期待你的加入 🚀" : "，期待你的名字出现在这里 ☕"}</div>`;
       return;
     }
 
-    listEl.innerHTML = items.map((it) => {
+    el.innerHTML = list.map((it) => {
       // 姓名/呼号均可选（后端要求至少一项）：只填其一时不重复展示
       const displayName = it.name || it.callsign || "";
       const callsignHtml = it.name && it.callsign
-        ? `<span class="coffee-callsign">${escapeHtml(it.callsign)}</span>`
+        ? `<span class="thx-callsign">${escapeHtml(it.callsign)}</span>`
         : "";
       const msgHtml = it.message
-        ? `<div class="coffee-thanks-msg">${escapeHtml(it.message)}</div>`
+        ? `<div class="thx-msg">${escapeHtml(it.message)}</div>`
         : "";
-      const metaHtml = `<div class="coffee-thanks-meta">${fmtDate(it.created_at)}${fmtAmount(it.amount)}</div>`;
+      // 内测用户不展示金额
+      const metaHtml = category === "sponsor"
+        ? `<div class="thx-meta">${fmtDate(it.created_at)}${fmtAmount(it.amount)}</div>`
+        : `<div class="thx-meta">${fmtDate(it.created_at)}</div>`;
       const actionsHtml = admin
-        ? `<div class="coffee-thanks-actions">
+        ? `<div class="thx-actions">
              <button type="button" class="edit" data-id="${it.id}" title="编辑">✏️</button>
              <button type="button" class="danger" data-id="${it.id}" title="删除">🗑️</button>
            </div>`
         : "";
+      const avatarIcon = category === "sponsor" ? "☕" : "🚀";
       return `
-        <div class="coffee-thanks-item" data-id="${it.id}">
-          <span class="coffee-thanks-avatar">☕</span>
-          <div class="coffee-thanks-main">
-            <div class="coffee-thanks-name">${escapeHtml(displayName)}${callsignHtml}</div>
+        <div class="thx-item" data-id="${it.id}">
+          <span class="thx-avatar ${category}">${avatarIcon}</span>
+          <div class="thx-main">
+            <div class="thx-name">${escapeHtml(displayName)}${callsignHtml}</div>
             ${msgHtml}${metaHtml}
           </div>
           ${actionsHtml}
         </div>`;
     }).join("");
 
-    // 管理员操作绑定
     if (admin) {
-      listEl.querySelectorAll(".coffee-thanks-actions .edit").forEach((b) => {
+      el.querySelectorAll(".thx-actions .edit").forEach((b) => {
         b.addEventListener("click", () => openForm(items.find((x) => x.id === b.dataset.id)));
       });
-      listEl.querySelectorAll(".coffee-thanks-actions .danger").forEach((b) => {
+      el.querySelectorAll(".thx-actions .danger").forEach((b) => {
         b.addEventListener("click", () => deleteThanks(b.dataset.id));
       });
     }
   }
 
+  function renderLists() {
+    const betaEl = $("thxBetaList");
+    const sponsorEl = $("thxSponsorList");
+    if (!betaEl || !sponsorEl) return;
+    renderList(betaEl, "beta");
+    renderList(sponsorEl, "sponsor");
+
+    const betaCount = items.filter((it) => (it.category || "sponsor") === "beta").length;
+    const sponsorCount = items.length - betaCount;
+    const betaCountEl = $("thxBetaCount");
+    const sponsorCountEl = $("thxSponsorCount");
+    if (betaCountEl) betaCountEl.textContent = betaCount ? `（${betaCount}）` : "";
+    if (sponsorCountEl) sponsorCountEl.textContent = sponsorCount ? `（${sponsorCount}）` : "";
+  }
+
   // ---------- 管理员 UI ----------
   function renderAdminUI() {
     const admin = isAdmin(window.K5AUTH.getUser());
-    const addBtn = $("coffeeThanksAdd");
-    const hint = $("coffeeThanksAdminHint");
+    const addBtn = $("thanksPageAdd");
+    const hint = $("thanksPageAdminHint");
     if (addBtn) addBtn.style.display = admin ? "" : "none";
     if (hint) hint.style.display = admin ? "" : "none";
     // 非管理员时隐藏编辑表单
     if (!admin) hideForm();
-    if (items.length || document.querySelectorAll("#coffeeThanksList .coffee-thanks-empty").length) renderList();
+    // 登录状态变化后重绘操作按钮
+    if (items.length || document.querySelectorAll("#thxBetaList .thx-empty, #thxSponsorList .thx-empty").length) renderLists();
   }
 
   // ---------- 新增 / 编辑表单 ----------
+  function toggleAmountField() {
+    const category = $("thPageCategory").value;
+    $("thPageAmountLabel").style.display = category === "sponsor" ? "" : "none";
+  }
+
   function openForm(item) {
     editingId = item ? item.id : null;
-    const form = $("coffeeThanksForm");
+    const form = $("thanksPageForm");
     if (!form) return;
-    $("coffeeThanksFormTitle").textContent = editingId ? "编辑鸣谢" : "新增鸣谢";
-    $("thName").value = item ? (item.name || "") : "";
-    $("thCallsign").value = item ? (item.callsign || "") : "";
-    $("thAmount").value = item && item.amount != null ? item.amount : "";
-    $("thMessage").value = item ? (item.message || "") : "";
+    $("thanksPageFormTitle").textContent = editingId ? "编辑鸣谢" : "新增鸣谢";
+    $("thPageCategory").value = item ? (item.category || "sponsor") : "sponsor";
+    $("thPageName").value = item ? (item.name || "") : "";
+    $("thPageCallsign").value = item ? (item.callsign || "") : "";
+    $("thPageAmount").value = item && item.amount != null ? item.amount : "";
+    $("thPageMessage").value = item ? (item.message || "") : "";
+    toggleAmountField();
     setFormStatus("", "");
     form.style.display = "flex";
   }
 
   function hideForm() {
-    const form = $("coffeeThanksForm");
+    const form = $("thanksPageForm");
     if (form) form.style.display = "none";
     editingId = null;
   }
 
   function setFormStatus(msg, cls) {
-    const el = $("coffeeThanksFormStatus");
+    const el = $("thanksPageFormStatus");
     if (!el) return;
     el.textContent = msg || "";
-    el.className = "coffee-thanks-form-status" + (cls ? " " + cls : "");
+    el.className = "thx-form-status" + (cls ? " " + cls : "");
   }
 
   // ---------- 保存（新增 POST / 编辑 PUT） ----------
   async function saveThanks() {
-    const name = ($("thName").value || "").trim();
-    const callsign = ($("thCallsign").value || "").trim();
-    const amountRaw = ($("thAmount").value || "").trim();
-    const message = ($("thMessage").value || "").trim();
+    const category = $("thPageCategory").value;
+    const name = ($("thPageName").value || "").trim();
+    const callsign = ($("thPageCallsign").value || "").trim();
+    const amountRaw = ($("thPageAmount").value || "").trim();
+    const message = ($("thPageMessage").value || "").trim();
 
     if (!name && !callsign) { setFormStatus("姓名与呼号至少填一项", "err"); return; }
     if (callsign && !/^[A-Za-z0-9\-/]{2,12}$/.test(callsign)) {
@@ -166,7 +211,7 @@
       return;
     }
     let amount = null;
-    if (amountRaw !== "") {
+    if (category === "sponsor" && amountRaw !== "") {
       const n = Number(amountRaw);
       if (!Number.isFinite(n) || n < 0) { setFormStatus("金额不合法", "err"); return; }
       amount = n;
@@ -176,7 +221,7 @@
     const token = await window.K5AUTH.getToken();
     if (!token) { setFormStatus("登录状态已失效，请重新登录", "err"); window.K5AUTH.openModal(); return; }
 
-    const btn = $("coffeeThanksFormSave");
+    const btn = $("thanksPageFormSave");
     const oldText = btn ? btn.textContent : "";
     if (btn) { btn.disabled = true; btn.textContent = "保存中…"; }
     try {
@@ -190,7 +235,7 @@
           Authorization: "Bearer " + token,
           apikey: window.SUPABASE_PUBLISHABLE_KEY || "",
         },
-        body: JSON.stringify({ name, callsign, amount, message, category: "sponsor" }),
+        body: JSON.stringify({ name, callsign, amount, message, category }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "HTTP " + resp.status);
@@ -232,17 +277,15 @@
 
   // ---------- 初始化 ----------
   function init() {
-    const addBtn = $("coffeeThanksAdd");
-    const cancelBtn = $("coffeeThanksFormCancel");
-    const saveBtn = $("coffeeThanksFormSave");
+    const addBtn = $("thanksPageAdd");
+    const cancelBtn = $("thanksPageFormCancel");
+    const saveBtn = $("thanksPageFormSave");
+    const categorySel = $("thPageCategory");
 
     if (addBtn) addBtn.addEventListener("click", () => openForm(null));
     if (cancelBtn) cancelBtn.addEventListener("click", hideForm);
     if (saveBtn) saveBtn.addEventListener("click", saveThanks);
-
-    // 打开弹窗时刷新榜单
-    const coffeeBtn = $("coffeeBtn");
-    if (coffeeBtn) coffeeBtn.addEventListener("click", () => { renderAdminUI(); loadThanks(); });
+    if (categorySel) categorySel.addEventListener("change", toggleAmountField);
 
     // 登录状态变化时刷新管理员 UI
     if (window.K5AUTH) window.K5AUTH.onAuth(() => renderAdminUI());
@@ -251,5 +294,5 @@
     loadThanks();
   }
 
-  window.K5THANKS = { init, loadThanks, isAdmin };
+  window.K5THANKSPAGE = { init, loadThanks, isAdmin };
 })();

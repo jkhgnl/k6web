@@ -1,9 +1,18 @@
 // 鸣谢榜 - 管理接口（仅管理员 Jkhgnl 可写）
-// POST   { name, callsign, amount, message, display_order }  -> 新增
-// PUT    ?id=xxx + { name, callsign, amount, message, display_order } -> 更新
+// POST   { name?, callsign?, amount, message, category, display_order }  -> 新增（name 与 callsign 至少填一项）
+// PUT    ?id=xxx + { name?, callsign?, amount, message, category, display_order } -> 更新
 // DELETE ?id=xxx  -> 删除
+// category: 'sponsor' = 赞助支持用户（默认）；'beta' = 首批内测用户
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { jsonResponse, getUser, handleOptions } from "../_shared/cors.ts";
+
+const THANKS_CATEGORIES = ["sponsor", "beta"] as const;
+
+function parseCategory(raw: unknown): string | null {
+  if (raw == null || String(raw).trim() === "") return "sponsor";
+  const v = String(raw).trim();
+  return (THANKS_CATEGORIES as readonly string[]).includes(v) ? v : null;
+}
 
 function isAdmin(user: { email?: string; user_metadata?: Record<string, unknown> }): boolean {
   const email = (user.email || "").toLowerCase().trim();
@@ -55,13 +64,15 @@ Deno.serve(async (req) => {
       const callsign = String(body.callsign || "").trim();
       const message = String(body.message || "").trim();
       const displayOrder = body.display_order != null ? parseInt(String(body.display_order), 10) : undefined;
+      const category = parseCategory(body.category);
+      if (!category) return jsonResponse({ error: "类别仅支持 sponsor / beta" }, 400);
       let amount: number | null = null;
       if (body.amount != null && String(body.amount).trim() !== "") {
         const n = Number(body.amount);
         if (!Number.isFinite(n) || n < 0) return jsonResponse({ error: "金额不合法" }, 400);
         amount = n;
       }
-      if (!name) return jsonResponse({ error: "姓名必填" }, 400);
+      if (!name && !callsign) return jsonResponse({ error: "姓名与呼号至少填一项" }, 400);
       if (name.length > 40) return jsonResponse({ error: "姓名不超过 40 字符" }, 400);
       if (callsign && !/^[A-Za-z0-9\-\/]{2,12}$/.test(callsign)) {
         return jsonResponse({ error: "呼号格式不合法（2-12 位字母/数字/-//，如 BG2XXX）" }, 400);
@@ -74,6 +85,7 @@ Deno.serve(async (req) => {
         callsign: callsign ? callsign.toUpperCase() : null,
         amount,
         message: message || null,
+        category,
       };
       if (Number.isFinite(displayOrder as number)) updates.display_order = displayOrder;
 
@@ -81,7 +93,7 @@ Deno.serve(async (req) => {
         .from("thanks")
         .update(updates)
         .eq("id", id)
-        .select("id, name, callsign, amount, message, display_order, created_at")
+        .select("id, name, callsign, amount, message, category, display_order, created_at")
         .single();
       if (error) throw error;
       return jsonResponse({ item: data });
@@ -94,13 +106,15 @@ Deno.serve(async (req) => {
       const callsign = String(body.callsign || "").trim();
       const message = String(body.message || "").trim();
       const displayOrder = body.display_order != null ? parseInt(String(body.display_order), 10) : 0;
+      const category = parseCategory(body.category);
+      if (!category) return jsonResponse({ error: "类别仅支持 sponsor / beta" }, 400);
       let amount: number | null = null;
       if (body.amount != null && String(body.amount).trim() !== "") {
         const n = Number(body.amount);
         if (!Number.isFinite(n) || n < 0) return jsonResponse({ error: "金额不合法" }, 400);
         amount = n;
       }
-      if (!name) return jsonResponse({ error: "姓名必填" }, 400);
+      if (!name && !callsign) return jsonResponse({ error: "姓名与呼号至少填一项" }, 400);
       if (name.length > 40) return jsonResponse({ error: "姓名不超过 40 字符" }, 400);
       if (callsign && !/^[A-Za-z0-9\-\/]{2,12}$/.test(callsign)) {
         return jsonResponse({ error: "呼号格式不合法（2-12 位字母/数字/-//，如 BG2XXX）" }, 400);
@@ -115,9 +129,10 @@ Deno.serve(async (req) => {
           callsign: callsign ? callsign.toUpperCase() : null,
           amount,
           message: message || null,
+          category,
           display_order: Number.isFinite(displayOrder) ? displayOrder : 0,
         })
-        .select("id, name, callsign, amount, message, display_order, created_at")
+        .select("id, name, callsign, amount, message, category, display_order, created_at")
         .single();
       if (error) throw error;
       return jsonResponse({ item: data }, 201);
