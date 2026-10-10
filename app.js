@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  const K5WEB_VERSION = "2.2.12";
+  const K5WEB_VERSION = "2.2.13";
   window.K5WEB_VERSION = K5WEB_VERSION;
 
   // GitHub Pages 模式：检测是否运行在无后端的静态托管环境（含自定义域名）
@@ -1069,84 +1069,183 @@
   });
 
 
-  // ---------- 计算过境 ----------
+  // ---------- 计算过境（最近 7 天全部过境，用户选择其一写入） ----------
+  // passList: findPasses 的过境概要数组；选中后用 buildEntries 生成逐秒频率表。
+  let passList = [];
+  let passSelected = -1;
+
+  const showCalcErr = (msg) => {
+    const r = $("result");
+    r.style.display = "block";
+    r.innerHTML = `<span class="err"><b>⚠️ ${msg}</b></span>`;
+    passList = [];
+    passSelected = -1;
+    passData = null;
+    $("btnWrite").disabled = true;
+    $("btnEphemExport").disabled = true;
+    $("btnEphemExportCsv").disabled = true;
+    setStatus(msg, "err");
+  };
+
+  // 固定按 Asia/Shanghai 显示，与系统时区无关（对比 Look4Sat 时不串时区）。
+  // AOS/LOS 已 round 到整秒，与 Look4Sat 的 aos/los 取整方式一致。
+  // withDate=false 时只显示 时:分:秒（同一天内省略日期）。
+  const fmtBj = (d, withDate = true) => {
+    const bj = new Date(Math.round(d.getTime() / 1000) * 1000 + 8 * 3600 * 1000);
+    const p = (n, l = 2) => String(n).padStart(l, "0");
+    const day = `${p(bj.getUTCMonth() + 1)}-${p(bj.getUTCDate())}`;
+    const time = `${p(bj.getUTCHours())}:${p(bj.getUTCMinutes())}:${p(bj.getUTCSeconds())}`;
+    return withDate ? `${day} ${time}` : time;
+  };
+  const weekdayBj = (d) => {
+    const bj = new Date(d.getTime() + 8 * 3600 * 1000);
+    return "日一二三四五六"[bj.getUTCDay()];
+  };
+  // 16 方位中文罗盘名（AOS→LOS 轨迹描述用）
+  const COMPASS16 = ["北", "北偏东", "东北", "东偏北", "东", "东偏南", "东南", "南偏东",
+                     "南", "南偏西", "西南", "西偏南", "西", "西偏北", "西北", "北偏西"];
+  const azToCompass = (deg) => COMPASS16[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
+
+  function isSameDay(a, b) {
+    const ba = new Date(a.getTime() + 8 * 3600 * 1000), bb = new Date(b.getTime() + 8 * 3600 * 1000);
+    return ba.getUTCFullYear() === bb.getUTCFullYear() && ba.getUTCMonth() === bb.getUTCMonth() && ba.getUTCDate() === bb.getUTCDate();
+  }
+
+  function renderPassDetail() {
+    const det = $("passDetail");
+    if (!det || passSelected < 0 || !passData) return;
+    const first = passData.entries[0], last = passData.entries[passData.entries.length - 1];
+    const truncatedNote = passList[passSelected].truncated
+      ? `<span class="err">⚠️ 过境超过 17 分钟，频率表已截断，跟踪会提前结束。</span><br>` : "";
+    det.innerHTML =
+      `<b>已选过境（北京时间）：</b>${fmtBj(passData.start)} → ${fmtBj(passData.end, !isSameDay(passData.start, passData.end))}<br>` +
+      `时长 ${passData.durationS}s，频率表 ${passData.entries.length} 条（每秒）<br>` +
+      `下行 ${(first.downlink / 1e5).toFixed(5)} ~ ${(last.downlink / 1e5).toFixed(5)} MHz<br>` +
+      `上行 ${(first.uplink / 1e5).toFixed(5)} ~ ${(last.uplink / 1e5).toFixed(5)} MHz<br>` +
+      truncatedNote +
+      `<span class="ok">可以写入。写入后请在过境开始前开机，长按 0 输入当前北京时间开始跟踪。</span>`;
+  }
+
+  function renderPassList() {
+    const r = $("result");
+    r.style.display = "block";
+    const now = Date.now();
+    const items = passList.map((p, i) => {
+      const dur = Math.round((p.end.getTime() - p.start.getTime()) / 1000);
+      const ongoing = p.start.getTime() <= now && now <= p.end.getTime();
+      const sameDay = isSameDay(p.start, p.end);
+      const meta = `最高仰角 ${p.maxElevationDeg.toFixed(0)}° · ${azToCompass(p.aosAzimuthDeg)}→${azToCompass(p.losAzimuthDeg)} · ${dur} 秒`
+        + (p.truncated ? ` · <span class="err">超 17 分钟将截断</span>` : "");
+      return `<div class="pass-item${i === passSelected ? " selected" : ""}" data-idx="${i}">` +
+        `<div class="pass-item-time">${fmtBj(p.start)} → ${fmtBj(p.end, !sameDay)}` +
+        `（周${weekdayBj(p.start)}${ongoing ? ` <span class="pass-ongoing">进行中</span>` : ""}）</div>` +
+        `<div class="pass-item-meta">${meta}</div>` +
+        `</div>`;
+    }).join("");
+    r.innerHTML =
+      `<div><b>未来 7 天共 ${passList.length} 次过境</b>（北京时间，点击选择要写入的过境）</div>` +
+      `<div class="pass-list">${items}</div>` +
+      `<div id="passDetail" class="result" style="margin-top:8px"></div>`;
+    renderPassDetail();
+  }
+
+  function selectPass(i) {
+    try {
+      const fUp = parseFloat($("fUp").value);
+      const fDown = parseFloat($("fDown").value);
+      if (isNaN(fUp) || isNaN(fDown) || fUp <= 0 || fDown <= 0) {
+        setStatus("上行/下行频率无效，无法生成频率表", "err");
+        return;
+      }
+      passData = passList[i].buildEntries(fUp, fDown);
+      passSelected = i;
+      $("btnWrite").disabled = false;
+      $("btnEphemExport").disabled = false;
+      $("btnEphemExportCsv").disabled = false;
+      // 更新选中态样式
+      document.querySelectorAll("#result .pass-item").forEach((el) => {
+        el.classList.toggle("selected", Number(el.dataset.idx) === i);
+      });
+      renderPassDetail();
+      log(`选择过境 ${fmtBj(passData.start)} → ${fmtBj(passData.end)}（北京时间），${passData.entries.length} 条`);
+      setStatus(`已选择 ${fmtBj(passData.start)} 的过境，可写入或导出`, "ok");
+    } catch (e) {
+      setStatus("生成频率表失败：" + e.message, "err");
+    }
+  }
+
+  // 频率改动后自动重建已选过境的频率表（过境概要与时刻不受频率影响）
+  ["fUp", "fDown"].forEach((id) =>
+    $(id).addEventListener("change", () => { if (passSelected >= 0 && passList[passSelected]) selectPass(passSelected); }));
+
   $("btnCalc").addEventListener("click", () => {
-    const showErr = (msg) => {
-      const r = $("result");
-      r.style.display = "block";
-      r.innerHTML = `<span class="err"><b>⚠️ ${msg}</b></span>`;
-      setStatus(msg, "err");
-    };
     const tle = $("tle").value.trim().split(/\r?\n/);
     if (tle.length < 2 || !tle[0].trim()) {
-      showErr("请先获取 TLE（点上方 ⬇️ 获取 TLE 按钮）或手动粘贴两行 TLE");
+      showCalcErr("请先获取 TLE（点上方 ⬇️ 获取 TLE 按钮）或手动粘贴两行 TLE");
       return;
     }
     const lat = parseFloat($("lat").value), lon = parseFloat($("lon").value);
     if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-      showErr("观测位置经纬度无效（纬度 -90~90，经度 -180~180）");
+      showCalcErr("观测位置经纬度无效（纬度 -90~90，经度 -180~180）");
       return;
     }
     const minEl = parseFloat($("minEl").value);
     if (isNaN(minEl) || minEl < 0 || minEl > 90) {
-      showErr("最低仰角无效（0~90）");
+      showCalcErr("最低仰角无效（0~90）");
       return;
     }
     const btn = $("btnCalc");
     btn.disabled = true;
     btn.textContent = "⏳ 计算中...";
-    // 先渲染"计算中"，再同步执行 SGP4 解算
+    // 先渲染"计算中"，再同步执行 SGP4 解算（7 天扫描约几十毫秒）
     setTimeout(() => {
     try {
-      const pass = calc.findPass({
+      const passes = calc.findPasses({
         tle1: tle[0],
         tle2: tle[1],
         latDeg: lat,
         lonDeg: lon,
         altKm: (parseFloat($("alt").value) || 0) / 1000,
-        uplinkMHz: parseFloat($("fUp").value),
-        downlinkMHz: parseFloat($("fDown").value),
         minElevation: parseFloat($("minEl").value) || 0,
         searchStart: new Date(),
-        maxSearchHours: 24,
+        maxSearchHours: 7 * 24,
         maxPassSeconds: 32 * 60,
       });
-      if (!pass) {
-        showErr("未来 24 小时内未找到可见过境。检查：TLE 是否当天最新、经纬度是否正确");
-        btn.disabled = false;
-        btn.textContent = "🔭 计算最近过境";
+      if (!passes.length) {
+        showCalcErr("未来 7 天内未找到可见过境。检查：TLE 是否当天最新、经纬度是否正确");
         return;
       }
-      passData = pass;
-      const r = $("result");
-      r.style.display = "block";
-      // 固定按 Asia/Shanghai 显示，与系统时区无关（对比 Look4Sat 时不串时区）。
-      // 内部 AOS/LOS 精度 0.1s（calc.js 插值），UI 显示仍按秒（round 到整秒，
-      // 与 Look4Sat 的 aos 取整方式一致）。
-      const fmt = (d) => {
-        const bj = new Date(Math.round(d.getTime() / 1000) * 1000 + 8 * 3600 * 1000);
-        const p = (n, l = 2) => String(n).padStart(l, "0");
-        return `${bj.getUTCFullYear()}-${p(bj.getUTCMonth() + 1)}-${p(bj.getUTCDate())} ${p(bj.getUTCHours())}:${p(bj.getUTCMinutes())}:${p(bj.getUTCSeconds())}`;
-      };
-      const first = pass.entries[0], last = pass.entries[pass.entries.length - 1];
-      r.innerHTML =
-        `<b>过境时间（北京时间）：</b>${fmt(pass.start)} → ${fmt(pass.end)}<br>` +
-        `时长 ${pass.durationS}s，频率表 ${pass.entries.length} 条（每秒）<br>` +
-        `下行 ${(first.downlink / 1e5).toFixed(5)} ~ ${(last.downlink / 1e5).toFixed(5)} MHz<br>` +
-        `上行 ${(first.uplink / 1e5).toFixed(5)} ~ ${(last.uplink / 1e5).toFixed(5)} MHz<br>` +
-        `<span class="ok">可以写入。写入后请在过境开始前开机，长按 0 输入当前北京时间开始跟踪。</span>`;
-      $("btnWrite").disabled = false;
-      $("btnEphemExport").disabled = false;
-      $("btnEphemExportCsv").disabled = false;
-      log(`过境 ${fmt(pass.start)} → ${fmt(pass.end)}（北京时间），${pass.entries.length} 条`);
+      passList = passes;
+      passSelected = -1;
+      passData = null;
+      $("btnWrite").disabled = true;
+      $("btnEphemExport").disabled = true;
+      $("btnEphemExportCsv").disabled = true;
+      renderPassList();
+      // 事件委托：点击列表项选择过境
+      r_bindOnce();
+      log(`7 日内共 ${passes.length} 次过境`);
+      setStatus(`已计算 7 日内 ${passes.length} 次过境，点击选择要写入的过境`, "info");
     } catch (e) {
-      showErr("计算失败：" + e.message);
+      showCalcErr("计算失败：" + e.message);
       log("计算异常：" + e.stack);
     }
     btn.disabled = false;
-    btn.textContent = "🔭 计算最近过境";
+    btn.textContent = "🔭 计算 7 日过境";
     }, 30);
   });
+
+  // passList 容器点击绑定一次即可（列表内容变化不影响委托监听）
+  let passListBound = false;
+  function r_bindOnce() {
+    if (passListBound) return;
+    passListBound = true;
+    $("result").addEventListener("click", (e) => {
+      const item = e.target.closest(".pass-item");
+      if (!item || !$("result").contains(item)) return;
+      selectPass(Number(item.dataset.idx));
+    });
+  }
 
   // ---------- 串口 ----------
   // readerAlive：读取循环是否健在。设备断电重枚举（如按住 PTT 重启进刷机模式）

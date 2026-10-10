@@ -1180,6 +1180,44 @@ window.addEventListener("load", function () {
     white-space: nowrap;
   }
 
+  /* ---------- 7 日过境列表（计算过境结果） ---------- */
+  .pass-list {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 340px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 6px;
+    background: #fafafa;
+  }
+  .pass-item {
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    background: #fff;
+    transition: all .15s ease;
+    user-select: none;
+  }
+  .pass-item:hover { border-color: #93b4f0; background: #eef4ff; }
+  .pass-item.selected {
+    border-color: #2f6fdc;
+    background: #eef4ff;
+    box-shadow: 0 1px 6px rgba(47,111,220,.25);
+  }
+  .pass-item-time { font-size: 13px; font-weight: 600; color: #222; }
+  .pass-item.selected .pass-item-time { color: #2f6fdc; }
+  .pass-item-meta { font-size: 11.5px; color: #888; margin-top: 2px; }
+  .pass-ongoing {
+    color: #c62828;
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: 4px;
+  }
+
   </style>
 </head>
 <body>
@@ -1894,7 +1932,7 @@ window.addEventListener("load", function () {
       <div id="map" style="height:320px;border:1px solid #bbb;border-radius:6px"></div>
       <p style="font-size:12px;color:#888;margin:4px 0 0">点击地图选点，经纬度自动填入并查询海拔（地图为高德 GCJ-02，已自动转 WGS-84）</p>
     </div>
-    <button id="btnCalc" style="margin-top:10px">🔭 计算最近过境</button>
+    <button id="btnCalc" style="margin-top:10px">🔭 计算 7 日过境</button>
     <div id="result" class="result" style="display:none"></div>
   </div>
 
@@ -1939,7 +1977,7 @@ window.addEventListener("load", function () {
 
   <div class="card">
     <h2>4. 导出星历到电脑（调试诊断）</h2>
-    <p class="hint">把当前计算出的过境星历（TLE、观测位置、过境窗口、每秒补偿频率表）导出为文件，便于核对计算、与其他软件对比、存档分析。<b>无需连接对讲机</b>，先在上方完成"计算最近过境"即可导出。JSON 含全部参数，CSV 可直接用 Excel 打开查看频率表。</p>
+    <p class="hint">把当前选中的过境星历（TLE、观测位置、过境窗口、每秒补偿频率表）导出为文件，便于核对计算、与其他软件对比、存档分析。<b>无需连接对讲机</b>，先在上方完成"计算 7 日过境"并点击选择过境即可导出。JSON 含全部参数，CSV 可直接用 Excel 打开查看频率表。</p>
     <div class="row" style="margin-top:8px">
       <button id="btnEphemExport" disabled type="button" style="flex:1">📤 导出星历 JSON</button>
       <button id="btnEphemExportCsv" disabled type="button" style="flex:1">📊 导出频率表 CSV</button>
@@ -2589,7 +2627,7 @@ window.addEventListener("load", function () {
 <script>
   window.SUPABASE_URL = "https://cvlrmxqaidnyvsexyesf.supabase.co";
   window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rkRLxx4SMTxhtS0VfxYhug_OwQZaKJO";
-  window.K5WEB_VERSION = "2.2.12";
+  window.K5WEB_VERSION = "2.2.13";
 </script>
 <script src="auth.js?v=1.22.6" defer></script>
 <script src="thanks.js?v=1.23.0" defer></script>
@@ -2604,8 +2642,8 @@ window.addEventListener("load", function () {
 <script src="lazyload.js" defer></script>
 <script src="protocol.js?v=16x17" defer></script>
 <script src="coord.js" defer></script>
-<script src="calc.js" defer></script>
-<script src="app.js?v=2.2.12" defer></script>
+<script src="calc.js?v=2.2.13" defer></script>
+<script src="app.js?v=2.2.13" defer></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
   // 侧边栏展开/折叠

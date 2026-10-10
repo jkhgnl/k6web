@@ -102,16 +102,60 @@ function downlinkFreq(fDownHz, vr) {
   return fDownHz * (1 - vr / C_KM_S);
 }
 
+/** 过境表条数上限：1020 条（约 17 分钟），与固件单个 16 KB 星历槽的容量一致。 */
+const MAX_TABLE_ENTRIES = 1020;
+
 /**
- * 从 t0 起查找最近一次可见过境窗口（仰角 > minElevation 度）。
- * 返回 { start: Date, end: Date, entries: [{unix, uplink, downlink}] }
- * entries 每秒一条（多普勒已补偿，10Hz 单位），最多 1020 条（约 17 分钟，
- * 与固件单个 16 KB 星历槽的容量一致）。
+ * 生成一次过境的 1 s 步进频率表（多普勒已补偿，10Hz 单位）。
+ * 表起点 floor 到整秒：start_unix 是整秒，固件按整秒索引（index = now - start_unix），
+ * AOS 的亚秒小数只用于过境时刻报告（pass.start/end），不进表。
+ * 最多 MAX_TABLE_ENTRIES 条（sum_time + 1 条，包含首尾，供固件插值）。
  */
-function findPass({
+function buildPassEntries(satrec, obsGd, obsEcf, uplinkMHz, downlinkMHz, passStart, passEnd) {
+  const entries = [];
+  const durS = Math.min(MAX_TABLE_ENTRIES - 1, Math.round((passEnd.getTime() - passStart.getTime()) / 1000));
+  const count = Math.min(MAX_TABLE_ENTRIES, durS + 1);
+  const tableStartMs = Math.floor(passStart.getTime() / 1000) * 1000;
+  for (let i = 0; i < count; i++) {
+    const date = new Date(tableStartMs + i * 1000);
+    const pv = satellite.propagate(satrec, date);
+    if (pv.position === undefined || pv.velocity === undefined) {
+      entries.push({ unix: 0, uplink: 0, downlink: 0, altitudeKm: 0, distanceKm: 0, azimuthDeg: 0, elevationDeg: 0 });
+      continue;
+    }
+    // 观测者 ECI 位置随地球自转变化，按时刻精确计算（见模块级 observerEci）。
+    const vr = radialVelocity(pv.position, pv.velocity, observerEci(obsEcf, date));
+    const posEcf = satellite.eciToEcf(pv.position, satellite.gstime(date));
+    const look = lookAngles(posEcf, obsEcf, obsGd.longitude, obsGd.latitude);
+    entries.push({
+      unix: Math.round(date.getTime() / 1000),
+      uplink: Math.round(uplinkFreq(uplinkMHz * 1e6, vr) / 10),
+      downlink: Math.round(downlinkFreq(downlinkMHz * 1e6, vr) / 10),
+      altitudeKm: look.altitudeKm,
+      distanceKm: look.distanceKm,
+      azimuthDeg: look.azimuthDeg,
+      elevationDeg: look.elevationDeg,
+    });
+  }
+  return { entries, durationS: durS };
+}
+
+/**
+ * 从 t0 起查找 [searchStart, searchStart + maxSearchHours) 内的所有可见过境
+ * （仰角 > minElevation 度），供用户从中挑选一次再写入星历。
+ *
+ * 两阶段：本函数只做粗扫 + AOS/LOS 细化，每个过境附带扫描期得到的最大仰角、
+ * 方位等概要信息，**不生成逐秒频率表**（7 天几十次过境全表太慢、占内存）。
+ * 用户选定后用返回对象上的 buildEntries(uplinkMHz, downlinkMHz) 生成与旧
+ * findPass 相同结构的表 { start, end, durationS, entries }。
+ *
+ * 返回按开始时间排序的数组 [{ start, end, durationS, maxElevationDeg,
+ * maxAzimuthDeg, aosAzimuthDeg, losAzimuthDeg, truncated, buildEntries }]，
+ * 无过境返回空数组。maxSearchHours 默认 24（最近一天），7 天传 7*24。
+ */
+function findPasses({
   tle1, tle2,
   latDeg, lonDeg, altKm,
-  uplinkMHz, downlinkMHz,
   minElevation = 0,
   searchStart = new Date(),
   maxSearchHours = 24,
@@ -124,11 +168,6 @@ function findPass({
     height: altKm,
   };
   const obsEcf = satellite.geodeticToEcf(obsGd);
-
-  // 观测者 ECI 位置随地球自转变化，按时刻精确计算（见模块级 observerEci）。
-  function obsEciAt(date) {
-    return observerEci(obsEcf, date);
-  }
 
   function elevationAt(date) {
     const pv = satellite.propagate(satrec, date);
@@ -145,83 +184,111 @@ function findPass({
     return satellite.radiansToDegrees(Math.asin(topZ / range));
   }
 
-  // 粗扫（10 s 步进）找首个可见时刻
-  const stepMs = 10 * 1000;
-  const end = new Date(searchStart.getTime() + maxSearchHours * 3600 * 1000);
-  let t = new Date(searchStart.getTime());
-  let coarseStart = null;
-  for (; t < end; t = new Date(t.getTime() + stepMs)) {
-    const el = elevationAt(t);
-    if (el !== null && el > minElevation) { coarseStart = t; break; }
-  }
-  if (!coarseStart) return null;
-
-  // 细化窗口开始（Look4Sat 同款算法：500ms 步进找首个越过 minElevation 的格点，
-  // 不插值；再四舍五入到整秒。若计算时过境已在进行中，最多回溯 32 分钟找到真实 AOS）。
-  const backLimit = new Date(coarseStart.getTime() - maxPassSeconds * 1000);
-  let passStart = coarseStart;
-  for (let tt = new Date(coarseStart.getTime() - 500); tt >= backLimit; tt = new Date(tt.getTime() - 500)) {
-    const el = elevationAt(tt);
-    if (el === null) { passStart = new Date(tt.getTime() + 500); break; }
-    if (el <= minElevation) {
-      // 取跨越点之后的第一个格点（首个 > minElevation 的 500ms 格点）
-      passStart = new Date(tt.getTime() + 500);
-      break;
-    }
-    passStart = tt;
-  }
-  // Look4Sat: aos = 1000 * ((time + 500) / 1000)，四舍五入到整秒
-  passStart = new Date(Math.round(passStart.getTime() / 1000) * 1000);
-
-  // 细化窗口结束（Look4Sat 同款：500ms 步进，首个回落格点，四舍五入到整秒）
-  const maxEnd = new Date(passStart.getTime() + maxPassSeconds * 1000);
-  let passEnd = maxEnd;
-  for (let tt = new Date(passStart.getTime() + 500); tt < maxEnd; tt = new Date(tt.getTime() + 500)) {
-    const el = elevationAt(tt);
-    if (el === null) { continue; }
-    if (el <= minElevation) {
-      passEnd = tt;
-      break;
-    }
-  }
-  // Look4Sat: los = 1000 * ((time + 500) / 1000)，四舍五入到整秒
-  passEnd = new Date(Math.round(passEnd.getTime() / 1000) * 1000);
-
-  // 生成 1 s 步进表（sum_time + 1 条，包含首尾，供固件插值）。
-  // 表起点 floor 到整秒：start_unix 是整秒，固件按整秒索引（index = now - start_unix），
-  // AOS 的亚秒小数只用于过境时刻报告（pass.start/end），不进表。
-  const entries = [];
-  const durS = Math.min(1019, Math.round((passEnd.getTime() - passStart.getTime()) / 1000));
-  const count = Math.min(1020, durS + 1);
-  const tableStartMs = Math.floor(passStart.getTime() / 1000) * 1000;
-  for (let i = 0; i < count; i++) {
-    const date = new Date(tableStartMs + i * 1000);
+  // 观测方位角（0..360 度），用于过境概览
+  function azimuthAt(date) {
     const pv = satellite.propagate(satrec, date);
-    if (pv.position === undefined || pv.velocity === undefined) {
-      entries.push({ unix: 0, uplink: 0, downlink: 0, altitudeKm: 0, distanceKm: 0, azimuthDeg: 0, elevationDeg: 0 });
-      continue;
-    }
-    const vr = radialVelocity(pv.position, pv.velocity, obsEciAt(date));
+    if (pv.position === undefined) return 0;
     const posEcf = satellite.eciToEcf(pv.position, satellite.gstime(date));
-    const look = lookAngles(posEcf, obsEcf, obsGd.longitude, obsGd.latitude);
-    entries.push({
-      unix: Math.round(date.getTime() / 1000),
-      uplink: Math.round(uplinkFreq(uplinkMHz * 1e6, vr) / 10),
-      downlink: Math.round(downlinkFreq(downlinkMHz * 1e6, vr) / 10),
-      altitudeKm: look.altitudeKm,
-      distanceKm: look.distanceKm,
-      azimuthDeg: look.azimuthDeg,
-      elevationDeg: look.elevationDeg,
+    const lam = obsGd.longitude, phi = obsGd.latitude;
+    const east = -Math.sin(lam) * (posEcf.x - obsEcf.x) + Math.cos(lam) * (posEcf.y - obsEcf.y);
+    const north = -Math.sin(phi) * Math.cos(lam) * (posEcf.x - obsEcf.x)
+                - Math.sin(phi) * Math.sin(lam) * (posEcf.y - obsEcf.y)
+                + Math.cos(phi) * (posEcf.z - obsEcf.z);
+    let az = satellite.radiansToDegrees(Math.atan2(east, north));
+    if (az < 0) az += 360;
+    return az;
+  }
+
+  const passes = [];
+
+  // 粗扫（10 s 步进）：状态机跟踪 不可见 -> 可见 的上升沿，逐个过境切段。
+  // 可见段内同时记录最大仰角及对应时刻、首末可见格点的方位。
+  const stepMs = 10 * 1000;
+  const searchEnd = new Date(searchStart.getTime() + maxSearchHours * 3600 * 1000);
+  let seg = null; // { coarseStart, maxEl, maxElAt, lastEl }
+  for (let t = new Date(searchStart.getTime()); t < searchEnd; t = new Date(t.getTime() + stepMs)) {
+    const el = elevationAt(t);
+    const visible = el !== null && el > minElevation;
+    if (visible) {
+      if (!seg) {
+        seg = { coarseStart: t, maxEl: el, maxElAt: t, lastEl: el };
+      } else {
+        if (el > seg.maxEl) { seg.maxEl = el; seg.maxElAt = t; }
+        seg.lastEl = el;
+      }
+    } else if (seg) {
+      passes.push(seg);
+      seg = null;
+    }
+  }
+  if (seg) passes.push(seg); // 搜索窗结束时过境仍在进行
+
+  // 对每个过境细化 AOS/LOS（Look4Sat 同款算法：500ms 步进找首个越过
+  // minElevation 的格点，不插值；再四舍五入到整秒）。
+  // 回溯下限取 两者的较大值：
+  //   - coarseStart - maxPassSeconds（与旧 findPass 相同，过境进行中可回溯到真实 AOS）
+  //   - 上一个过境细化后的 LOS（防止回溯落进前一个可见段，产生重叠过境；
+  //     首段之前没有已收集过境，不设此限）
+  const result = [];
+  for (const seg of passes) {
+    const prevEndMs = result.length ? result[result.length - 1].end.getTime() : -Infinity;
+    const backLimit = new Date(Math.max(seg.coarseStart.getTime() - maxPassSeconds * 1000, prevEndMs));
+    let passStart = seg.coarseStart;
+    for (let tt = new Date(seg.coarseStart.getTime() - 500); tt >= backLimit; tt = new Date(tt.getTime() - 500)) {
+      const el = elevationAt(tt);
+      if (el === null) { passStart = new Date(tt.getTime() + 500); break; }
+      if (el <= minElevation) {
+        // 取跨越点之后的第一个格点（首个 > minElevation 的 500ms 格点）
+        passStart = new Date(tt.getTime() + 500);
+        break;
+      }
+      passStart = tt;
+    }
+    // Look4Sat: aos = 1000 * ((time + 500) / 1000)，四舍五入到整秒
+    passStart = new Date(Math.round(passStart.getTime() / 1000) * 1000);
+
+    const maxEnd = new Date(passStart.getTime() + maxPassSeconds * 1000);
+    let passEnd = maxEnd;
+    for (let tt = new Date(passStart.getTime() + 500); tt < maxEnd; tt = new Date(tt.getTime() + 500)) {
+      const el = elevationAt(tt);
+      if (el === null) { continue; }
+      if (el <= minElevation) {
+        passEnd = tt;
+        break;
+      }
+    }
+    // Look4Sat: los = 1000 * ((time + 500) / 1000)，四舍五入到整秒
+    passEnd = new Date(Math.round(passEnd.getTime() / 1000) * 1000);
+
+    // 逐秒表条数受 1020 上限约束；被截断的过境标记 truncated，由 UI 提示不可写入
+    const rawDurS = Math.round((passEnd.getTime() - passStart.getTime()) / 1000);
+    result.push({
+      start: passStart,
+      end: passEnd,
+      durationS: Math.min(MAX_TABLE_ENTRIES - 1, rawDurS),
+      truncated: rawDurS > MAX_TABLE_ENTRIES - 1,
+      maxElevationDeg: seg.maxEl,
+      maxAzimuthDeg: azimuthAt(seg.maxElAt),
+      aosAzimuthDeg: azimuthAt(passStart),
+      losAzimuthDeg: azimuthAt(passEnd),
+      buildEntries: (uplinkMHz, downlinkMHz) => {
+        const { entries, durationS } = buildPassEntries(
+          satrec, obsGd, obsEcf, uplinkMHz, downlinkMHz, passStart, passEnd);
+        return { satrec, start: passStart, end: passEnd, durationS, entries };
+      },
     });
   }
+  return result;
+}
 
-  return {
-    satrec,
-    start: passStart,
-    end: passEnd,
-    durationS: durS,
-    entries,
-  };
+/**
+ * （兼容保留）从 t0 起查找最近一次可见过境并直接生成频率表。
+ * 返回 { satrec, start, end, durationS, entries } 或 null。
+ */
+function findPass(opts) {
+  const passes = findPasses(opts);
+  if (!passes.length) return null;
+  return passes[0].buildEntries(opts.uplinkMHz, opts.downlinkMHz);
 }
 
 /** Date -> 固件 6 字节时间 [年2000, 月, 日, 时, 分, 秒]（固定北京时间 UTC+8）。
@@ -417,7 +484,7 @@ function buildFreqMap(transmitters) {
 })(typeof self !== "undefined" ? self : this, function () {
   return {
     radialVelocity, uplinkFreq, downlinkFreq, observerEci, lookAngles,
-    findPass, dateToFwTime, unixToFw, noradId, tleEpoch, mergeTleList, mergeSatelliteSources,
+    findPass, findPasses, dateToFwTime, unixToFw, noradId, tleEpoch, mergeTleList, mergeSatelliteSources,
     pickBestTransceiver, buildFreqMap, isAmateurBandHz,
   };
 });
