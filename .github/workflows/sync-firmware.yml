@@ -32,7 +32,30 @@ jobs:
           release_json="$(mktemp)"
           trap 'rm -f "$release_json" /tmp/firmware.bin' EXIT
 
-          curl --fail --silent --show-error --location --retry 3 "$API_URL" -o "$release_json"
+          # GitHub runner 到 Gitee / foruda CDN 的跨境 TLS 连接会偶发握手失败
+          # （curl exit 35，历史上本工作流失败全部由此导致）。curl 的 --retry
+          # 默认不重试 SSL connect 错误，因此在外层做带退避的整请求重试；
+          # exit 22（--fail 触发的 4xx）是确定性失败，不重试以免浪费时间
+          curl_retry() {
+            local url="$1" out="$2" rc=0 attempt
+            for attempt in 1 2 3 4 5; do
+              rc=0
+              curl --fail --silent --show-error --location \
+                --connect-timeout 15 --max-time 180 \
+                --retry 3 --retry-delay 5 \
+                "$url" -o "$out" || rc=$?
+              if (( rc == 0 )); then return 0; fi
+              if (( rc == 22 )); then
+                echo "请求失败，HTTP 状态码错误（不重试）：$url" >&2
+                return "$rc"
+              fi
+              echo "请求失败（curl exit $rc），第 ${attempt}/5 次尝试：$url" >&2
+              sleep $((attempt * 30))
+            done
+            return "$rc"
+          }
+
+          curl_retry "$API_URL" "$release_json"
           jq -e '(.tag_name | type == "string") and (.assets | type == "array")' "$release_json" >/dev/null
 
           tag="$(jq -r '.tag_name' "$release_json")"
@@ -55,7 +78,7 @@ jobs:
             exit 1
           fi
 
-          curl --fail --silent --show-error --location --retry 3 "$firmware_url" -o /tmp/firmware.bin
+          curl_retry "$firmware_url" /tmp/firmware.bin
           size="$(stat -c '%s' /tmp/firmware.bin)"
           if (( size == 0 || size > 118 * 1024 )); then
             echo "固件大小无效：${size} 字节（允许 1-118 KB）" >&2
